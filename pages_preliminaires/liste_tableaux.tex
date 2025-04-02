@@ -1,0 +1,25 @@
+% Ce fichier est optionnel, car \listoftables génère automatiquement la liste des tableaux
+% Utilisez ce fichier seulement si vous souhaitez personnaliser davantage la liste des tableaux
+
+\chapter*{Liste des Tableaux}
+\addcontentsline{toc}{chapter}{Liste des Tableaux}
+\thispagestyle{fancy}
+
+\begingroup
+\renewcommand{\numberline}[1]{\tablename~#1~:~}
+\listoftables
+\endgroup
+
+% Si vous souhaitez une liste personnalisée, vous pouvez la créer ainsi:
+%
+% \begin{tabular}{cp{12cm}}
+% \toprule
+% \textbf{Tableau} & \textbf{Description} \\
+% \midrule
+% 3.1 & Synthèse des données collectées sur le réseau béninois \\
+% 3.2 & Paramètres caractéristiques par classe de véhicule \\
+% 5.1 & Résultats de calibration des paramètres du modèle \\
+% 6.1 & Indices de sensibilité des paramètres du modèle \\
+% % ... et ainsi de suite
+% \bottomrule
+% \end{tabular}

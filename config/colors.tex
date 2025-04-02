@@ -1,0 +1,33 @@
+% Define custom colors for use throughout the document
+% Requires the xcolor package (loaded in packages.tex)
+
+% --- Basic Colors (Original) ---
+\definecolor{darkblue}{rgb}{0.0, 0.0, 0.55} % Overridden by benintraffic below
+\definecolor{darkred}{rgb}{0.55, 0.0, 0.0}
+\definecolor{darkgreen}{rgb}{0.0, 0.55, 0.0} % Overridden by benintraffic below
+\definecolor{darkgray}{gray}{0.3}
+\definecolor{lightgray}{gray}{0.85}
+
+% --- Colors from benintraffic.sty ---
+\definecolor{roadgray}{RGB}{80,80,80}
+\definecolor{darkblue}{RGB}{0,43,112}      % Overrides the one above
+\definecolor{midblue}{rgb}{0.3,0.5,0.8}
+\definecolor{lightblue}{RGB}{173,216,230}
+\definecolor{trafficred}{RGB}{200,30,15}
+\definecolor{trafficyellow}{RGB}{240,200,0}
+\definecolor{trafficgreen}{RGB}{0,128,0}    % Overrides darkgreen
+\definecolor{midgray}{RGB}{120,120,120}
+% \definecolor{pagebackground}{RGB}{252,252,250} % Page background color - skip for now
+
+% --- Colors for specific elements (Original examples, updated with new colors) ---
+\definecolor{linkcolor}{rgb}{0,0,0.6}        % Color for internal links (hyperref) - Using original dark blue-ish
+\definecolor{citecolor}{rgb}{0,0.5,0}        % Color for citations (hyperref) - Using original dark green-ish
+\definecolor{urlcolor}{rgb}{0.6,0,0.6}         % Color for URLs (hyperref) - Using original magenta-ish
+
+% --- Colors for Theorems (using benintraffic colors) ---
+\colorlet{theoremlincolor}{darkblue}        % Color for theorem box lines
+\colorlet{theoremheadfontcolor}{darkblue}   % Color for theorem head font
+\colorlet{theoremnotefontcolor}{darkblue}   % Color for theorem note font (e.g., (Lemma))
+\colorlet{theorembackground}{lightblue!5}   % Background for theorem body (5% lightblue)
+
+% Add more color definitions as needed

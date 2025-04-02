@@ -1,0 +1,66 @@
+% Configure page layout using the geometry package
+% Requires geometry package (loaded in packages.tex)
+
+\geometry{
+  a4paper,            % Paper size
+  top=2.5cm,          % Top margin
+  bottom=2.5cm,       % Bottom margin
+  left=3cm,           % Left margin (adjust for binding if needed, e.g., left=3.5cm, right=2.5cm)
+  right=2.5cm,        % Right margin
+  headheight=14.5pt,    % Height needed for the header (from benintraffic)
+  % footskip=1cm,       % Space from bottom of text body to bottom of footer
+  % includehead,        % Ensure header space is accounted for
+  % includefoot,      % Include footer in text area calculation (optional)
+}
+
+% --- Line Spacing ---
+% Requires setspace package (loaded in packages.tex)
+% \setstretch{1.15} % From benintraffic - Use this or onehalfspacing (set in typography.tex)
+\onehalfspacing % Common for theses - Keep this unless 1.15 is preferred (set in typography.tex)
+
+% --- Paragraph Indentation and Spacing ---
+% Default LaTeX style is to indent paragraphs and not add vertical space between them.
+% To change this (e.g., no indent, space between paragraphs):
+% \usepackage{parskip} % Add this to packages.tex
+% \setlength{\parindent}{0pt} % Set paragraph indent to zero
+% \setlength{\parskip}{1ex plus 0.5ex minus 0.2ex} % Add space between paragraphs
+
+% Keep default indentation for now unless requested otherwise.
+
+% --- Header and Footer Design ---
+% Requires fancyhdr package (loaded in packages.tex)
+\pagestyle{fancy}
+\fancyhf{} % Clear existing header/footer fields
+\renewcommand{\headrulewidth}{0.4pt} % Rule below header
+\renewcommand{\footrulewidth}{0.4pt} % Rule above footer
+
+% Define content for header/footer (using benintraffic style)
+% LE = Left Even, RO = Right Odd, RE = Right Even, LO = Left Odd
+% \leftmark contains Chapter info, \rightmark contains Section info
+\fancyhead[LE,RO]{\thepage} % Page number on outer side
+\fancyhead[RE]{\textit{\nouppercase{\leftmark}}}  % Chapter title on inner side (even pages)
+\fancyhead[LO]{\textit{\nouppercase{\rightmark}}} % Section title on inner side (odd pages)
+% \fancyfoot[C]{\small Modélisation du Trafic Routier au Bénin} % Footer text - Replace with your thesis context if desired
+\fancyfoot[C]{\small Simulation Numérique d'un Modèle Épidémique Diffusif} % Example footer
+
+% Adjust vertical position if needed (already set headheight in geometry)
+% \fancyheadoffset{0.5cm} % Offset from default position - Usually not needed if headheight is correct
+
+% --- Spacing around environments ---
+% Requires etoolbox package (loaded in packages.tex)
+% Add vertical space before/after theorem and definition environments
+\BeforeBeginEnvironment{theorem}{\vspace{1ex}}
+\AfterEndEnvironment{theorem}{\vspace{1ex}}
+\BeforeBeginEnvironment{proposition}{\vspace{1ex}} % Add for other theorem-like envs if needed
+\AfterEndEnvironment{proposition}{\vspace{1ex}}
+\BeforeBeginEnvironment{lemma}{\vspace{1ex}}
+\AfterEndEnvironment{lemma}{\vspace{1ex}}
+\BeforeBeginEnvironment{corollary}{\vspace{1ex}}
+\AfterEndEnvironment{corollary}{\vspace{1ex}}
+
+\BeforeBeginEnvironment{definition}{\vspace{1ex}}
+\AfterEndEnvironment{definition}{\vspace{1ex}}
+\BeforeBeginEnvironment{remark}{\vspace{1ex}} % Add for other definition-like envs if needed
+\AfterEndEnvironment{remark}{\vspace{1ex}}
+\BeforeBeginEnvironment{example}{\vspace{1ex}}
+\AfterEndEnvironment{example}{\vspace{1ex}}

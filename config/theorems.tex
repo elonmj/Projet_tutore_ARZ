@@ -1,0 +1,152 @@
+% Define theorem-like environments using ntheorem and mdframed
+% Requires ntheorem, mdframed, xcolor packages (loaded in packages.tex)
+% Requires color definitions (darkblue, lightblue, theorem*) from colors.tex
+
+% % --- Basic Theorem Styles ---
+% % Option 1: Standard amsthm styles
+% \theoremstyle{plain} % Style for theorems, lemmas, propositions, corollaries (italic text)
+% \newtheorem{theorem}{Theorem}[section] % Numbered within section
+% \newtheorem{lemma}[theorem]{Lemma}     % Use same counter as theorem
+% \newtheorem{proposition}[theorem]{Proposition}
+% \newtheorem{corollary}[theorem]{Corollary}
+
+% \theoremstyle{definition} % Style for definitions, conditions, problems, examples (upright text)
+% \newtheorem{definition}[theorem]{Definition}
+% \newtheorem{condition}[theorem]{Condition}
+% \newtheorem{example}[theorem]{Example}
+% \newtheorem{problem}[theorem]{Problem}
+% \newtheorem{assumption}[theorem]{Assumption} % Added Assumption environment
+
+% \theoremstyle{remark} % Style for remarks, notes, claims, summaries, cases (upright text, less prominent heading)
+% \newtheorem{remark}[theorem]{Remark}
+% \newtheorem{note}[theorem]{Note}
+% \newtheorem{claim}[theorem]{Claim}
+% \newtheorem{summary}[theorem]{Summary}
+% \newtheorem{case}[theorem]{Case}
+
+% % --- Customization Example (Optional - using mdframed or tcolorbox) ---
+% % For more visual customization (e.g., colored boxes), you might use packages
+% % like mdframed or tcolorbox. This requires adding the chosen package to packages.tex.
+% % Below is a *conceptual example* using pseudo-commands. You'd need to implement
+% % this properly with the actual package syntax if desired.
+
+% % \usepackage{mdframed} % Add this to packages.tex if using mdframed
+
+% % Example of a styled theorem box (requires package and proper setup)
+% % \newmdtheoremenv[
+% %   linecolor=darkblue,
+% %   linewidth=1pt,
+% %   topline=true, bottomline=true, leftline=true, rightline=true,
+% %   backgroundcolor=theorembodyshade,
+% %   frametitlebackgroundcolor=theoremtitleshade,
+% %   frametitlerule=true,
+% %   frametitlefont=\bfseries,
+% %   innertopmargin=\topskip,
+% % ]{stheorem}{Theorem}[section]
+
+% % \newmdtheoremenv[
+% %   style=stheorem, % Inherit style from stheorem
+% % ]{slemma}[stheorem]{Lemma} % Use same counter
+
+% --- Theorem Style Definition (using mdframed via ntheorem) ---
+\theoremstyle{nonumberplain} % Base style for frame setup
+\theoremheaderfont{\normalfont\bfseries\color{theoremheadfontcolor}}
+\theorembodyfont{\normalfont\itshape} % Italic body for theorems
+\theoremseparator{:}
+\theorempreskip{12pt} % Space above
+\theorempostskip{12pt} % Space below
+
+\newmdenv[
+    linewidth=1pt,
+    linecolor=theoremlincolor,
+    backgroundcolor=theorembackground,
+    roundcorner=5pt,
+    skipabove=\theorempreskip, % Use ntheorem spacing variables
+    skipbelow=\theorempostskip
+]{theorembox}
+
+\def\theoremframecommand{\theorembox} % Apply this frame to environments using theoremstyle plain
+\def\lemmaframecommand{\theorembox}
+\def\propositionframecommand{\theorembox}
+\def\corollaryframecommand{\theorembox}
+
+\theoremstyle{plain} % Apply the frame settings defined above
+\theoremsymbol{} % No symbol by default
+\theoremheaderfont{\normalfont\bfseries\color{theoremheadfontcolor}}
+\theorembodyfont{\normalfont\itshape}
+\theoremseparator{:}
+\theorempreskip{12pt}
+\theorempostskip{12pt}
+
+\newtheorem{theorem}{Théorème}[chapter] % Numbered within chapter for book class
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemme}
+\newtheorem{corollary}[theorem]{Corollaire}
+
+% --- Simpler Definition Style ---
+\theoremstyle{plain} % Still use plain, but customize fonts/spacing
+\theoremsymbol{}
+\theoremheaderfont{\normalfont\bfseries} % Simpler header font
+\theorembodyfont{\normalfont} % Upright body font
+\theoremseparator{:}
+\theorempreskip{6pt} % Less space above/below
+\theorempostskip{6pt}
+\def\definitionframecommand{} % No frame for definitions
+\def\remarkframecommand{}
+\def\exampleframecommand{}
+
+\newtheorem{definition}[theorem]{Définition} % Use same counter as theorem
+\newtheorem{remark}[theorem]{Remarque}
+\newtheorem{example}[theorem]{Exemple}
+\newtheorem{assumption}[theorem]{Hypothèse} % Added Assumption
+
+% --- Cleveref Configuration ---
+% Define how \cref should refer to these environments
+\crefname{theorem}{Theorem}{Theorems}
+\Crefname{theorem}{Theorem}{Theorems}
+\crefname{lemma}{Lemma}{Lemmas}
+\Crefname{lemma}{Lemma}{Lemmas}
+\crefname{proposition}{Proposition}{Propositions}
+\Crefname{proposition}{Proposition}{Propositions}
+\crefname{corollary}{Corollary}{Corollaries}
+\Crefname{corollary}{Corollary}{Corollaries}
+\crefname{definition}{Definition}{Definitions}
+\Crefname{definition}{Definition}{Definitions}
+\crefname{example}{Example}{Examples}
+\Crefname{example}{Example}{Examples}
+\crefname{remark}{Remark}{Remarks}
+\Crefname{remark}{Remark}{Remarks}
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+\crefname{section}{Section}{Sections} % Also configure for sections, figures, tables etc.
+\Crefname{section}{Section}{Sections}
+
+% Define how \cref should refer to these environments (French names)
+\crefname{theorem}{Théorème}{Théorèmes}
+\Crefname{theorem}{Théorème}{Théorèmes}
+\crefname{lemma}{Lemme}{Lemmes}
+\Crefname{lemma}{Lemme}{Lemmes}
+\crefname{proposition}{Proposition}{Propositions}
+\Crefname{proposition}{Proposition}{Propositions}
+\crefname{corollary}{Corollaire}{Corollaires}
+\Crefname{corollary}{Corollaire}{Corollaires}
+\crefname{definition}{Définition}{Définitions}
+\Crefname{definition}{Définition}{Définitions}
+\crefname{example}{Exemple}{Exemples}
+\Crefname{example}{Exemple}{Exemples}
+\crefname{remark}{Remarque}{Remarques}
+\Crefname{remark}{Remarque}{Remarques}
+\crefname{assumption}{Hypothèse}{Hypothèses}
+\Crefname{assumption}{Hypothèse}{Hypothèses}
+
+% Names for standard elements (ensure consistency with babel french)
+\crefname{chapter}{Chapitre}{Chapitres}
+\Crefname{chapter}{Chapitre}{Chapitres}
+\crefname{section}{Section}{Sections}
+\Crefname{section}{Section}{Sections}
+\crefname{figure}{Figure}{Figures}
+\Crefname{figure}{Figure}{Figures}
+\crefname{table}{Table}{Tables}
+\Crefname{table}{Table}{Tables}
+\crefname{equation}{Equation}{Equations} % Default is usually 'eq.'/'eqs.'
+\Crefname{equation}{Equation}{Equations} % Default is usually 'Eq.'/'Eqs.'

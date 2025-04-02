@@ -1,0 +1,46 @@
+% Main Preamble File
+% This file is included by main.tex and loads all other configuration files.
+
+% --- Load Packages ---
+\input{config/packages.tex}
+
+% --- Load Color Definitions ---
+\input{config/colors.tex}
+
+% --- Load Custom Commands ---
+\input{config/commands.tex}
+
+% --- Load Theorem Environments ---
+\input{config/theorems.tex}
+
+% --- Load Layout Configuration ---
+\input{config/layout.tex}
+
+% --- Load Typography Configuration ---
+\input{config/typography.tex}
+
+% --- Hyperref Setup ---
+% Configure hyperref options (can be done here or in packages.tex)
+% Example: PDF metadata
+\hypersetup{
+    pdftitle={Thesis Title Placeholder}, % Set your thesis title
+    pdfauthor={Yanel Aïna},             % Set your name
+    pdfsubject={Subject of Thesis},      % Set subject
+    pdfkeywords={keyword1, keyword2},    % Set keywords
+    bookmarksopen=true,
+    bookmarksnumbered=true,
+    linktoc=all                         % Make links in TOC clickable
+}
+
+% --- Biblatex Setup ---
+% Load the bibliography file (adjust path if needed)
+\addbibresource{bibliography.bib} % Path relative to main.tex (should be in the same directory)
+
+% --- Other Global Settings ---
+% Example: Number equations within sections
+\numberwithin{equation}{section}
+
+% Example: Set default language (if using babel)
+\selectlanguage{french} % Or english
+
+% Add any other global settings or configurations here.

@@ -1,0 +1,71 @@
+% Configure typography: fonts, heading styles, list styles, etc.
+
+% --- Line Spacing ---
+% Requires setspace package (loaded in packages.tex)
+% \setstretch{1.15} % From benintraffic example
+
+% --- Font Setup ---
+% Default: Uses LaTeX's default Computer Modern fonts (via lmodern package)
+% Keep this unless you want to switch to Times, Palatino, or use Xe/LuaLaTeX
+
+% Option: Use Times-like font (requires packages in packages.tex)
+\usepackage{mathptmx} % Times Roman font for text and math (may need adjustments for math symbols)
+\usepackage[scaled=.90]{helvet} % Helvetica for sans-serif
+\usepackage{courier} % Courier for monospace
+
+% Option: Use Palatino-like font (requires packages in packages.tex)
+% \usepackage{mathpazo} % Palatino for text and math
+% \linespread{1.05} % Palatino needs slightly more line spacing
+% \usepackage[scaled=.95]{helvet} % Helvetica for sans-serif
+% \usepackage{courier} % Courier for monospace
+
+% Option: Use XeLaTeX or LuaLaTeX with fontspec (requires package in packages.tex and compilation with Xe/LuaLaTeX)
+% \usepackage{fontspec}
+% \setmainfont{TeX Gyre Termes} % Example: Times clone
+% \setsansfont{TeX Gyre Heros} % Example: Helvetica clone
+% \setmonofont{TeX Gyre Cursor} % Example: Courier clone
+% Or specify system fonts:
+% \setmainfont{Times New Roman}
+% \setsansfont{Arial}
+% \setmonofont{Courier New}
+
+
+% --- Heading Styles (from benintraffic) ---
+% Requires titlesec package (loaded in packages.tex)
+% Requires xcolor package and color definitions (darkblue, midblue)
+
+% Chapter style (Example - Needs refinement for 'book' class)
+% \titleformat{\chapter}[display]
+%   {\normalfont\huge\bfseries\color{darkblue}\centering} % Format for the whole heading
+%   {\chaptertitlename\ \thechapter}      % Label (e.g., "Chapter 1")
+%   {20pt}                                % Separation between label and title
+%   {\Huge}                               % Format for the title text itself
+% \titlespacing*{\chapter}{0pt}{50pt}{40pt} % Spacing around the chapter title (left, before, after)
+
+% Section style
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{darkblue}} % Format
+  {\thesection}                % Label (e.g., "1.1")
+  {0.75em}                     % Separation between label and title
+  {}                           % Code before title (empty)
+\titlespacing*{\section}{0pt}{3.5ex plus 1ex minus .2ex}{2.3ex plus .2ex} % Spacing
+
+% Subsection style
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{midblue}} % Format
+  {\thesubsection}             % Label (e.g., "1.1.1")
+  {0.75em}                     % Separation between label and title
+  {}                           % Code before title (empty)
+\titlespacing*{\subsection}{0pt}{3ex plus 0.8ex minus .2ex}{1.5ex plus .2ex} % Spacing (Adjusted slightly)
+
+% --- List Styles ---
+% Requires enumitem package (loaded in packages.tex)
+% Requires xcolor package and color definition (darkblue)
+\setlist[itemize]{leftmargin=1.5cm, label=\textcolor{darkblue}{$\blacktriangleright$}}
+\setlist[enumerate]{leftmargin=1.5cm, label=\textcolor{darkblue}{\arabic*.}, font=\color{darkblue}\bfseries}
+
+
+% --- Microtype Adjustments ---
+% Requires microtype package (loaded in packages.tex)
+% Usually works well with defaults. Enable specific features if needed.
+% \microtypecontext{spacing=nonfrench} % Adjust spacing rules if needed

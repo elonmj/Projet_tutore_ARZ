@@ -1,0 +1,67 @@
+% --- Core Packages ---
+\usepackage[utf8]{inputenc}         % Input encoding (UTF-8 recommended)
+\usepackage[T1]{fontenc}            % Font encoding (for better hyphenation and accented characters)
+\usepackage{lmodern}              % Latin Modern font (good default, scalable version of CM)
+% \usepackage{fontspec}             % Use if compiling with XeLaTeX or LuaLaTeX for wider font choices
+
+% --- Language and Babel ---
+\usepackage[english,french,shorthands=off]{babel} % Support for French and English, disable French shorthands to avoid conflicts
+\usepackage{csquotes}               % Context-sensitive quotation marks (recommended with biblatex)
+
+% --- Mathematics ---
+\usepackage{amsmath}                % AMS math enhancements
+\usepackage{amssymb}                % AMS symbols
+% \usepackage{amsthm}                 % Theorem environments (Replaced by ntheorem)
+\usepackage{mathtools}              % Further math enhancements (e.g., \coloneqq)
+\usepackage{bm}                     % Bold math symbols (\bm{})
+
+% --- Layout and Appearance ---
+\usepackage{geometry}               % Page layout (configured in layout.tex)
+\usepackage{graphicx}               % Include graphics (\includegraphics)
+\usepackage{xcolor}                 % Define and use colors (configured in colors.tex)
+\usepackage{setspace}               % Control line spacing (e.g., \onehalfspacing)
+\usepackage{titlesec}               % Customize chapter/section titles (configured in typography.tex)
+\usepackage{microtype}              % Improves typography (subtle adjustments to spacing, protrusion) - Highly recommended
+\usepackage{booktabs}               % Nicer tables (\toprule, \midrule, \bottomrule)
+\usepackage{caption}                % Customize captions for figures and tables
+\usepackage{subcaption}             % Support for subfigures and subtables
+\usepackage{fancyhdr}               % Custom headers and footers (configured in layout.tex)
+\usepackage{enumitem}               % Customize lists (configured in typography.tex)
+\usepackage[framemethod=TikZ]{mdframed} % Framed boxes, needed for ntheorem style
+\usepackage[amsmath,thmmarks,hyperref]{ntheorem} % Theorem environments (configured in theorems.tex) - amsmath needed for compatibility
+\usepackage{etoolbox}               % Programming tools (used for spacing around environments)
+
+% --- References and Links ---
+\usepackage[
+    backend=biber,              % Use biber backend (more powerful than bibtex)
+    style=alphabetic,              % Citation style (e.g., numeric, authoryear, alphabetic) - Choose based on requirements
+    sorting=ynt,                % Sorting order (year,name, title)
+    citestyle=alphabetic,     % Compact numeric citations (e.g., [1-3])
+    maxbibnames=99,             % Show all authors in bibliography
+    maxcitenames=2,             % Show max 2 authors in citation before using 'et al.'
+    giveninits=true,            % Use initials for given names
+    uniquename=init            % Disambiguate authors with same last name using initials
+]{biblatex}                 % Modern bibliography management
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=green, urlcolor=magenta]{hyperref} % Clickable links and references
+\usepackage[capitalise,noabbrev]{cleveref} % Smarter cross-referencing (\cref{}, \Cref{}) - Must be loaded AFTER hyperref and ntheorem
+
+% --- Plotting ---
+\usepackage{pgfplots}              % Plotting package
+\pgfplotsset{compat=newest}       % Use newest features
+\pgfplotsset{ % Apply style from benintraffic.sty
+    compat=newest,
+    every axis/.append style={
+        line width=0.5pt,
+        tick style={color=midgray, line width=0.5pt} % midgray needs to be defined in colors.tex
+    }
+}
+\usetikzlibrary{arrows.meta}      % For newer arrow tip styles if needed
+
+% --- Utilities ---
+\usepackage{lipsum}                 % Generate dummy text (for testing layout)
+\usepackage{todonotes}              % Add TODO notes in the margin
+\usepackage{import}                 % Allows importing files from other directories (\subimport, \import)
+
+% --- Graphics Path ---
+% Define where LaTeX should look for graphics files
+\graphicspath{{../assets/figures/}} % Relative path from main.tex to figures folder

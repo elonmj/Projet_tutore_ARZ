@@ -1,0 +1,74 @@
+% Define custom commands and macros for frequently used symbols or expressions
+% Requires relevant math packages (amsmath, amssymb, bm - loaded in packages.tex)
+% Requires xcolor package for \highlight (loaded in packages.tex, colors defined in colors.tex)
+
+% --- Mathematical Symbols ---
+\newcommand{\R}{\mathbb{R}} % Real numbers
+\newcommand{\N}{\mathbb{N}} % Natural numbers
+\newcommand{\Z}{\mathbb{Z}} % Integers
+\newcommand{\C}{\mathbb{C}} % Complex numbers
+
+\newcommand{\abs}[1]{\left\lvert#1\right\rvert}      % Absolute value: |x|
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}    % Norm: ||x||
+\newcommand{\inner}[2]{\left\langle#1, #2\right\rangle} % Inner product: <x, y>
+
+% --- Calculus and Differential Equations ---
+\newcommand{\dd}{\mathop{}\!\mathrm{d}}              % Differential d (for integrals, etc.) e.g., \int f(x) \dd x
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}} % Partial derivative: d/dx
+\newcommand{\pdd}[2]{\frac{\partial^2 #1}{\partial #2^2}} % Second partial derivative: d^2/dx^2
+\newcommand{\pdm}[3]{\frac{\partial^2 #1}{\partial #2 \partial #3}} % Mixed partial derivative
+\newcommand{\od}[2]{\frac{\dd #1}{\dd #2}}          % Ordinary derivative: d/dx
+\newcommand{\odd}[2]{\frac{\dd^2 #1}{\dd #2^2}}     % Second ordinary derivative: d^2/dx^2
+
+\newcommand{\grad}{\nabla}                         % Gradient symbol
+\newcommand{\laplace}{\Delta}                      % Laplacian symbol
+
+% --- Model Specific Notation (Examples - Adapt as needed based on your paper) ---
+\newcommand{\popS}{S}                               % Susceptible population density
+\newcommand{\popI}[1]{I_{#1}}                       % Infected population density for strain #1
+\newcommand{\popN}{N}                               % Total population size (constant)
+\newcommand{\domain}{\Omega}                         % Spatial domain
+\newcommand{\boundary}{\partial\Omega}               % Boundary of the domain
+\newcommand{\normal}{\vec{n}}                        % Outward unit normal vector
+
+\newcommand{\diffS}{d_S}                             % Diffusion coefficient for S
+\newcommand{\diffI}[1]{d_{#1}}                      % Diffusion coefficient for I_#1
+\newcommand{\betaI}[1]{\beta_{#1}}                   % Transmission rate for strain #1
+\newcommand{\gammaI}[1]{\gamma_{#1}}                 % Recovery rate for strain #1
+
+\newcommand{\Rzero}{\mathcal{R}_0}                   % Basic reproduction number (multi-strain)
+\newcommand{\Rzeroi}[1]{\mathcal{R}_{0,#1}}          % Basic reproduction number for strain #1
+\newcommand{\Rloc}{\mathfrak{R}}                     % Local reproduction function (multi-strain)
+\newcommand{\Rloci}[1]{\mathfrak{R}_{#1}}            % Local reproduction function for strain #1
+\newcommand{\Rinv}[1]{\tilde{\mathcal{R}}_{#1}}      % Invasion reproduction number for strain #1
+
+\newcommand{\SigmaSet}[1]{\Sigma_{#1}}               % Sigma sets (Sigma_0, Sigma_1, Sigma_2)
+
+% --- Operators ---
+\DeclareMathOperator*{\argmax}{arg\,max}             % Arg max
+\DeclareMathOperator*{\argmin}{arg\,min}             % Arg min
+\DeclareMathOperator{\supp}{supp}                   % Support of a function
+\DeclareMathOperator{\esssup}{ess\,sup}             % Essential supremum
+\DeclareMathOperator{\trace}{Tr}                    % Trace of a matrix/operator
+\DeclareMathOperator{\diag}{diag}                   % Diagonal matrix
+
+% --- Text Macros ---
+\newcommand{\eg}{e.g.,}                             % Example abbreviation
+\newcommand{\ie}{i.e.,}                             % Id est abbreviation
+\newcommand{\etal}{\textit{et al.}}                 % Et al. abbreviation
+
+% --- Commands from benintraffic.sty ---
+% Highlight equation box (requires color 'lightblue' defined in colors.tex)
+\newcommand{\highlight}[1]{%
+\colorbox{lightblue!15}{$\displaystyle#1$}}
+
+% Optional: Commands for numerical scheme indices (if useful for your discretization chapter)
+% \newcommand{\rhonij}[3]{\rho_{#1,#2}^{#3}} % Density with space-time indices
+% \newcommand{\rhoni}[2]{\rho_{#1}^{#2}}     % Density with time index
+% \newcommand{\rhoij}[2]{\rho_{#1,#2}}       % Density with space index
+% \newcommand{\vnij}[3]{v_{#1,#2}^{#3}}      % Velocity with space-time indices
+% \newcommand{\vni}[2]{v_{#1}^{#2}}          % Velocity with time index
+% \newcommand{\vij}[2]{v_{#1,#2}}            % Velocity with space index
+% \newcommand{\fnij}[3]{F_{#1,#2}^{#3}}      % Flux with space-time indices
+
+% Add more custom commands as you identify recurring patterns in your writing
