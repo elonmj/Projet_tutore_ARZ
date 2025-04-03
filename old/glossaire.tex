@@ -1,0 +1,86 @@
+% Glossaire des termes utilisés dans le mémoire
+% Chargé par le fichier principal via \input{glossaire}
+
+\newglossaryentry{lwr}{
+    name={Modèle LWR},
+    description={Modèle macroscopique de trafic routier élaboré indépendamment par Lighthill et Whitham (1955) puis Richards (1956). Il s'appuie sur une analogie avec la dynamique des fluides pour décrire le trafic comme un flux continu},
+    first={modèle de Lighthill-Whitham-Richards (LWR)}
+}
+
+\newglossaryentry{densite}{
+    name={Densité de trafic},
+    description={Nombre de véhicules par unité de longueur de route, généralement exprimé en véhicules par kilomètre (véh/km)},
+    symbol={$\rho$}
+}
+
+\newglossaryentry{flux}{
+    name={Flux de trafic},
+    description={Nombre de véhicules passant par un point fixe de la route par unité de temps, généralement exprimé en véhicules par heure (véh/h)},
+    symbol={$q$}
+}
+
+\newglossaryentry{vitesse}{
+    name={Vitesse moyenne},
+    description={Vitesse moyenne des véhicules à une position et un instant donnés, exprimée en kilomètres par heure (km/h)},
+    symbol={$v$}
+}
+
+\newglossaryentry{diagramme-fondamental}{
+    name={Diagramme fondamental},
+    description={Relation entre les variables macroscopiques du trafic (densité, flux, vitesse) dans des conditions d'équilibre}
+}
+
+\newglossaryentry{onde-choc}{
+    name={Onde de choc},
+    description={Discontinuité dans la densité et la vitesse du trafic qui se propage le long de la route. Elle représente la frontière entre différentes conditions de trafic}
+}
+
+\newglossaryentry{rarefaction}{
+    name={Onde de raréfaction},
+    description={Transition continue entre deux états de trafic, caractérisée par une expansion et une accélération du trafic}
+}
+
+\newglossaryentry{gap-filling}{
+    name={Gap-filling},
+    description={Comportement caractéristique des motos qui utilisent les espaces (gaps) entre les véhicules plus grands, augmentant ainsi la densité effective du trafic sans nécessairement réduire les vitesses},
+    first={gap-filling (remplissage des espaces)}
+}
+
+\newglossaryentry{interweaving}{
+    name={Interweaving},
+    description={Comportement des motos consistant à se faufiler entre les files de véhicules, créant des perturbations qui affectent la vitesse des autres classes},
+    first={interweaving (circulation en zigzag)}
+}
+
+\newglossaryentry{zemidjan}{
+    name={Zémidjan},
+    description={Terme local désignant les taxis-motos au Bénin, littéralement "emmène-moi vite" en langue fon. Ils constituent le mode de transport principal dans les villes béninoises},
+    plural={Zémidjans}
+}
+
+\newglossaryentry{hyperbolique}{
+    name={Équation hyperbolique},
+    description={Classe d'équations aux dérivées partielles caractérisées par la propagation d'ondes à vitesse finie. L'équation du modèle LWR appartient à cette catégorie}
+}
+
+\newglossaryentry{multiclasse}{
+    name={Modèle multiclasse},
+    description={Extension des modèles de trafic qui distingue différentes catégories de véhicules, chacune avec ses propres caractéristiques (taille, vitesse, comportement)}
+}
+
+\newglossaryentry{cfl}{
+    name={Condition CFL},
+    description={Condition de stabilité numérique proposée par Courant, Friedrichs et Lewy, qui stipule que le pas de temps doit être inférieur au temps nécessaire pour qu'une information traverse une cellule du maillage},
+    first={condition de Courant-Friedrichs-Lewy (CFL)}
+}
+
+\newglossaryentry{godunov}{
+    name={Schéma de Godunov},
+    description={Méthode numérique conservative du premier ordre pour la résolution des lois de conservation hyperboliques, particulièrement adaptée pour capturer les discontinuités comme les ondes de choc}
+}
+
+% Ajouter des acronymes
+\newacronym{lwr}{LWR}{Lighthill-Whitham-Richards}
+\newacronym{edp}{EDP}{Équation aux Dérivées Partielles}
+\newacronym{cfl}{CFL}{Courant-Friedrichs-Lewy}
+\newacronym{rmse}{RMSE}{Root Mean Square Error}
