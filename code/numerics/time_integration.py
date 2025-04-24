@@ -301,17 +301,12 @@ def strang_splitting_step(U_n: np.ndarray, dt: float, grid: Grid1D, params: Mode
         np.ndarray: State array at time n+1 (including ghost cells). Shape (4, N_total).
     """
     # Select the appropriate ODE solver based on the device parameter
-    # Note: A true GPU implementation of the ODE step using solve_ivp is not straightforward
-    # as solve_ivp is CPU-based and operates cell-by-cell.
-    # For now, the 'gpu' option will still use the CPU ODE solver, but future GPU
-    # acceleration could target the hyperbolic step or a custom GPU ODE solver.
-    if params.device == 'cpu':
+    if params.device == 'gpu':
+        # Use the new GPU explicit Euler solver
+        ode_solver_func = solve_ode_step_gpu
+    elif params.device == 'cpu':
+        # Use the original CPU solver based on solve_ivp
         ode_solver_func = solve_ode_step_cpu
-    elif params.device == 'gpu':
-        # For now, use CPU solver even if device is 'gpu'
-        # A proper GPU implementation would require a different approach (e.g., custom kernel)
-        ode_solver_func = solve_ode_step_cpu
-        # print("Warning: GPU device selected, but ODE step is currently CPU-only.") # Optional warning
     else:
         raise ValueError(f"Unsupported device: {params.device}. Choose 'cpu' or 'gpu'.")
 
