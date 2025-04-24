@@ -60,6 +60,11 @@ class SimulationRunner:
             # Re-validate after overrides if necessary
             # self.params._validate_parameters()
 
+        # --- Add the device setting to the parameters object ---
+        # This makes it accessible to functions like time_integration
+        self.params.device = self.device
+        # -------------------------------------------------------
+
         if not self.quiet:
             print(f"Parameters loaded for scenario: {self.params.scenario_name}")
 
