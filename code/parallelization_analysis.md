@@ -56,12 +56,22 @@ Based on the project structure and code implementation (including `SimulationRun
 | 3d       | Intra-Simulation (GPU Perf.)  | GPU (CuPy, etc.)               | Yes (Arrays)    | ⭐⭐⭐⭐ (Medium-High) | Requires GPU & significant code changes. Best for very large `N`.          |
 | 4        | Algorithmic / Scheme          | Higher-Order, Implicit, AMR    | N/A             | Variable           | Changes the computation needed. Complex implementation.                    |
 
-## Recommendation
+## Numba Optimization Results (April 2025)
 
-1.  **Profile:** Identify the actual bottlenecks within a single simulation step for a representative grid size.
-2.  **Parallelize Multiple Runs:** Implement `multiprocessing` for batch jobs (highest impact for parameter studies).
-3.  **Optimize Bottlenecks (Intra-Simulation):**
-    *   If bottlenecks are CPU-bound loops (e.g., flux calculation), try **Numba**.
-    *   If the ODE step (`solve_ivp` loop) is the bottleneck, try **`multiprocessing`**.
-    *   Consider **GPU/Cython** only if Numba/multiprocessing prove insufficient for very large `N`.
+*   **Profiling:** Initial profiling (using `cProfile`) on a short test case identified `physics.calculate_pressure`, `physics.calculate_source_term`, and `physics.calculate_equilibrium_speed` as major hotspots within the simulation step.
+*   **Optimization:** `@numba.njit` was applied to `calculate_pressure`, `calculate_source_term`, and `calculate_physical_velocity`. This required refactoring function signatures to pass individual parameters instead of the `ModelParameters` object.
+*   **Challenge:** `calculate_equilibrium_speed` was not easily Numba-fied due to its use of dictionary lookups (`params.Vmax_m[r]`) based on road quality index `r`, which is not well-supported in Numba's `nopython` mode.
+*   **Performance:** Testing with the `scenario_riemann_test.yml` (t=60s, N=100) showed a runtime reduction from ~40.05s (baseline) to ~34.28s (Numba-optimized), representing a **~14.4% speedup**.
+*   **Profiling Interaction:** Profiling the Numba-optimized code with `cProfile` showed significant overhead and misleading results (dominated by `ffi`/`win32` calls), suggesting interaction issues between the profiler, Numba, and potentially console I/O (`tqdm`). Runtime measurements without profiling are more reliable.
+
+## Updated Recommendation (Post-Numba)
+
+1.  **Parallelize Multiple Runs:** Implement `multiprocessing` for batch jobs (e.g., `run_convergence_test.py`). This remains the highest impact optimization for parameter studies.
+2.  **Parallelize ODE Step (Intra-Simulation) - Attempted & Reverted:**
+    *   **Experiment:** The loop in `solve_ode_step` calling `scipy.integrate.solve_ivp` for each cell was parallelized using `joblib` with both `prefer="processes"` and `prefer="threads"`.
+    *   **Result:** For the tested grid size (N=100), both parallelization backends resulted in significantly *slower* execution compared to the Numba-optimized serial version (~44s and ~58s vs ~34s).
+    *   **Conclusion:** The overhead of creating and managing parallel tasks (process/thread creation, data transfer) outweighs the computational work done by `solve_ivp` for a single cell at this grid size. This strategy is likely only beneficial for much larger `N`. The `joblib` changes were reverted.
+3.  **Further Numba/Optimization:**
+    *   Revisit `calculate_equilibrium_speed` optimization if further speedup is critical for large `N`. Workarounds for the dictionary lookup (e.g., passing Vmax arrays) could be explored.
+    *   Profile again *after* parallelizing the ODE step to identify remaining bottlenecks (potentially in the hyperbolic step/flux calculations). Numba (`prange`) could be applied to loops there if necessary.
 4.  **Consider Algorithmic Changes:** If fundamental performance limits are hit, evaluate **higher-order methods** or other scheme changes based on accuracy requirements vs. computational cost.

@@ -23,7 +23,8 @@ class SimulationRunner:
     def __init__(self, scenario_config_path: str,
                  base_config_path: str = 'config/config_base.yml',
                  override_params: dict = None,
-                 quiet: bool = False):
+                 quiet: bool = False,
+                 device: str = 'cpu'): # Add device parameter
         """
         Initializes the simulation runner.
 
@@ -35,8 +36,10 @@ class SimulationRunner:
             quiet (bool, optional): If True, suppress most print statements. Defaults to False.
         """
         self.quiet = quiet
+        self.device = device # Store the device parameter
         if not self.quiet:
             print(f"Initializing simulation from scenario: {scenario_config_path}")
+            print(f"Using device: {self.device}") # Indicate which device is being used
         # Load parameters
         self.params = ModelParameters()
         self.params.load_from_yaml(base_config_path, scenario_config_path) # Load base and scenario

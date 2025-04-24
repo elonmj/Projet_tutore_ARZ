@@ -1,4 +1,5 @@
 import numpy as np
+from numba import cuda # Import cuda
 from scipy.integrate import solve_ivp
 from ..grid.grid1d import Grid1D
 from ..core.parameters import ModelParameters
@@ -48,8 +49,16 @@ def _ode_rhs(t: float, y: np.ndarray, cell_index: int, grid: Grid1D, params: Mod
     Ve_m, Ve_c = physics.calculate_equilibrium_speed(rho_m_calc, rho_c_calc, R_local, params)
     tau_m, tau_c = physics.calculate_relaxation_time(rho_m_calc, rho_c_calc, params)
 
-    # Call the Numba-fied source term function with individual parameters
-    source = physics.calculate_source_term(
+    # Calculate the source term.
+    # Note: This function (_ode_rhs) is called by scipy.integrate.solve_ivp
+    # for each cell individually. This structure is inherently CPU-based
+    # and not suitable for direct GPU acceleration using Numba CUDA kernels,
+    # which operate on arrays.
+    # The 'device' parameter primarily influences the hyperbolic step and
+    # other array-based physics calculations if they were moved here.
+    # For now, the source term calculation within the ODE solver remains CPU-based.
+
+    source = physics.calculate_source_term( # This is the Numba-optimized CPU version
         y,
         # Pressure params
         params.alpha, params.rho_jam, params.K_m, params.gamma_m, params.K_c, params.gamma_c,
@@ -62,9 +71,10 @@ def _ode_rhs(t: float, y: np.ndarray, cell_index: int, grid: Grid1D, params: Mod
     )
     return source
 
-def solve_ode_step(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+
+def solve_ode_step_cpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
     """
-    Solves the ODE system dU/dt = S(U) for each cell over a time step dt_ode.
+    Solves the ODE system dU/dt = S(U) for each cell over a time step dt_ode using the CPU.
 
     Args:
         U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
@@ -109,9 +119,9 @@ def solve_ode_step(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelP
 
 # --- Helper for Hyperbolic Step ---
 
-def solve_hyperbolic_step(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+def solve_hyperbolic_step_cpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
     """
-    Solves the hyperbolic part dU/dt + dF/dx = 0 using FVM with CU flux.
+    Solves the hyperbolic part dU/dt + dF/dx = 0 using FVM with CU flux on the CPU.
     Uses first-order Euler forward in time.
 
     Args:
@@ -177,6 +187,104 @@ def solve_hyperbolic_step(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params:
     return U_out
 
 
+# --- CUDA Kernel for Hyperbolic State Update ---
+
+@cuda.jit
+def _update_state_hyperbolic_cuda_kernel(U_in, fluxes, dt_hyp, dx, epsilon,
+                                         num_ghost_cells, N_physical, U_out):
+    """
+    CUDA kernel to update the state vector for physical cells using flux differences.
+    U_out = U_in - (dt/dx) * (F_{j+1/2} - F_{j-1/2})
+    Also applies density floor.
+    """
+    # Global thread index, maps to physical cell index
+    phys_idx = cuda.grid(1)
+
+    if phys_idx < N_physical:
+        # Calculate the corresponding index in the full U array (including ghost cells)
+        j = num_ghost_cells + phys_idx
+
+        # Flux indices F_{j+1/2} correspond to fluxes[:, j]
+        # Flux indices F_{j-1/2} correspond to fluxes[:, j-1]
+        flux_right_0 = fluxes[0, j]
+        flux_right_1 = fluxes[1, j]
+        flux_right_2 = fluxes[2, j]
+        flux_right_3 = fluxes[3, j]
+
+        flux_left_0 = fluxes[0, j - 1]
+        flux_left_1 = fluxes[1, j - 1]
+        flux_left_2 = fluxes[2, j - 1]
+        flux_left_3 = fluxes[3, j - 1]
+
+        # Update state variables
+        dt_dx = dt_hyp / dx
+        U_out_0 = U_in[0, j] - dt_dx * (flux_right_0 - flux_left_0)
+        U_out_1 = U_in[1, j] - dt_dx * (flux_right_1 - flux_left_1)
+        U_out_2 = U_in[2, j] - dt_dx * (flux_right_2 - flux_left_2)
+        U_out_3 = U_in[3, j] - dt_dx * (flux_right_3 - flux_left_3)
+
+        # Apply density floor (ensure non-negative densities)
+        U_out[0, j] = max(U_out_0, epsilon) # rho_m
+        U_out[1, j] = U_out_1             # w_m
+        U_out[2, j] = max(U_out_2, epsilon) # rho_c
+        U_out[3, j] = U_out_3             # w_c
+
+
+# --- GPU Hyperbolic Step Implementation ---
+
+def solve_hyperbolic_step_gpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+    """
+    Solves the hyperbolic part dU/dt + dF/dx = 0 using FVM with CU flux on the GPU.
+    Uses first-order Euler forward in time.
+
+    Args:
+        U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
+        dt_hyp (float): Time step for the hyperbolic update.
+        grid (Grid1D): Grid object.
+        params (ModelParameters): Model parameters.
+
+    Returns:
+        np.ndarray: Output state array after the hyperbolic step. Shape (4, N_total) on CPU.
+    """
+    # Ensure input is contiguous and on CPU
+    U_in_cpu = np.ascontiguousarray(U_in)
+    N_total = U_in_cpu.shape[1]
+
+    # Allocate device memory for input and output states
+    d_U_in = cuda.to_device(U_in_cpu)
+    d_U_out = cuda.device_array_like(d_U_in) # Allocate output on GPU
+
+    # Calculate fluxes on the GPU
+    # riemann_solvers.central_upwind_flux_gpu now returns fluxes directly on the GPU device
+    d_fluxes = riemann_solvers.central_upwind_flux_gpu(U_in_cpu, params)
+
+    # Configure the kernel launch for state update (over physical cells)
+    threadsperblock_update = 256
+    blockspergrid_update = (grid.N_physical + (threadsperblock_update - 1)) // threadsperblock_update
+
+    # Launch the state update kernel
+    _update_state_hyperbolic_cuda_kernel[blockspergrid_update, threadsperblock_update](
+        d_U_in, d_fluxes, dt_hyp, grid.dx, params.epsilon,
+        grid.num_ghost_cells, grid.N_physical, d_U_out
+    )
+
+    # Copy the full result (including potentially uninitialized ghost cells) back to CPU
+    U_out_cpu = d_U_out.copy_to_host()
+
+    # Copy ghost cell values from the original input U_in_cpu
+    # Left ghost cells
+    U_out_cpu[:, :grid.num_ghost_cells] = U_in_cpu[:, :grid.num_ghost_cells]
+    # Right ghost cells
+    U_out_cpu[:, grid.num_ghost_cells + grid.N_physical:] = U_in_cpu[:, grid.num_ghost_cells + grid.N_physical:]
+
+    # Optional: Check for NaNs or Infs after GPU computation
+    if np.isnan(U_out_cpu).any() or np.isinf(U_out_cpu).any():
+        print("Warning: NaN or Inf detected in GPU hyperbolic step output.")
+        # Consider adding more detailed debugging info here if needed
+
+    return U_out_cpu
+
+
 # --- Strang Splitting Step ---
 
 def strang_splitting_step(U_n: np.ndarray, dt: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
@@ -192,14 +300,39 @@ def strang_splitting_step(U_n: np.ndarray, dt: float, grid: Grid1D, params: Mode
     Returns:
         np.ndarray: State array at time n+1 (including ghost cells). Shape (4, N_total).
     """
+    # Select the appropriate ODE solver based on the device parameter
+    # Note: A true GPU implementation of the ODE step using solve_ivp is not straightforward
+    # as solve_ivp is CPU-based and operates cell-by-cell.
+    # For now, the 'gpu' option will still use the CPU ODE solver, but future GPU
+    # acceleration could target the hyperbolic step or a custom GPU ODE solver.
+    if params.device == 'cpu':
+        ode_solver_func = solve_ode_step_cpu
+    elif params.device == 'gpu':
+        # For now, use CPU solver even if device is 'gpu'
+        # A proper GPU implementation would require a different approach (e.g., custom kernel)
+        ode_solver_func = solve_ode_step_cpu
+        # print("Warning: GPU device selected, but ODE step is currently CPU-only.") # Optional warning
+    else:
+        raise ValueError(f"Unsupported device: {params.device}. Choose 'cpu' or 'gpu'.")
+
+
     # Step 1: Solve ODEs for dt/2
-    U_star = solve_ode_step(U_n, dt / 2.0, grid, params)
+    U_star = ode_solver_func(U_n, dt / 2.0, grid, params)
+
+    # Select the appropriate hyperbolic solver based on the device parameter
+    if params.device == 'cpu':
+        hyperbolic_solver_func = solve_hyperbolic_step_cpu
+    elif params.device == 'gpu':
+        hyperbolic_solver_func = solve_hyperbolic_step_gpu
+    else:
+        raise ValueError(f"Unsupported device: {params.device}. Choose 'cpu' or 'gpu'.")
+
 
     # Step 2: Solve Hyperbolic part for full dt
-    U_ss = solve_hyperbolic_step(U_star, dt, grid, params)
+    U_ss = hyperbolic_solver_func(U_star, dt, grid, params)
 
     # Step 3: Solve ODEs for dt/2
-    U_np1 = solve_ode_step(U_ss, dt / 2.0, grid, params)
+    U_np1 = ode_solver_func(U_ss, dt / 2.0, grid, params)
 
     return U_np1
 

@@ -71,6 +71,12 @@ def main():
         action='store_true',
         help="Suppress most output messages during the simulation."
     )
+    parser.add_argument(
+        '--device',
+        choices=['cpu', 'gpu'],
+        default='cpu',
+        help="Specify the device to use for computation: 'cpu' or 'gpu' (default: 'cpu')."
+    )
 
     args = parser.parse_args()
 
@@ -100,7 +106,8 @@ def main():
             runner_est = SimulationRunner(
                 scenario_config_path=scenario_config_path,
                 base_config_path=base_config_path,
-                quiet=args.quiet # Pass quiet flag
+                quiet=args.quiet, # Pass quiet flag
+                device=args.device # Pass the device argument
             )
 
             # --- Run Simulation for Estimation Steps ---
@@ -174,7 +181,8 @@ def main():
             runner = SimulationRunner(
                 scenario_config_path=scenario_config_path,
                 base_config_path=base_config_path,
-                quiet=args.quiet # Pass quiet flag
+                quiet=args.quiet, # Pass quiet flag
+                device=args.device # Pass the device argument
             )
 
             # --- Run Simulation ---
