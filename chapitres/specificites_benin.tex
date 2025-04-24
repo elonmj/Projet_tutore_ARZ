@@ -1,0 +1,170 @@
+% --- Revised Chapter 3 ---
+\chapter{Caractéristiques du Trafic Routier au Bénin}
+\label{chap:specificites_benin}
+
+Ce chapitre présente les caractéristiques uniques du trafic routier au Bénin, en mettant l'accent sur le contexte socio-économique, l'état des infrastructures, la composition du parc automobile dominé par les motos, leurs comportements spécifiques, et les défis qui en découlent pour la modélisation mathématique.
+
+\section{Contexte Socio-Économique et Défis du Transport} % Plan 3.1
+\label{sec:contexte_socio_economique}
+
+Le Bénin, comme de nombreux pays d'Afrique de l'Ouest, connaît une urbanisation rapide et une croissance démographique soutenue. Selon les données agrégées de la Banque Mondiale, basées sur les statistiques de l'Institut National de la Statistique et de l'Analyse Économique (INSAE), la population urbaine du Bénin représentait **47.86\%** de la population totale en 2019 \cite{WorldBank_UrbanPop_Benin_2019}, avec une concentration particulière dans les villes du littoral comme Cotonou, Porto-Novo, Abomey-Calavi, ainsi que Parakou dans le nord.
+
+Cette urbanisation s'accompagne d'une demande croissante en mobilité, dans un contexte où les infrastructures peinent à suivre le rythme de développement. Le Bénin doit faire face à plusieurs défis majeurs dans le secteur des transports:
+\begin{itemize}
+    \item Un \textbf{réseau routier souvent insuffisant et inégalement entretenu}, particulièrement en milieu rural et dans le nord, entraînant des coûts et des temps de transport élevés hors des grands centres et exacerbant les disparités régionales. L'entretien insuffisant est une faiblesse reconnue, nécessitant des investissements importants \cite{WorldBank_UrbanMobilityCrisis_2022}.
+    \item Une \textbf{motorisation croissante et rapide}, particulièrement celle des deux-roues motorisés (motos), qui constituent une part très importante du parc et dont la régulation et l'intégration sécurisée sont complexes \cite{Assouma_ZemidjanCotonou_2023}. Le parc de véhicules est également marqué par une certaine vétusté, notamment pour les voitures d'occasion importées, dont l'âge moyen était estimé entre 13 et 18 ans en 2017 \cite{WorldBank_UrbanMobilityCrisis_2022}.
+    \item Un \textbf{système de transport public formel limité}, surtout en dehors de quelques lignes interurbaines, largement suppléé par des services informels (comme les Zémidjans) efficaces pour la couverture mais peu structurés et posant des défis de sécurité et de régulation \cite{Houndagnon_ZemidjanPortoNovo_2004}.
+    \item Un \textbf{besoin d'investissements massifs} pour la construction, la réhabilitation et l'entretien des infrastructures afin de soutenir la croissance économique et d'améliorer l'accessibilité, objectif central du PAG \cite{Benin_PAG_2021_2026}.
+\end{itemize}
+Ces défis ont conduit à l'émergence d'un système de transport dominé par des solutions adaptatives, parmi lesquelles les motos-taxis (communément appelées \textbf{Zémidjans}) occupent une place prépondérante. Elles constituent un service de transport public informel mais essentiel, assurant une part très significative de la mobilité urbaine, estimée par exemple à **75\% du transport interne à Cotonou** vers 2017-2018 \cite{Djossou_ZemidjanCotonou}.
+
+\section{Le Réseau Routier Béninois} % Plan 3.2
+\label{sec:reseau_routier_beninois}
+
+Le réseau routier béninois présente une grande hétérogénéité qui impacte significativement la dynamique du trafic.
+
+\subsection{Hétérogénéité des Infrastructures Routières}
+\label{subsec:heterogeneite_infra}
+
+La longueur exacte et l'état actualisé du réseau routier total sont difficiles à établir précisément à partir des sources publiques consolidées. Des statistiques plus anciennes (vers 2008) indiquaient un réseau classé d'environ 6 591 km dont 1 838 km bitumés (environ 28\%) \cite{INSAE_Stats_Benin_Referenced}. Un rapport de la BAD de 2009 mentionnait des chiffres similaires pour le réseau classé relevant du ministère \cite{BAD_RouteBohiconDassa_PAD_2009}. Des efforts considérables ont été menés depuis 2016, avec plus de **2070 km de routes bitumées additionnelles** annoncées comme réalisées ou en cours début 2024 \cite{GouvBJ_ActuRoutes_Jan2024}. Malgré ces progrès, une large part du réseau, notamment la voirie urbaine secondaire et les routes rurales, reste non revêtue. Par exemple, à Cotonou, avant le lancement du programme d'asphaltage (lié au projet PAURAD), il était estimé que seulement **14\% de la voirie était revêtue** \cite{WorldBank_PAURAD_PAD_2018}.
+On distingue principalement quatre catégories de revêtement, chacune influençant différemment la circulation :
+\begin{itemize}
+    \item \textbf{Routes bitumées} : Principalement dans les grandes villes et sur les axes interurbains majeurs. Leur qualité varie de bonne (réhabilitations récentes) à fortement dégradée (nids-de-poule, fissures), affectant différemment voitures et motos \cite{IMF_Benin_ArtIV_2022}.
+    \item \textbf{Routes en terre ou latérite} : Très répandues, majoritaires dans de nombreuses zones périurbaines et rurales. Elles sont sensibles aux conditions climatiques (poussière en saison sèche, boue en saison des pluies), souvent difficilement praticables pour les voitures standards mais généralement accessibles aux motos.
+    \item \textbf{Routes pavées (pavés autobloquants)} : Utilisées dans certaines opérations d'aménagement urbain/périurbain (par exemple, via le projet asphaltage). Elles offrent une meilleure résistance et adhérence que la terre, mais peuvent induire des vibrations.
+    \item \textbf{Pistes et voies informelles} : Créées par l'usage, particulièrement dans les quartiers périphériques ou non lotis. Souvent étroites et irrégulières, elles sont fréquemment empruntées par les motos pour éviter la congestion ou accéder à des zones spécifiques, formant un réseau parallèle.
+\end{itemize}
+
+% \begin{figure}[htbp] % Keep figure structure, ensure image file exists
+%    \centering
+%    \includegraphics[width=0.9\textwidth]{images/reseau_benin/types_routes}
+%    \caption{Les différents types de routes au Bénin : (a) route bitumée à Cotonou; (b) route en terre en zone périurbaine; (c) route pavée; (d) piste accessible principalement aux motos.}
+%    \label{fig:types_routes}
+% \end{figure}
+
+\begin{remark}
+Cette diversité des revêtements affecte différemment chaque classe de véhicule. Notamment, les motos sont souvent moins affectées que les voitures par la dégradation modérée de la chaussée ou les surfaces non bitumées \cite{IMF_Benin_ArtIV_2022} (conceptuellement), ce qui renforce leur avantage comparatif en termes de temps de parcours et de zones accessibles. Cette caractéristique nécessitera une prise en compte spécifique dans la modélisation.
+\end{remark}
+
+\subsection{Organisation Spatiale du Réseau}
+\label{subsec:organisation_spatiale}
+
+La configuration du réseau présente plusieurs particularités structurelles :
+\begin{itemize}
+    \item \textbf{Structure souvent radiale} dans les grandes villes (ex: Cotonou), concentrant le trafic vers des points centraux et des axes principaux.
+    \item \textbf{Voies à largeur variable}, même sur un même axe, créant des goulots d'étranglement physiques.
+    \item \textbf{Rareté des voies rapides} ou autoroutes urbaines permettant une ségrégation efficace par vitesse et type de véhicule.
+    \item \textbf{Intégration forte avec l'habitat}, y compris l'habitat spontané, présentant des réseaux viaires irréguliers où coexistent intensément trafic motorisé, piétons et activités commerciales \cite{WorldBank_PAURAD_PAD_2018}.
+\end{itemize}
+
+\subsection{Gestion des Intersections et Régulation du Trafic}
+\label{subsec:gestion_intersections_regulation}
+
+La régulation et la gestion des intersections au Bénin présentent des spécificités qui complexifient leur modélisation :
+\begin{itemize}
+    \item \textbf{Proportion relativement faible d'intersections signalisées} par des feux tricolores dans l'ensemble du réseau. De plus, les feux existants connaissent fréquemment des **dysfonctionnements** liés à des problèmes de maintenance, de fourniture électrique ou de vandalisme, réduisant leur efficacité et leur crédibilité auprès des usagers \cite{LaNation_FeuxTricolores_2021, BeninWebTV_FeuxCotonou_2023}. Des initiatives pour améliorer la situation existent (installation de feux solaires "made in Benin" depuis 2022-2023, projet de Poste Central de Régulation lié au Grand Nokoué) \cite{GouvBJ_FeuxSolaires_2023, WorldBank_PAURAD_PAD_2018}.
+    \item \textbf{Ronds-points fréquents}, constituant un mode de gestion privilégié, mais souvent non géométriquement optimisés et opérant en surcharge aux heures de pointe, générant des blocages importants.
+    \item \textbf{Présence ponctuelle d'agents de circulation} aux carrefours majeurs, introduisant une régulation humaine adaptative mais dont l'efficacité dépend des conditions et de la formation.
+    \item \textbf{Règles de priorité souvent négociées} de manière informelle entre usagers, particulièrement aux intersections non régulées ou en cas de dysfonctionnement des feux. L'assertivité et la taille du véhicule peuvent influencer le passage \cite{OgundeleEtAl2017} (étude nigériane, contexte similaire).
+    \item \textbf{Respect variable du code de la route} formel par l'ensemble des usagers (y compris non-respect des feux rouges, sens interdits, etc.), contribuant à l'insécurité routière et à l'imprédictibilité du trafic \cite{WorldBank_BeninRoadSafetyAssess_2022, LaNation_FeuxTricolores_2021}.
+\end{itemize}
+Ces caractéristiques créent un environnement routier où la négociation, l'anticipation et l'adaptabilité individuelle ou collective priment souvent sur les règles établies, rendant la modélisation basée uniquement sur des règles formelles peu réaliste.
+
+% \begin{figure}[htbp] % Keep figure structure, ensure image file exists
+%    \centering
+%    \includegraphics[width=0.8\textwidth]{images/reseau_benin/intersections}
+%    \caption{Gestion des intersections au Bénin : (a) carrefour sans feux avec agent de circulation; (b) rond-point congestionné; (c) intersection non régulée avec prédominance de motos.}
+%    \label{fig:intersections}
+% \end{figure}
+
+\section{Composition Hétérogène du Parc Automobile} % Plan 3.3
+\label{sec:composition_parc}
+
+Le parc automobile béninois présente une structure très différente de celle des pays occidentaux, caractérisée par une grande diversité et une **prédominance marquée des deux-roues motorisés**. Bien que des statistiques précises et exhaustives au niveau national soient difficiles d'accès, les études ciblées, les observations et les données partielles concordent sur la composition générale suivante, particulièrement visible dans les flux urbains \cite{WorldBank_PAURAD_PAD_2018}:
+\begin{itemize}
+    \item \textbf{Motos et tricycles} : Représentant la **très grande majorité des véhicules en circulation** (souvent estimée bien au-delà de 70-80\% des flux dans les grandes villes comme Cotonou). Elles constituent l'épine dorsale du transport urbain et périurbain, incluant les motos privées et les très nombreux Zémidjans (estimés à environ 120 000 à Cotonou en 2017/2018 ) \cite{Kalieu2016, Houndagnon_ZemidjanPortoNovo_2004}.
+    \item \textbf{Voitures particulières} : Une part minoritaire mais croissante du parc, souvent importées d'occasion et présentant un âge moyen relativement élevé (estimé entre 13 et 18 ans en 2017 \cite{WorldBank_BeninRoadSafetyAssess_2022}).
+    \item \textbf{Taxis-voitures} : Une composante visible du transport rémunéré de personnes, souvent des véhicules plus anciens.
+    \item \textbf{Minibus et bus} : Assurant une partie du transport en commun, souvent sur des lignes fixes interurbaines ou quelques lignes urbaines, mais avec une couverture et une fréquence limitées par rapport à la demande.
+    \item \textbf{Camions et poids lourds} : Essentiels pour le transport de marchandises, plus présents sur les axes interurbains, les corridors économiques et dans les zones d'activité (port, marchés).
+\end{itemize}
+Cette hétérogénéité extrême, avec une classe (les motos) numériquement dominante et aux caractéristiques physiques très distinctes, est un élément fondamental pour la modélisation.
+
+% --- REMOVED Unsourced Table ---
+% Note: If you have reliable sources for vehicle parameters (Vmax, Rho_max, Length, etc.) specific to Benin,
+% you could re-introduce a table, clearly citing the source for EACH value or assumption. Otherwise, omit it.
+
+\section{Comportements Spécifiques des Motos et Impact sur le Trafic} % Plan 3.4 (Combined Behaviors and Impact)
+\label{sec:comportements_motos_impact}
+
+Les motos, en tant que classe dominante, jouent un rôle central et adoptent des comportements de conduite spécifiques qui les distinguent nettement des autres usagers et influencent profondément la dynamique globale du trafic. Bien que la quantification précise de ces comportements au Bénin nécessite des études dédiées avec suivi vidéo, leur existence est confirmée par l'observation directe et indirectement par les études sur la mobilité, la congestion et l'accidentalité \cite{Kalieu2016, Houndagnon_ZemidjanPortoNovo_2004, WorldBank_BeninRoadSafetyAssess_2022}.
+
+\subsection{Pratiques de Conduite Distinctives}
+\label{subsec:pratiques_conduite}
+
+\subsubsection{Gap-Filling (Remplissage des Espaces)}
+\label{subsubsec:gap_filling}
+Le \textit{gap-filling} désigne la tendance et la capacité des motos à utiliser les **espaces longitudinaux et latéraux disponibles** entre les véhicules plus grands (voitures, camions), même si ces espaces sont réduits \cite{khan2021macroscopic}. Ceci leur permet de maintenir une vitesse moyenne plus élevée que les voitures en conditions de congestion légère à modérée et d'augmenter significativement la densité d'occupation de la chaussée \cite{NguyenEtAl2012}. Leur faible largeur leur permet d'exploiter des interstices inaccessibles aux voitures.
+
+\subsubsection{Interweaving (Circulation en Zigzag / Mouvement Latéral)}
+\label{subsubsec:interweaving}
+L'\textit{interweaving} ou le **mouvement latéral fréquent et agile** est caractéristique. Les motos se faufilent entre les files de véhicules plus lents ou statiques, changent fréquemment de position latérale sur la chaussée pour progresser \cite{TiwariEtAl2007}. Ce comportement, facilité par leur maniabilité, optimise leur temps de parcours individuel mais peut perturber le flux des véhicules plus larges, réduire l'adhérence à une discipline de voie stricte et augmenter les risques de conflits, notamment moto-moto ou moto-voiture \cite{easts2011modeling, WorldBank_BeninRoadSafetyAssess_2022}.
+
+\subsubsection{Front-Loading aux Intersections}
+\label{subsubsec:front_loading}
+Le \textit{front-loading} est l'accumulation préférentielle des motos à l'**avant des files d'attente** aux intersections (feux rouges, stops, ronds-points congestionnés). Les motos filtrent à travers le trafic arrêté ou ralenti pour se positionner en première ligne, occupant tout l'espace disponible sur la largeur de la chaussée \cite{Kalieu2016} (observation fréquente, également décrite dans des contextes similaires \cite{TiwariEtAl2007}). Elles tendent également à démarrer très rapidement, parfois en anticipant le signal vert, ce qui influence la capacité de l'intersection et la dynamique de départ des pelotons de véhicules.
+
+\subsubsection{Adaptation aux Infrastructures et "Creeping"}
+\label{subsubsec:adaptation_infra}
+Les motos démontrent une plus grande capacité à maintenir leur vitesse sur des **chaussées dégradées ou non revêtues** par rapport aux voitures \cite{IMF_Benin_ArtIV_2022} (conceptuellement). Elles utilisent fréquemment les accotements, les trottoirs (illégalement), les pistes informelles ou les espaces non conventionnels pour contourner les obstacles ou la congestion principale. Le "creeping" (reptation), où les motos continuent de progresser lentement même dans une congestion quasi-totale en se faufilant, est également une caractéristique observée.
+
+% \begin{figure}[htbp] % Keep figure structure, ensure image file exists
+%    \centering
+%    \includegraphics[width=0.9\textwidth]{images/reseau_benin/comportement_motos}
+%    \caption{Comportements spécifiques des motos dans le trafic béninois : (a) gap-filling entre voitures; (b) regroupement aux intersections (front-loading); (c) trajectoires flexibles (interweaving) contournant les obstacles.}
+%    \label{fig:comportement_motos}
+% \end{figure}
+
+\subsection{Impact sur la Dynamique Globale du Trafic}
+\label{subsec:impact_global}
+
+Ces comportements spécifiques des motos modifient profondément la dynamique du trafic par rapport aux modèles classiques développés pour un trafic majoritairement automobile \cite{WongWong2002}. L'impact est majeur, bien que souvent non quantifié précisément dans la littérature locale :
+\begin{itemize}
+    \item \textbf{Effets sur la Capacité et la Relation Vitesse-Densité} : Le gap-filling et l'interweaving tendent à **augmenter le débit total** (véhicules par heure) pouvant emprunter une section de route pour une même surface, particulièrement en régime congestionné \cite{khan2021macroscopic} (conceptuellement). La relation vitesse-densité macroscopique est modifiée : elle dépend fortement de la proportion de motos et de leur capacité à maintenir une vitesse relative plus élevée que les voitures à densité égale ou élevée \cite{TiwariEtAl2007}. La capacité maximale peut être atteinte à des densités plus élevées.
+    \item \textbf{Effets sur la Stabilité du Flux} : L'interweaving peut introduire des perturbations locales (freinages des voitures) mais aussi permettre au système de fonctionner comme un **flux "à deux vitesses"**, où les motos conservent une certaine fluidité alors que les véhicules plus larges sont bloqués ou ralentis. La nature des ondes de choc de congestion peut être différente.
+    \item \textbf{Effets sur la Dynamique aux Intersections} : Le front-loading modifie les profils de départ des véhicules après un arrêt, avec une **"vague" initiale rapide de motos** qui sature l'espace. Ceci affecte le calcul de la capacité effective des feux ou des ronds-points et les temps de vert nécessaires, comme le montrent les modèles de capacité tenant compte des comportements de départ \cite{Akcelik_Book_TrafficSignals_2008}. Les problèmes de régulation aux carrefours de Cotonou sont en partie liés à cette dynamique \cite{LaNation_FeuxTricolores_2021}.
+    \item \textbf{Utilisation de Réseaux Parallèles et Complexité des Trajectoires} : L'usage fréquent de voies informelles ou d'espaces non dédiés par les motos rend la prédiction des flux basée uniquement sur le réseau officiel plus complexe et moins précise. Les trajectoires réelles sont moins contraintes par les voies définies.
+\end{itemize}
+
+\section{Méthodologie de Collecte et d'Analyse des Données} % Plan 3.5
+\label{sec:collecte_donnees}
+
+La modélisation précise nécessite des données spécifiques au contexte local, dont la collecte systématique et détaillée présente des défis au Bénin en raison de ressources limitées et de la complexité du système. Notre approche pour informer le modèle s'appuiera donc sur une combinaison pragmatique de sources :
+\begin{itemize}
+    \item \textbf{Données Indirectes et Publiques} : Utilisation de couches de trafic agrégées accessibles publiquement (type Google Maps Traffic, si la couverture est jugée suffisante) pour identifier qualitativement les zones et heures de congestion récurrentes, et estimer très approximativement des vitesses relatives ou des temps de parcours moyens sur certains axes.
+    \item \textbf{Données Statistiques Officielles} : Consultation des données disponibles auprès d'organismes comme l'INSAE (Institut National de la Statistique et de l'Analyse Économique - successeur de l'INStaD), le Ministère en charge des Transports (actuellement Ministère du Cadre de Vie et des Transports, MCVT \cite{MCVT_Website_Benin}), l'Agence Nationale des Transports Terrestres (ANaTT, mentionnée dans \cite{WorldBank_BeninRoadSafetyAssess_2022}), ou le Centre National de Sécurité Routière (CNSR \cite{CNSR_Website_Benin}) concernant la composition estimée du parc, le réseau routier officiel (via l'AGEROUTE si possible), les données d'accidentalité, et potentiellement des comptages de trafic agrégés s'ils existent et sont accessibles. Les plans et rapports gouvernementaux (comme le PAG \cite{Benin_PAG_2021_2026}) et les rapports d'organisations internationales (Banque Mondiale \cite{WorldBank_BeninEconUpdate_Apr2023, WorldBank_PAURAD_PAD_2018}, BAD \cite{BAD_RouteBohiconDassa_PAD_2009}) seront aussi exploités.
+    \item \textbf{Littérature Scientifique et Grise} : Exploitation des études académiques existantes spécifiques au Bénin (e.g., \cite{Kalieu2016, Houndagnon_ZemidjanPortoNovo_2004}) ou à des contextes très similaires (pays voisins \cite{OgundeleEtAl2017}, villes asiatiques avec fort taux de motos \cite{TiwariEtAl2007, NguyenEtAl2012, khan2021macroscopic}) pour comprendre les comportements, les ordres de grandeur et les approches de modélisation déjà tentées.
+    \item \textbf{Observations Qualitatives Ciblées} : Documentation photographique ou vidéographique ponctuelle sur le terrain, et notes d'observation pour confirmer ou illustrer les phénomènes clés décrits dans la littérature (gap-filling, front-loading, usage des infrastructures) sans prétendre à une quantification systématique faute de moyens dédiés.
+    \item \textbf{Consultation d'Experts Locaux} (si possible) : Échanges avec des professionnels béninois (urbanistes, ingénieurs des transports, forces de l'ordre, chercheurs locaux) pour valider les observations, comprendre les pratiques locales de gestion et recueillir des avis éclairés.
+\end{itemize}
+
+\begin{remark}
+Il est crucial de reconnaître les limitations inhérentes à cette approche, dictée par la disponibilité des données. Le manque probable de données granulaires et continues (trajectoires individuelles de véhicules sur de longues périodes, comptages automatiques classifiés par type de véhicule sur l'ensemble du réseau étudié) nécessitera de formuler des hypothèses lors de la calibration du modèle. L'objectif principal sera de s'assurer que le modèle est capable de reproduire **qualitativement** les phénomènes clés observés (congestion due aux motos, flux à deux vitesses, dynamique aux intersections) plutôt que de viser une correspondance quantitative parfaite point par point avec une réalité difficile à mesurer exhaustivement.
+\end{remark}
+
+Le traitement envisagé des données collectées inclura :
+\begin{enumerate}
+    \item Analyse spatio-temporelle des données de congestion indirectes disponibles pour identifier les points noirs et les régimes de trafic typiques.
+    \item Classification des segments routiers étudiés selon leur type (bitumé/non bitumé/pavé) et état présumé (bon/dégradé), en s'appuyant sur les informations disponibles et les observations.
+    \item Synthèse des informations sur la composition du parc (proportion de motos vs autres véhicules) issues des sources disponibles, en définissant des proportions types pour les zones étudiées.
+    \item Validation croisée des informations entre les différentes sources (littérature, observations, données indirectes, statistiques partielles) pour assurer la cohérence des hypothèses.
+\end{enumerate}
+
+\section{Défis et Besoins pour la Modélisation (Conclusion du Chapitre)} % Conclusion / Transition
+\label{sec:defis_modelisation_conclusion}
+
+Les spécificités béninoises décrites dans ce chapitre – hétérogénéité extrême du parc dominé par les motos \cite{ Kalieu2016}, infrastructure variable en type et en état \cite{ WorldBank_PAURAD_PAD_2018}, et comportements de conduite adaptatifs distincts des motocyclistes (gap-filling, interweaving, front-loading, adaptation à l'infrastructure) \cite{khan2021macroscopic, TiwariEtAl2007} – soulèvent des défis fondamentaux pour l'application directe des modèles de trafic standards.
+
+Les modèles macroscopiques **homogènes** (supposant un seul type de véhicule ou des véhicules aux comportements similaires) sont clairement **inadaptés** pour capturer la réalité du trafic béninois. Les modèles **multi-classes** standards, bien que nécessaires pour distinguer au moins motos et voitures, risquent d'être **insuffisants** s'ils ne capturent pas explicitement les interactions spécifiques et les comportements uniques des motos qui dictent largement la dynamique observée, notamment en condition de saturation \cite{WongWong2002}. De plus, l'impact différentiel de l'état de l'infrastructure sur les vitesses et les choix d'itinéraire des différentes classes de véhicules doit être intégré pour plus de réalisme. La gestion souvent informelle ou défaillante des intersections \cite{LaNation_FeuxTricolores_2021, BeninWebTV_FeuxCotonou_2023} ajoute une couche de complexité.
+
+Ce chapitre a donc mis en évidence la nécessité impérieuse de développer ou d'adapter une approche de modélisation sur mesure pour le contexte béninois. Dans le chapitre suivant, nous relèverons ce défi en proposant une **extension du modèle de second ordre Aw-Rascle-Zhang (ARZ)**. Ce cadre est choisi pour sa capacité intrinsèque à modéliser les phénomènes hors équilibre (importants lors de la formation et la dissipation de la congestion) et sa flexibilité reconnue pour l'extension multi-classes. Notre extension visera spécifiquement à intégrer les caractéristiques clés du trafic béninois identifiées ici – notamment la distinction moto/voiture, leurs comportements différentiés (vitesses souhaitées, capacité à exploiter les espaces), et potentiellement l'influence de l'état de la route – afin de fournir un outil plus réaliste pour l'analyse du trafic et l'évaluation de scénarios d'aménagement dans ce contexte spécifique.

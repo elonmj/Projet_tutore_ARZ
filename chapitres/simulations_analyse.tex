@@ -1,0 +1,386 @@
+\chapter{Simulation Numérique et Analyse du Modèle ARZ Étendu} % Titre du Chapitre
+\label{chap:simulations_analyse} % Label pour référencer le chapitre
+
+% Optionnel : Ajouter ici une courte introduction générale au chapitre,
+% rappelant brièvement les objectifs (tester le modèle, comprendre sa dynamique)
+% avant de commencer la section 6.1.
+% Exemple :
+% Ce chapitre présente les résultats des simulations numériques réalisées avec le modèle
+% ARZ multi-classes étendu développé précédemment. L'objectif est d'évaluer sa capacité
+% à reproduire les caractéristiques clés du trafic béninois et d'analyser l'influence
+% de ses paramètres spécifiques. En raison des limitations des données disponibles,
+% une calibration quantitative rigoureuse n'a pu être entreprise ; nous adoptons donc
+% une approche basée sur l'estimation de paramètres plausibles, la validation numérique
+% et phénoménologique, et l'analyse de sensibilité.
+
+\section{Stratégie d'Estimation des Paramètres et Jeu de Base} % Titre de la Section 6.1
+\label{sec:strategie_params} % Label pour la section 6.1
+
+\subsection{Stratégie Générale d'Estimation des Paramètres} % Titre de la Sous-section 6.1.1
+\label{subsec:strategie_estim_params}
+
+La calibration rigoureuse d'un modèle de trafic macroscopique complexe comme le modèle ARZ multi-classes étendu développé au Chapitre \ref{chap:formulation_modele} nécessite idéalement des données dynamiques détaillées sur le trafic réel. Ces données incluraient typiquement des mesures de densité, de vitesse et de débit par classe de véhicules (motos et autres véhicules dans notre cas) sur différents types de routes et dans diverses conditions de congestion. De telles données permettraient d'ajuster les nombreux paramètres du modèle (\(\alpha, V_{creeping}, \rho_{jam}\), et les paramètres définissant les fonctions \(p_i, V_{e,i}, g_i, \tau_i\)) afin que les simulations reproduisent quantitativement les observations \cite{KhelifiEtAl2023}.
+
+Cependant, comme souligné au Chapitre \ref{chap:caracteristiques_benin}, l'obtention de ce type de données granulaires et continues pour le trafic routier au Bénin représente un défi majeur. Les systèmes de mesure permanents (boucles inductives, caméras avec analyse d'image) sont rares, et les données disponibles via des API commerciales de trafic (comme Google Maps, TomTom ou Mapbox) sont souvent limitées en couverture géographique, en résolution temporelle, ou ne fournissent pas la décomposition par classe de véhicules essentielle pour notre approche multi-classes. Bien que des estimations de vitesse moyenne puissent parfois être obtenues via l'API Google Directions pour certains axes majeurs, leur utilisation pour une calibration quantitative complète des paramètres dynamiques (\(\rho, q\)) via des modèles intermédiaires simples (comme Greenshields) serait méthodologiquement incohérente avec notre approche de second ordre (ARZ) qui vise justement à dépasser ces modèles d'équilibre \cite{FanHertySeibold2014}.
+
+Face à cette limitation en données quantitatives de calibration, une approche alternative est adoptée pour ce travail. L'objectif n'est pas d'atteindre une calibration précise et validée quantitativement sur l'ensemble du réseau béninois, mais plutôt de définir un \textbf{jeu de paramètres de base plausible} pour le modèle ARZ étendu. Ce jeu de paramètres servira de fondation pour :
+\begin{enumerate}
+    \item Évaluer la capacité du modèle à reproduire \textbf{qualitativement} les phénomènes de trafic spécifiques observés au Bénin (validation phénoménologique, Section \ref{sec:validation_phenomenologique}).
+    \item Étudier la \textbf{sensibilité} de la dynamique simulée aux différents paramètres clés du modèle, en particulier ceux liés aux comportements spécifiques des motocyclettes (analyse de sensibilité, Section \ref{sec:analyse_sensibilite}).
+\end{enumerate}
+
+La stratégie pour définir ce jeu de paramètres de base repose sur la combinaison de plusieurs sources d'information :
+\begin{itemize}
+    \item \textbf{Données d'Infrastructure (OpenStreetMap) :} Les données géographiques détaillées d'OSM, traitées comme décrit à la section suivante (\ref{subsec:params_infra_osm}), sont utilisées pour déterminer les paramètres spatiaux du modèle, notamment la classification des types de route \(R(x)\) qui influence les vitesses maximales.
+    \item \textbf{Littérature Scientifique :} Les études existantes sur la modélisation du trafic, en particulier celles traitant du trafic mixte hétérogène (souvent dans des contextes asiatiques ou d'autres pays en développement) \cite{TiwariEtAl2007, khan2021macroscopic, FanWork2015}, sont utilisées pour obtenir des ordres de grandeur ou des formes fonctionnelles raisonnables pour les paramètres comportementaux (e.g., \(\alpha\), fonctions de pression, temps de relaxation).
+    \item \textbf{Observations Qualitatives Locales :} Les caractéristiques spécifiques du trafic béninois décrites au Chapitre \ref{chap:caracteristiques_benin} (rôle central des Zémidjans, gap-filling, interweaving, creeping, adaptation à l'infrastructure) guident le choix qualitatif des paramètres pour refléter ces comportements (e.g., choix de \(V_{creeping} > 0\), \(\alpha < 1\), \(\tau_m < \tau_c\), différence marquée entre \(V_{max,m}(R)\) et \(V_{max,c}(R)\) pour les routes dégradées).
+    \item \textbf{Hypothèses Physiques Raisonnées :} Lorsque aucune donnée ou observation directe n'est disponible, des hypothèses basées sur des principes physiques ou des comportements de conduite logiques sont formulées (e.g., la pression augmente avec la densité, la vitesse diminue avec la densité).
+    \item \textbf{Données de Vitesse Externes (Indicatives) :} Les estimations de vitesse moyenne potentiellement disponibles via Google Maps (API ou couche trafic) peuvent être utilisées comme une source d'information *supplémentaire* pour guider l'estimation initiale des vitesses en flux libre (\(V_{max,i}\)) et pour une comparaison qualitative *a posteriori* (Section \ref{sec:comparaison_google}), mais pas pour une dérivation directe des paramètres de densité ou de débit.
+\end{itemize}
+Cette approche pragmatique vise à construire un modèle paramétré de manière cohérente et plausible, permettant une analyse significative de sa dynamique et de sa capacité à représenter les spécificités du trafic béninois, tout en reconnaissant explicitement les limites imposées par la disponibilité des données de calibration. Les sections suivantes détaillent l'estimation spécifique de chaque groupe de paramètres selon cette stratégie.
+
+% La suite du chapitre viendra ici, en commençant par la sous-section 6.1.2
+% \subsection{Paramètres d'Infrastructure (Dérivés d'OSM \texttt{roads})}
+% \label{subsec:params_infra_osm}
+% ...
+
+\subsection{Paramètres d'Infrastructure (Dérivés d'OSM \texttt{roads})}
+\label{subsec:params_infra_osm}
+
+La définition des paramètres liés à l'infrastructure routière, en particulier le type de route \( R(x) \) qui influence la vitesse maximale en flux libre \( V_{max,i} \), repose sur l'analyse des données géographiques du réseau routier béninois issues d'OpenStreetMap (OSM).
+
+\subsubsection{Source et Traitement des Données OSM}
+Les données proviennent d'un extrait récent du Bénin téléchargé depuis le serveur Geofabrik (\url{https://download.geofabrik.de/}), spécifiquement le fichier Shapefile contenant les entités routières (`gis\_osm\_roads\_free\_1.shp`). Ce fichier contient 128\,501 segments de route, chacun associé à divers attributs décrivant ses caractéristiques.
+
+Un script Python utilisant la bibliothèque GeoPandas \cite{Jordahl2014GeoPandas} a été développé pour traiter ce fichier (voir Annexe \ref{annexe:code_traitement_osm} pour le code source). Les étapes clés de ce traitement incluent :
+\begin{enumerate}
+    \item La lecture du fichier Shapefile.
+    \item Le calcul de la longueur géométrique de chaque segment en mètres. Ceci a nécessité une reprojection des données depuis leur système de coordonnées d'origine (géographique, EPSG:4326) vers un système métrique approprié pour le Bénin (UTM Zone 31N, EPSG:32631) afin d'obtenir des mesures de longueur précises.
+    \item L'extraction et l'analyse de l'attribut `fclass`, qui classifie les routes selon leur fonction dans OSM.
+    \item L'application d'une fonction de classification pour attribuer une catégorie de type de route \( R \) à chaque segment, basée sur sa valeur `fclass`.
+    \item La sauvegarde des données traitées (attributs pertinents et longueur calculée) pour une utilisation ultérieure.
+\end{enumerate}
+L'analyse de l'attribut `maxspeed` présent dans le fichier a révélé qu'il était très largement inutilisable pour estimer directement les vitesses maximales, 99.7\% des segments ayant une valeur de 0 (indiquant probablement une donnée manquante dans la source OSM) et seulement 0.3\% ayant une valeur numérique supérieure à zéro (principalement 30 ou 50 km/h).
+
+\subsubsection{Classification des Types de Route \( R(x) \)}
+En se basant sur l'analyse des différentes valeurs de l'attribut `fclass` et leur fréquence dans les données OSM du Bénin (voir Section \ref{sec:resultats_code_collecte} pour le décompte détaillé), nous avons défini la classification suivante pour le paramètre de type de route \( R(x) \). Ce paramètre est un indice catégoriel qui sera utilisé pour différencier les propriétés du flux, notamment \( V_{max,i}(R) \).
+
+% --- Description de la Classification R(x) ---
+Nous définissons 5 catégories principales (R=1 à 5) et une catégorie résiduelle (R=9), basées sur la fonction et le type probable de revêtement/praticabilité :
+\begin{itemize}
+    \item \textbf{R=1 : Routes Majeures.} Correspond aux `fclass` 'trunk', 'primary' et les bretelles associées ('trunk\_link', 'primary\_link'). Ces routes représentent les axes interurbains principaux et les artères majeures en ville, généralement bitumées et de standard plus élevé. (Nombre de segments : 2190)
+    \item \textbf{R=2 : Routes Secondaires.} Correspond aux `fclass` 'secondary', 'tertiary' et les bretelles associées ('secondary\_link', 'tertiary\_link'). Il s'agit de routes connectant des localités ou de voies importantes en milieu urbain, souvent bitumées ou pavées mais potentiellement de qualité plus variable que R=1. (Nombre de segments : 3060)
+    \item \textbf{R=3 : Routes Résidentielles/Locales.} Correspond aux `fclass` 'residential', 'unclassified', 'living\_street'. Cette catégorie est la plus fréquente et représente la voirie locale en ville ou en village, dont l'état et le revêtement sont très hétérogènes (bitume dégradé, pavés, mais très souvent terre ou latérite). (Nombre de segments : 92259)
+    \item \textbf{R=4 : Pistes Carrossables.} Correspond aux `fclass` 'track' et ses variantes ('track\_grade*'). Il s'agit de pistes en terre ou latérite, principalement en milieu rural ou péri-urbain, praticables par des véhicules adaptés (y compris les motos). (Nombre de segments : 12960)
+    \item \textbf{R=5 : Chemins et Voies de Service.} Regroupe les `fclass` 'service', 'path', 'footway', 'cycleway', 'pedestrian', 'steps'. Ces voies ne sont généralement pas conçues pour le trafic automobile continu mais sont fréquemment empruntées par les piétons, les deux-roues (particulièrement les motos comme raccourcis ou accès fin). Leur praticabilité et leur largeur sont très variables. (Nombre de segments : 18016)
+    \item \textbf{R=9 : Inconnu/Autre.} Catégorie pour les rares segments sans `fclass` ou avec des classifications non prévues ou ambiguës ('unknown', 'bridleway'). (Nombre de segments : 16)
+\end{itemize}
+Cette classification reflète la diversité des infrastructures routières rencontrées au Bénin et permet d'associer des caractéristiques de flux distinctes à chaque catégorie. La prédominance écrasante des catégories R=3, R=4 et R=5 souligne l'importance de modéliser correctement le trafic sur des infrastructures autres que les grands axes bitumés.
+
+\subsubsection{Estimation \textit{a priori} des Vitesses Maximales en Flux Libre \( V_{max,i}(R) \)}
+La vitesse maximale en flux libre \( V_{max,i}(R) \) représente la vitesse moyenne souhaitée par les conducteurs de la classe \( i \) ( \(m\)=motos, \(c\)=autres véhicules) sur une route de type \( R \) lorsque la densité de trafic est très faible (\( \rho \to 0 \)). Comme les données `maxspeed` d'OSM sont inexploitables, nous définissons des valeurs \textit{a priori} plausibles pour ces paramètres, basées sur le type de route décrit par \( R \), les observations qualitatives des vitesses pratiquées au Bénin, et l'avantage comparatif attendu des motos, notamment sur les revêtements dégradés ou inexistants. Ces valeurs constituent le point de départ pour les simulations et l'analyse de sensibilité ; elles devraient idéalement être affinées par une calibration future si des données de vitesse fiables devenaient disponibles.
+
+Le Tableau \ref{tab:vmax_estimates} présente les estimations de base utilisées dans cette étude.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Estimations \textit{a priori} des vitesses maximales en flux libre \(V_{max,c}\) (Autres Véhicules) et \(V_{max,m}\) (Motos) par catégorie de route R (en km/h).}
+    \label{tab:vmax_estimates}
+    \begin{tabular}{c p{4.5cm} c c p{5.5cm}}
+        \toprule
+        \textbf{Catégorie R} & \textbf{Description Type} & \textbf{\(V_{max,c}\) (km/h)} & \textbf{\(V_{max,m}\) (km/h)} & \textbf{Justification indicative} \\
+        \midrule
+        1 & Routes Majeures (Trunk/Primary) & 75 & 85 & Vitesse interurbaine/artérielle, revêtement supposé bon. Avantage moto modéré (agilité). \\
+        2 & Routes Secondaires (Secondary/Tertiary) & 60 & 70 & Vitesse de liaison/urbaine principale, revêtement variable. Avantage moto similaire. \\
+        3 & Routes Résidentielles/Locales (Residential/Unclassified) & 35 & 50 & Vitesse faible due à l'état (souvent non revêtu), la géométrie, ou la densité locale. Avantage moto accru. \\
+        4 & Pistes Carrossables (Track) & 25 & 45 & Vitesse très limitée pour voitures standards. Avantage moto significatif sur terre/latérite. \\
+        5 & Chemins/Voies de Service (Path/Service/etc.) & 10 & 30 & Praticabilité très limitée pour voitures. Motos agiles mais contraintes par l'étroitesse/usage piéton. \\
+        9 & Inconnu/Autre & 35 & 50 & Utilisation des valeurs de R=3 (catégorie la plus fréquente) comme hypothèse par défaut. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Ces valeurs reflètent l'hypothèse clé que l'avantage de vitesse des motos en flux libre (\(V_{max,m} - V_{max,c}\)) augmente à mesure que la qualité et la praticabilité de l'infrastructure diminuent (R croissant de 1 à 5). Ces fonctions \( V_{max,i}(R) \), bien que définies par catégorie, seront appliquées localement dans les simulations en fonction de la valeur \( R(x_j) \) de la cellule \( j \).
+
+
+\subsection{Estimation des Paramètres Comportementaux et Dynamiques}
+\label{subsec:params_comportement_dynamique}
+
+Au-delà des paramètres d'infrastructure dérivés d'OSM, le modèle ARZ multi-classes étendu (\ref{eq:full_system_rho_w_i}) dépend d'un ensemble de paramètres et de fonctions décrivant les comportements spécifiques des classes de véhicules (motos \(m\), autres véhicules \(c\)) et la dynamique fondamentale du flux. En l'absence de données de calibration détaillées, nous estimons ces paramètres en nous basant sur la littérature concernant le trafic mixte et les modèles ARZ, les observations qualitatives du trafic au Bénin (Chapitre \ref{chap:caracteristiques_benin}), et des hypothèses physiques. L'objectif est de définir un jeu de base cohérent permettant une première exploration réaliste du modèle.
+
+\subsubsection{Paramètre de Gap-filling/Interweaving (\(\alpha\))}
+Ce paramètre (\(0 \le \alpha < 1\)) quantifie la réduction de l'impact de la densité des voitures (\(\rho_c\)) sur la densité effective perçue par les motos (\(\rho_{eff,m} = \rho_m + \alpha \rho_c\)), modélisant ainsi leur capacité à utiliser les interstices (Section \ref{sec:modeling_gap_filling}).
+\begin{itemize}
+    \item \textbf{Choix de Base :} \( \alpha = 0.4 \)
+    \item \textbf{Justification :}
+        \begin{itemize}
+            \item Une valeur \( \alpha < 1 \) est nécessaire pour modéliser l'avantage des motos en densité.
+            \item \( \alpha = 0 \) serait irréaliste (les motos ne seraient pas du tout gênées par les voitures).
+            \item Des études sur le trafic mixte en Asie, bien que contextuellement différentes, suggèrent souvent que les motos occupent un espace dynamique nettement inférieur et interagissent différemment \cite{TiwariEtAl2007}. Des modèles macroscopiques hétérogènes ont parfois utilisé des facteurs d'interaction réduits \cite{FanWork2015}.
+            \item La valeur de 0.4 est une estimation initiale suggérant qu'une voiture contribue à 40% de l'encombrement perçu par une moto par rapport à une autre moto (ou par rapport à la perception voiture-voiture si l'on prend \( \rho_{eff,c} = \rho \)). C'est une hypothèse modérée qui reconnaît l'avantage des motos sans l'exagérer.
+            \item Ce paramètre a un impact potentiellement fort et sera une cible privilégiée pour l'analyse de sensibilité (Section \ref{sec:analyse_sensibilite}).
+        \end{itemize}
+\end{itemize}
+
+\subsubsection{Vitesse de Creeping (\(V_{creeping}\))}
+Il s'agit de la vitesse résiduelle (\(>0\)) maintenue par les motos même en condition de congestion quasi-totale (\(\rho \approx \rho_{jam}\)), modélisée via la fonction \(V_{e,m}\) (Section \ref{sec:modeling_creeping}).
+\begin{itemize}
+    \item \textbf{Choix de Base :} \( V_{creeping} = 5 \) km/h \( \approx 1.4 \) m/s.
+    \item \textbf{Justification :}
+        \begin{itemize}
+            \item Nécessaire pour capturer le phénomène de reptation observé qualitativement au Bénin.
+            \item La valeur doit être faible (vitesse de marche rapide ou de petit trot) mais non nulle.
+            \item 5 km/h semble un ordre de grandeur plausible pour des motos se faufilant très lentement dans un embouteillage quasi-statique.
+            \item Des modèles incluant le creeping ont utilisé des vitesses résiduelles de cet ordre de grandeur \cite{FanWork2015}.
+            \item L'impact de ce paramètre sur la dynamique en très haute densité sera testé (Section \ref{sec:validation_phenomenologique} et \ref{sec:analyse_sensibilite}). Pour les voitures, \(V_{creeping, c} = 0\).
+        \end{itemize}
+\end{itemize}
+
+\subsubsection{Fonctions de Pression (\(P_m, P_c\)) et Densité de Blocage (\(\rho_{jam}\))}
+La fonction de pression \(p_i = P_i(\rho_{eff,i})\) représente l'anticipation ou la gêne due à la densité. Elle doit être croissante et garantir l'hyperbolicité (\(P'_i > 0\)). La densité de blocage \(\rho_{jam}\) représente la densité physique maximale.
+\begin{itemize}
+    \item \textbf{Densité de Blocage Physique (\(\rho_{jam}\)) :}
+        \begin{itemize}
+            \item \textbf{Choix de Base :} \( \rho_{jam} = 250 \) véhicules/km.
+            \item \textbf{Justification :} La densité de blocage dépend de la longueur moyenne des véhicules et de l'espacement minimal. Pour un trafic mixte avec une très forte proportion de motos (plus courtes), la densité maximale peut être significativement plus élevée que les valeurs standards pour voitures seules (souvent 120-180 véh/km). En supposant une longueur moyenne "effective" considérant l'occupation spatiale des motos d'environ 4m (1 / (0.004 veh/m) = 250 veh/km), cette valeur semble une estimation raisonnable pour un trafic dominé par les motos au Bénin. Elle reste une approximation.
+        \end{itemize}
+    \item \textbf{Forme Fonctionnelle de \( P_i(x) \) :} Nous adoptons une forme puissance courante pour sa simplicité et sa capacité à assurer l'hyperbolicité \cite{AwKlarMaterneRascle2000, FanWork2015}.
+        \begin{equation}
+            P_i(x) = K_i \left( \frac{x}{\rho_{jam,i}^{eff}} \right)^{\gamma_i}
+        \end{equation}
+        où \(x\) est la densité effective perçue (\(\rho_{eff,m}\) ou \(\rho\)), \( \rho_{jam,i}^{eff} \) est la densité de blocage effective perçue par la classe \(i\), et \( K_i, \gamma_i \) sont des paramètres positifs.
+        \begin{itemize}
+            \item \textbf{Densités de Blocage Effectives Perçues :}
+                \begin{itemize}
+                    \item \( \rho_{jam,c}^{eff} = \rho_{jam} = 250 \) véh/km (les voitures perçoivent la densité physique).
+                    \item \( \rho_{jam,m}^{eff} = \rho_{jam} (1-\alpha) + \alpha \rho_{jam} = \rho_{jam} \). Non, ceci est incorrect. La pression \(P_m\) doit être définie sur \( [0, \rho_{eff,m}^{max}] \) où \( \rho_{eff,m}^{max} \) correspond à l'état physique \( \rho = \rho_{jam} \). Si l'on suppose un ratio fixe \( \theta = \rho_m / \rho \) et \( 1-\theta = \rho_c / \rho \), alors à \( \rho = \rho_{jam} \), \( \rho_{eff,m} = \theta \rho_{jam} + \alpha (1-\theta) \rho_{jam} \). Cette valeur dépend de la composition du flux au point de blocage. Pour simplifier, on peut supposer que \( P_m \) et \( P_c \) utilisent la même référence \(\rho_{jam}\) mais avec des paramètres \(K_i, \gamma_i\) différents.
+                    \item \textbf{Simplification Adoptée :} Nous utilisons \( \rho_{jam} = 250 \) comme référence pour les deux classes dans la normalisation de la pression pour la forme puissance, tout en reconnaissant que la pression \(P_m\) sera évaluée à \(\rho_{eff,m}\) qui peut être inférieur à \(\rho\).
+                      \[ P_i(x) = K_i \left( \frac{x}{\rho_{jam}} \right)^{\gamma_i} \]
+                      où \(x = \rho_{eff,m}\) pour \(i=m\) et \(x = \rho\) pour \(i=c\).
+                \end{itemize}
+            \item \textbf{Paramètres \( \gamma_i \) :} Exponent contrôlant la sensibilité à la densité.
+                \begin{itemize}
+                    \item \textbf{Choix de Base :} \( \gamma_m = 1.5 \), \( \gamma_c = 2.0 \)
+                    \item \textbf{Justification :} Des valeurs de \( \gamma \) entre 1 et 3 sont courantes. Nous supposons que les voitures (\( \gamma_c = 2.0 \)) sont plus sensibles à l'augmentation de la densité (leur pression augmente plus vite) que les motos (\( \gamma_m = 1.5 \)) qui peuvent mieux s'adapter (lié à \(\alpha\) et leur agilité).
+                \end{itemize}
+            \item \textbf{Paramètres \( K_i \) :} Facteur d'échelle pour la pression. L'échelle de \( p_i \) est souvent liée à l'échelle de la vitesse ou à d'autres constantes physiques. On peut les choisir pour assurer une certaine cohérence avec les vitesses d'équilibre ou les calibrer.
+                 \begin{itemize}
+                    \item \textbf{Choix de Base :} \( K_m = 10 \) (km/h), \( K_c = 15 \) (km/h).
+                    \item \textbf{Justification :} Ces valeurs sont des ordres de grandeur plausibles, donnant des contributions de pression de l'ordre de quelques km/h à densité modérée. Nous supposons \( K_c > K_m \), renforçant l'idée que les conducteurs de voiture ressentent une "pression" plus forte. Ces valeurs sont des candidats clairs pour l'analyse de sensibilité.
+                \end{itemize}
+        \end{itemize}
+\end{itemize}
+
+\subsubsection{Fonctions de Vitesse d'Équilibre (\(g_m, g_c\))}
+Ces fonctions décrivent la décroissance normalisée de la vitesse (\(g_i(0)=1, g_i(\rho_{jam})=0\)) avec la densité totale \(\rho\).
+\begin{itemize}
+    \item \textbf{Forme Fonctionnelle :} Nous adoptons une forme simple et classique type "Greenshields" (linéaire) pour les deux classes, mais avec des pentes potentiellement différentes implicites via les \(V_{max}\) et \(V_{creeping}\). La forme est :
+        \begin{equation}
+            g_i(\rho) = \left( 1 - \frac{\rho}{\rho_{jam}} \right)_+
+        \end{equation}
+        où \( (x)_+ = \max(x, 0) \) et \( \rho_{jam} = 250 \) véh/km.
+    \item \textbf{Justification :} La forme linéaire est la plus simple. La différence de comportement entre motos et voitures est principalement capturée par les différentes valeurs de \( V_{max,i}(R) \) (Tableau \ref{tab:vmax_estimates}) et la présence de \( V_{creeping} \) pour les motos, plutôt que par des formes complexes différentes pour \( g_i \). Cela limite le nombre de paramètres à estimer.
+        \[ V_{e,m}(\rho, R) = V_{creeping} + (V_{max,m}(R) - V_{creeping}) (1 - \rho/\rho_{jam})_+ \]
+        \[ V_{e,c}(\rho, R) = V_{max,c}(R) (1 - \rho/\rho_{jam})_+ \]
+\end{itemize}
+
+\subsubsection{Temps de Relaxation (\(\tau_m, \tau_c\))}
+Temps caractéristique d'ajustement de la vitesse \( v_i \) vers la vitesse d'équilibre \( V_{e,i} \).
+\begin{itemize}
+    \item \textbf{Choix de Base :} Temps de relaxation constants.
+        \begin{itemize}
+            \item \( \tau_m = 5 \) secondes \( \approx 0.0014 \) heures.
+            \item \( \tau_c = 10 \) secondes \( \approx 0.0028 \) heures.
+        \end{itemize}
+    \item \textbf{Justification :}
+        \begin{itemize}
+            \item L'utilisation de constantes est une première approche simple.
+            \item Les temps de relaxation dans les modèles ARZ sont typiquement de l'ordre de quelques secondes à quelques dizaines de secondes \cite{AwKlarMaterneRascle2000, KhelifiEtAl2023}.
+            \item Nous choisissons \( \tau_m < \tau_c \) pour refléter l'hypothèse que les motos, étant plus agiles et capables d'entrelacement (Section \ref{sec:modeling_interweaving}), s'adaptent plus rapidement aux changements de conditions de trafic que les voitures. Le rapport de 1 à 2 est une estimation plausible.
+            \item La dépendance à la densité, bien que potentiellement pertinente (Section 5.4.3), est omise dans ce jeu de base pour limiter la complexité initiale. L'influence de \(\tau_m\) et \(\tau_c\) sera étudiée en sensibilité.
+        \end{itemize}
+\end{itemize}
+
+\subsubsection{Composition du Flux de Base}
+Pour réaliser les simulations, il faut définir la proportion de chaque classe de véhicules.
+\begin{itemize}
+    \item \textbf{Choix de Base :}
+        \begin{itemize}
+            \item Milieu Urbain / Péri-urbain (majorité des scénarios) : **75\% motos, 25\% autres véhicules**.
+            \item Milieu Interurbain (si simulé) : **50\% motos, 50\% autres véhicules** (proportion de motos plus faible sur longues distances).
+        \end{itemize}
+    \item \textbf{Justification :}
+        \begin{itemize}
+            \item Le ratio 75/25 en milieu urbain est cohérent avec les observations et estimations rapportées pour Cotonou (Chapitre \ref{chap:caracteristiques_benin}, e.g., \cite{Djossou_ZemidjanCotonou}).
+            \item Le ratio 50/50 en interurbain est une hypothèse reflétant une moindre utilisation des motos (surtout Zémidjans) pour les longs trajets par rapport aux voitures/bus/camions.
+            \item Cette composition influence directement les densités relatives \( \rho_m, \rho_c \) dans les conditions initiales et aux limites des simulations.
+        \end{itemize}
+\end{itemize}
+
+Ce jeu de paramètres comportementaux et dynamiques, bien qu'estimé et non calibré, fournit une base cohérente et justifiée pour initier les simulations numériques et l'analyse du modèle ARZ étendu dans le contexte béninois.
+
+
+\subsection{Tableau Récapitulatif du Jeu de Paramètres de Base}
+\label{subsec:tableau_params_base}
+
+Le Tableau \ref{tab:base_parameters} récapitule l'ensemble des paramètres et des formes fonctionnelles de base estimés dans les sections précédentes. Ce jeu de paramètres constitue la référence pour les simulations phénoménologiques (Section \ref{sec:validation_phenomenologique}) et le point de départ pour l'analyse de sensibilité (Section \ref{sec:analyse_sensibilite}). Il est important de rappeler que ces valeurs sont des estimations plausibles basées sur les informations disponibles et non le résultat d'une calibration quantitative rigoureuse.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Jeu de paramètres de base pour le modèle ARZ multi-classes étendu.}
+    \label{tab:base_parameters}
+    \small % Rendre la police un peu plus petite si nécessaire
+    \begin{tabular}{p{3.5cm} p{2cm} p{8.5cm}}
+        \toprule
+        \textbf{Paramètre/Fonction} & \textbf{Symbole} & \textbf{Valeur/Forme Fonctionnelle de Base} \\
+        \midrule
+        \multicolumn{3}{l}{\textit{Paramètres Comportementaux Moto}} \\
+        Gap-filling / Interweaving & \( \alpha \) & 0.4 \\
+        Vitesse de Creeping & \( V_{creeping} \) & 5 km/h (\(\approx 1.4\) m/s) \\
+        \midrule
+        \multicolumn{3}{l}{\textit{Paramètres Communs / Environnement}} \\
+        Densité de Blocage Physique & \( \rho_{jam} \) & 250 véh/km \\
+        Composition Flux (Urbain) & (\%m / \%c) & 75\% / 25\% \\
+        Composition Flux (Interurbain) & (\%m / \%c) & 50\% / 50\% \\
+        \midrule
+        \multicolumn{3}{l}{\textit{Fonctions de Pression} \( p_i = P_i(x) = K_i (x / \rho_{jam})^{\gamma_i} \)} \\
+        Argument Pression Motos & \( x \) pour \( P_m \) & \( \rho_{eff,m} = \rho_m + \alpha \rho_c \) \\
+        Argument Pression Voitures & \( x \) pour \( P_c \) & \( \rho = \rho_m + \rho_c \) \\
+        Exposant Pression Motos & \( \gamma_m \) & 1.5 \\
+        Exposant Pression Voitures & \( \gamma_c \) & 2.0 \\
+        Constante Pression Motos & \( K_m \) & 10 km/h \\
+        Constante Pression Voitures & \( K_c \) & 15 km/h \\
+        \midrule
+        \multicolumn{3}{l}{\textit{Vitesse Max. Flux Libre (km/h)} \( V_{max,i}(R) \) - Voir Tableau \ref{tab:vmax_estimates}} \\
+        R=1 (Majeures) & \( V_{max,c}(1) / V_{max,m}(1) \) & 75 / 85 \\
+        R=2 (Secondaires) & \( V_{max,c}(2) / V_{max,m}(2) \) & 60 / 70 \\
+        R=3 (Locales) & \( V_{max,c}(3) / V_{max,m}(3) \) & 35 / 50 \\
+        R=4 (Pistes) & \( V_{max,c}(4) / V_{max,m}(4) \) & 25 / 45 \\
+        R=5 (Chemins/Service) & \( V_{max,c}(5) / V_{max,m}(5) \) & 10 / 30 \\
+        R=9 (Inconnu) & \( V_{max,c}(9) / V_{max,m}(9) \) & 35 / 50 \\
+        \midrule
+        \multicolumn{3}{l}{\textit{Fonctions Vitesse Équilibre} \( V_{e,i}(\rho, R) \)} \\
+        Forme générale Motos & \( V_{e,m} \) & \( V_{creeping} + (V_{max,m}(R) - V_{creeping}) (1 - \rho/\rho_{jam})_+ \) \\
+        Forme générale Voitures & \( V_{e,c} \) & \( V_{max,c}(R) (1 - \rho/\rho_{jam})_+ \) \\
+        Fonction de réduction (\(g_i\)) & \( (1 - \rho/\rho_{jam})_+ \) & \( \max(0, 1 - \rho/\rho_{jam}) \) \\
+        \midrule
+        \multicolumn{3}{l}{\textit{Temps de Relaxation} \( \tau_i \)} \\
+        Motos & \( \tau_m \) & 5 secondes (\(\approx 0.0014\) h) \\
+        Voitures & \( \tau_c \) & 10 secondes (\(\approx 0.0028\) h) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Ce tableau synthétise l'ensemble des hypothèses paramétriques qui seront utilisées pour les simulations numériques présentées dans les sections suivantes de ce chapitre. La plausibilité de ce jeu de paramètres sera évaluée qualitativement à travers la capacité du modèle à reproduire les phénomènes attendus, et l'impact de l'incertitude sur certains de ces paramètres sera exploré via l'analyse de sensibilité.
+
+
+
+\subsection{Tests de Convergence}
+\label{subsec:tests_convergence}
+
+\textbf{Objectif et Méthodologie :}
+Pour vérifier l'exactitude de l'implémentation numérique et déterminer son ordre de précision effectif, un test de convergence standard a été réalisé. L'objectif est de s'assurer que la solution numérique se rapproche de la solution exacte (ou d'une solution de référence très précise) lorsque la résolution de la discrétisation augmente. La méthodologie suivie est celle de la solution de référence numérique, adaptée aux systèmes non linéaires pour lesquels une solution analytique n'est généralement pas disponible \cite{LeVeque2002}.
+
+Un scénario test avec une condition initiale lisse et des conditions aux limites périodiques a été défini. Spécifiquement, un état d'équilibre uniforme \( U_0 \) a été perturbé par une simple onde sinusoïdale de faible amplitude sur la densité des motos (\(\rho_m\)), sur un domaine spatial de longueur L = 1000 m. Ce choix vise à évaluer la convergence sur une solution régulière, avant l'éventuelle formation de discontinuités.
+
+Une série de simulations a été effectuée en utilisant le jeu de paramètres de base (Tableau \ref{tab:base_parameters}) sur des grilles uniformes de plus en plus fines, avec un nombre de cellules \( N \in \{50, 100, 200, 400, 800\} \). Le pas de temps \( \Delta t \) a été ajusté à chaque simulation pour maintenir un nombre CFL constant (\( \nu = 0.8 \)), conformément à la condition (\ref{eq:cfl_condition_final}). La simulation sur la grille la plus fine (N=800) a été considérée comme la solution de référence \( U_{ref} \).
+
+Pour chaque résolution plus grossière \( N \), l'erreur \( E_N \) par rapport à la solution de référence a été calculée au temps final \( T = 10 \) s (temps court choisi pour éviter les chocs). La solution de référence \( U_{ref} \) a été projetée sur la grille grossière \( N \) en utilisant une moyenne cellulaire simple (compatible avec l'approche FVM). L'erreur a été mesurée en utilisant la norme discrète L1 pour chaque composante du vecteur d'état \( U \):
+\[ E_{N,k} = \Delta x_N \sum_{j=1}^{N} | U_{N,k,j}(T) - U_{ref\_projected, k, j}(T) | \]
+L'ordre de convergence observé \( q_{obs} \) entre deux résolutions \( N \) et \( N/2 \) a ensuite été estimé par la formule :
+\[ q_{obs} = \log_2 \left( \frac{E_{N/2}}{E_N} \right) \]
+
+\textbf{Résultats :}
+Les erreurs L1 calculées pour chaque variable et chaque résolution sont présentées dans le Tableau \ref{tab:convergence_results}. La Figure \ref{fig:convergence_plot} montre l'évolution de ces erreurs en fonction du pas spatial \( \Delta x \) sur une échelle Log-Log.
+
+% Note : Créez un label pour le tableau de résultats qui sera généré par votre script
+% \label{tab:convergence_results}
+% Insérez ici le tableau généré par le script run_convergence_analysis.py
+% (Celui commençant par --- Convergence Results ---)
+% Exemple :
+\begin{table}[htbp]
+ \centering
+ \caption{Erreurs L1 et ordres de convergence observés pour le test sinusoïdal.}
+ \label{tab:convergence_results}
+ \scriptsize % Rendre plus petit si besoin
+ \begin{tabular}{rr r@{ }r r@{ }r r@{ }r r@{ }r}
+  \toprule
+  N & \(\Delta x\) (m) & \multicolumn{2}{c}{L1(\(\rho_m\))} & \multicolumn{2}{c}{L1(\(w_m\))} & \multicolumn{2}{c}{L1(\(\rho_c\))} & \multicolumn{2}{c}{L1(\(w_c\))} \\
+    &          & Erreur & Ordre             & Erreur & Ordre           & Erreur & Ordre           & Erreur & Ordre \\
+  \midrule
+   50 & 2.00e+01 & 2.72e-02 &  -   & 7.44e-01 &  -   & 8.46e-04 &  -   & 3.63e-01 &  -   \\ % Replaced nan with -
+  100 & 1.00e+01 & 1.21e-02 & 1.16 & 3.47e-01 & 1.10 & 3.85e-04 & 1.14 & 1.69e-01 & 1.10 \\
+  200 & 5.00e+00 & 5.26e-03 & 1.21 & 1.49e-01 & 1.22 & 1.75e-04 & 1.14 & 7.26e-02 & 1.22 \\
+  400 & 2.50e+00 & 1.74e-03 & 1.60 & 4.96e-02 & 1.58 & 5.83e-05 & 1.58 & 2.42e-02 & 1.58 \\
+  800 & 1.25e+00 & \multicolumn{8}{c}{(Solution de référence, erreur $\approx$ 0)} \\ % Slightly more precise description
+  \bottomrule
+ \end{tabular}
+\end{table}
+
+% Note : Créez un label pour la figure de convergence générée par votre script
+% \label{fig:convergence_plot}
+% Insérez ici la figure générée par le script run_convergence_analysis.py
+% (Convergence Plot (L1 Error vs. Grid Spacing))
+\begin{figure}[htbp]
+    \centering
+    % Commande pour inclure l'image .png générée
+    \includegraphics[width=0.8\textwidth]{results/convergence/convergence_plot_convergence_test_sine.png}
+    \caption{Graphique Log-Log de l'erreur L1 en fonction du pas de grille \( \Delta x \) pour les quatre variables d'état. Les lignes pointillée et tiretée indiquent des pentes théoriques d'ordre 1 et 2, respectivement.}
+    \label{fig:convergence_plot}
+\end{figure}
+
+Comme attendu, le Tableau \ref{tab:convergence_results} montre que l'erreur L1 diminue de manière monotone pour toutes les variables lorsque la grille est raffinée. Les ordres de convergence observés (\(q_{obs}\)) pour les raffinements successifs sont calculés entre 1.10 et 1.60. Bien que l'ordre semble s'améliorer légèrement sur les grilles plus fines (se rapprochant de 1.6), il reste globalement proche de 1 et n'atteint pas l'ordre 2.
+
+La Figure \ref{fig:convergence_plot} confirme visuellement cette tendance. Les courbes d'erreur pour les quatre variables présentent une pente approximativement parallèle à la ligne de référence pour l'ordre 1 (\(O(\Delta x)\)) et nettement inférieure à la pente pour l'ordre 2 (\(O(\Delta x^2)\)).
+
+\textbf{Conclusion du Test :}
+Ces résultats démontrent que le schéma numérique implémenté \textbf{converge vers la solution de référence} lorsque la grille est raffinée. L'ordre de convergence observé est \textbf{cohérent avec l'ordre théorique attendu (premier ordre)} pour le schéma FVM/CU du premier ordre spatial utilisé dans cette implémentation (Phase 1). Cela valide la correction fondamentale de l'implémentation de la partie hyperbolique et de la gestion temporelle via la condition CFL. La diffusion numérique inhérente à un schéma du premier ordre est présente mais contrôlée, et l'erreur diminue de manière prévisible avec le raffinement de la grille.
+
+
+\subsection{Vérification de la Conservation de la Masse}
+\label{subsec:conservation_masse}
+
+\textbf{Objectif et Méthodologie :}
+Une propriété fondamentale du modèle physique (\ref{eq:full_mass_i}) est la conservation de la masse (ou du nombre total de véhicules) pour chaque classe \( i \), en l'absence de flux nets aux frontières du domaine. Il est essentiel de vérifier que le schéma numérique FVM implémenté préserve cette propriété au niveau discret, à la précision des erreurs d'arrondi près.
+
+Pour ce faire, une simulation spécifique a été configurée en utilisant le jeu de paramètres de base (Tableau \ref{tab:base_parameters}) sur un domaine de 1000 m avec une discrétisation de N=200 cellules (\( \Delta x = 5 \) m). Des \textbf{conditions aux limites périodiques} ont été appliquées aux deux extrémités du domaine, garantissant ainsi un système fermé sans entrée ni sortie de véhicules. La condition initiale utilisée était une perturbation sinusoïdale de faible amplitude superposée à un état de base uniforme (similaire à celle du test de convergence) pour induire une dynamique non triviale.
+
+La simulation a été exécutée pour une durée totale de \( T_{final} = 500 \) secondes. À intervalles réguliers (tous les 10 pas de temps), la masse totale pour chaque classe \( i \in \{m, c\} \) a été calculée en sommant les densités moyennes cellulaires sur les cellules physiques et en multipliant par \( \Delta x \) :
+\[ M_i(t^n) = \sum_{j=1}^{N} \rho_{i,j}^n \Delta x \]
+L'erreur relative de conservation par rapport à la masse initiale \( M_i^0 \) a ensuite été calculée à chaque instant de mesure :
+\[ E_{rel, i}(t^n) = \frac{|M_i(t^n) - M_i^0|}{|M_i^0|} \]
+
+\textbf{Résultats :}
+La Figure \ref{fig:mass_conservation_error} présente l'évolution de l'erreur relative de conservation \( E_{rel, i} \) pour les motos et les voitures au cours des 500 secondes de simulation.
+
+% Note : Créez un label pour la figure générée
+% \label{fig:mass_conservation_error}
+% Insérez ici la figure générée (plot_mass_data_N200_error.png)
+\begin{figure}[htbp]
+    \centering
+    % Commande pour inclure l'image .png générée
+    \includegraphics[width=0.8\textwidth]{results/conservation/plot_mass_data_N200_error.png}
+    \caption{Évolution de l'erreur relative de conservation de la masse pour les motos (\(E_{rel, m}\)) et les voitures (\(E_{rel, c}\)) au cours du temps, sur une échelle logarithmique.}
+    \label{fig:mass_conservation_error}
+\end{figure}
+
+Comme l'illustre la Figure \ref{fig:mass_conservation_error}, l'erreur relative de conservation pour les deux classes de véhicules reste extrêmement faible tout au long de la simulation. Les valeurs fluctuent aléatoirement dans une plage d'environ \( 1.4 \times 10^{-16} \) à \( 2.8 \times 10^{-16} \). Cet ordre de grandeur correspond à la précision attendue des calculs en virgule flottante double précision utilisés par NumPy. Crucialement, aucune dérive ou tendance systématique à l'augmentation ou à la diminution de l'erreur n'est observée sur la durée de la simulation.
+
+\textbf{Conclusion du Test :}
+Les résultats de ce test confirment sans équivoque que l'implémentation de la méthode des volumes finis conserve la masse totale de chaque classe de véhicules à la précision machine près, comme attendu théoriquement pour un schéma FVM correctement implémenté dans un système fermé. Cela renforce la confiance dans la correction de l'implémentation du solveur numérique.
+
+\subsection{Vérification de la Positivité des Densités}
+\label{subsec:positivite_densite}
+
+\textbf{Objectif et Méthodologie :}
+Une contrainte physique fondamentale pour tout modèle de trafic est que les densités de véhicules, \( \rho_m \) et \( \rho_c \), doivent rester non négatives (\( \ge 0 \)) à tout instant et en tout point de l'espace. Bien que les modèles mathématiques garantissent cela pour des solutions exactes partant de conditions initiales positives, les schémas numériques, en raison des erreurs de discrétisation et d'arrondi, peuvent parfois produire de très petites valeurs négatives, en particulier dans des situations de très faible densité (proche du vide) ou lors de la simulation d'ondes de raréfaction très rapides.
+
+Pour garantir la robustesse de l'implémentation et le respect de cette contrainte physique, un mécanisme de vérification et de correction a été intégré au code de simulation (décrit en Section \ref{subsec:challenges}). Après chaque mise à jour de l'état \( U_j^{n+1} \) lors de l'étape hyperbolique du schéma numérique, les composantes de densité \( \rho_{m,j}^{n+1} \) et \( \rho_{c,j}^{n+1} \) sont vérifiées. Si une valeur négative est détectée, un message d'avertissement est émis, et la valeur est réinitialisée à un petit seuil positif (plancher), \( \epsilon = 10^{-10} \), afin d'éviter des problèmes mathématiques dans les étapes suivantes (par exemple, logarithmes ou racines carrées de nombres négatifs, ou interprétation physique erronée) tout en ayant un impact négligeable sur la solution globale si l'occurrence est rare et la valeur négative initiale très petite.
+
+\textbf{Résultats :}
+Les simulations numériques réalisées pour les tests de validation (convergence, Section \ref{subsec:tests_convergence} ; conservation de la masse, Section \ref{subsec:conservation_masse}) ainsi que pour les scénarios phénoménologiques qui seront présentés à la Section \ref{sec:validation_phenomenologique} ont été systématiquement surveillées pour détecter l'activation de ce mécanisme de plancher via les messages d'avertissement.
+
+Dans l'ensemble des simulations effectuées pour cette étude, couvrant une gamme de conditions initiales, de résolutions spatiales et de régimes de flux (y compris des situations de faible densité et des interactions d'ondes), \textbf{aucun avertissement indiquant la détection de densités négatives n'a été généré}. Les valeurs de densité \( \rho_m \) et \( \rho_c \) sont restées strictement positives ou nulles (à la précision machine près) tout au long des simulations.
+
+\textbf{Conclusion du Test :}
+Ce résultat indique que le schéma numérique FVM/Central-Upwind implémenté, combiné avec le pas de temps régi par la condition CFL (\( \nu=0.8 \)), est suffisamment robuste pour préserver la positivité des densités dans les conditions et pour les plages de paramètres explorées dans ce travail. Le mécanisme de plancher, bien qu'implémenté par sécurité, n'a pas été nécessaire, renforçant la confiance dans la fiabilité physique des résultats de simulation qui seront présentés par la suite.

@@ -1,0 +1,254 @@
+\chapter{Revue de la Littérature}
+\label{chap:revue_litterature}
+
+\section{Vue d'ensemble des approches de modélisation du flux de trafic}
+\label{sec:revue_vue_ensemble}
+
+L'étude de la dynamique du trafic routier repose sur diverses approches de modélisation, classées principalement en trois catégories selon leur niveau de granularité : \textbf{microscopiques}, \textbf{macroscopiques} et \textbf{mésoscopiques}.
+
+Les modèles \textbf{microscopiques} se concentrent sur le comportement individuel des véhicules et de leurs conducteurs, simulant les interactions directes telles que le suivi de véhicule (car-following) et les changements de voie\footnote{\url{https://en.wikipedia.org/wiki/Traffic_flow}}. Ils offrent un niveau de détail élevé, permettant d'analyser l'impact des comportements individuels sur le flux global, mais deviennent computationnellement coûteux pour les grands réseaux\footnote{\url{https://en.wikipedia.org/wiki/Traffic_flow}}. Des exemples incluent les modèles stimulus-réponse, les modèles basés sur des points d'action, et les modèles d'automates cellulaires \cite{Daganzo2007GenealogyProc}.
+Le modèle \textbf{Lighthill-Whitham-Richards (LWR)}, développé indépendamment dans les années 1950, est le pionnier des approches macroscopiques\footnote{\url{https://en.wikipedia.org/wiki/Traffic_flow}}. Il repose sur le principe fondamental de la \textbf{conservation du nombre de véhicules} \cite{Lebacque1993}, exprimé par l'équation de continuité :
+\[
+\frac{\partial \rho}{\partial t} + \frac{\partial q}{\partial x} = 0
+\]
+où \( \rho(x, t) \) est la densité et \( q(x, t) \) est le débit à la position \(x\) et au temps \(t\)\footnote{\url{https://www.civil.iitb.ac.in/tvm/nptel/541_Macro/web/web.html}}.
+
+Une hypothèse clé est l'existence d'une relation d'équilibre statique entre le débit, la densité et la vitesse moyenne \(v\), souvent appelée \textbf{diagramme fondamental} : \( q = \rho v \) et \( v = V_e(\rho) \), où \( V_e(\rho) \) est la vitesse d'équilibre, fonction décroissante de la densité \cite{Lebacque1993}. L'équation du modèle devient alors :
+\[
+\frac{\partial \rho}{\partial t} + \frac{\partial (\rho V_e(\rho))}{\partial x} = 0
+\]
+\footnote{\url{https://www.civil.iitb.ac.in/tvm/nptel/541_Macro/web/web.html}}.
+
+\textbf{Limitations critiques :} Malgré sa simplicité et sa capacité à décrire les ondes de choc, le modèle LWR présente des limitations majeures :
+\begin{enumerate}
+    \item \textbf{Hypothèse d'équilibre instantané :} Il suppose que la vitesse s'ajuste instantanément à \( V_e(\rho) \), ce qui est irréaliste car les conducteurs ont un temps de réaction \cite{FanHertySeibold2014}.
+    \item \textbf{Incapacité à modéliser les phénomènes hors équilibre :} Il ne peut pas reproduire l'hystérésis (différence de comportement lors de la formation et de la dissipation de la congestion) ni les oscillations \textit{stop-and-go} \cite{AwKlarMaterneRascle2000}.
+    \item \textbf{Simplification excessive :} Il ne tient pas compte de l'anticipation, des temps de réaction, ou de l'influence directe des véhicules voisins au-delà de la densité locale \cite{FanHertySeibold2014}.
+    \item \textbf{Difficulté à gérer l'hétérogénéité :} La relation vitesse-densité unique rend difficile la représentation d'un trafic mixte avec des véhicules aux caractéristiques variées (e.g., motos vs voitures), un point crucial pour le Bénin \cite{WongWong2002}.
+\end{enumerate}
+
+Ces lacunes ont motivé le développement de modèles de \textbf{second ordre}.
+
+\subsection{Modèles de second ordre}
+\label{sec:revue_modele_2nd_ordre}
+
+Les modèles macroscopiques de second ordre visent à surmonter les limitations des modèles LWR en introduisant une équation dynamique supplémentaire, généralement pour l'évolution de la vitesse moyenne ou d'une variable liée (quantité de mouvement, énergie) \cite{FanHertySeibold2014}. Cela permet de prendre en compte l'inertie du flux et le temps d'ajustement des vitesses, capturant ainsi les états hors équilibre -. Ils peuvent ainsi modéliser des phénomènes comme l'hystérésis \cite{Laval2011Hysteresis} et les ondes de choc (oscillations \textit{stop-and-go})\footnote{\url{https://math.mit.edu/traffic/}}.
+
+Plusieurs familles de modèles de second ordre existent, comme le modèle de Payne-Whitham (PW) \cite{AwKlarMaterneRascle2000}, critiqué pour certains comportements non physiques \cite{TreiberN/ALecture7}, et des modèles généralisés (GSOM) comme METANET \cite{BiswasUddin2015Metanet}. Parmi eux, le modèle \textbf{Aw-Rascle-Zhang (ARZ)}, développé indépendamment par Aw \& Rascle (2000) et Zhang (2002)\footnote{\url{https://math.mit.edu/traffic/}}, se distingue particulièrement.
+
+\textbf{Principes du modèle ARZ :} Le modèle ARZ est un système de deux équations aux dérivées partielles hyperboliques \cite{IPAMN/AMathIntroTraffic}. Il conserve l'équation de masse du LWR et ajoute une équation pour une quantité liée à la vitesse :
+\[
+\frac{\partial \rho}{\partial t} + \frac{\partial (\rho v)}{\partial x} = 0
+\]
+\[
+\frac{\partial (v + p(\rho))}{\partial t} + v \frac{\partial (v + p(\rho))}{\partial x} = 0 \quad \text{(Formulation originale)}
+\]
+ou, sous forme conservative pour la quantité de mouvement généralisée \( \rho w \) avec \( w = v + p(\rho) \) :
+\[
+\frac{\partial (\rho w)}{\partial t} + \frac{\partial (\rho v w)}{\partial x} = 0
+\]
+\cite{yu2024traffic}. Ici, \( v \) est la vitesse moyenne et \( p(\rho) \) est une fonction de "pression" dépendant de la densité, reflétant l'anticipation ou l'hésitation des conducteurs\footnote{\url{https://math.mit.edu/traffic/}}. La quantité \( w = v + p(\rho) \) est un invariant lagrangien, constant le long des trajectoires des véhicules dans un flux homogène \cite{FanHertySeibold2014}.
+
+Certaines formulations incluent un terme de relaxation pour modéliser l'ajustement de la vitesse \( v \) vers une vitesse d'équilibre \( V_e(\rho) \) sur un temps caractéristique \( \tau \) \cite{yu2024traffic}:
+\[
+\frac{\partial v}{\partial t} + (v - \rho p'(\rho)) \frac{\partial v}{\partial x} = \frac{V_e(\rho) - v}{\tau}
+\]
+\cite{yu2024traffic}.
+
+\textbf{Avantages du modèle ARZ :}
+\begin{itemize}
+    \item \textbf{Anisotropie :} Le modèle respecte le principe selon lequel les conducteurs réagissent principalement aux conditions en aval (devant eux). Les perturbations se propagent vers l'arrière à une vitesse \( \lambda_1 = v - \rho p'(\rho) \), qui est inférieure ou égale à la vitesse des véhicules \( v = \lambda_2 \) \cite{yu2024traffic}.
+    \item \textbf{Capture des phénomènes hors équilibre :} Il modélise les états métastables, l'hystérésis, les transitions congestion/fluide, et les ondes \textit{stop-and-go}\footnote{\url{https://math.mit.edu/traffic/}}.
+    \item \textbf{Pas de vitesses négatives :} Contrairement à certains modèles antérieurs, il évite les vitesses non physiques si \( p'(\rho) \ge 0 \).
+    \item \textbf{Flexibilité :} Le cadre ARZ peut être étendu pour modéliser le trafic multi-classe \cite{LingChanutLebacque2011Multiclass}. Il présente une famille de diagrammes fondamentaux paramétrée par \( w \), offrant une représentation plus riche que le diagramme unique du LWR \cite{FanHertySeibold2014}.
+\end{itemize}
+
+\textbf{Défis et limitations :}
+\begin{itemize}
+    \item \textbf{Complexité :} Le système hyperbolique non linéaire est plus complexe à analyser et à résoudre numériquement que le LWR \cite{DiEtAl2024}.
+    \item \textbf{Calibration :} La calibration des paramètres, notamment la fonction de pression \( p(\rho) \) et le temps de relaxation \( \tau \), peut être délicate \cite{KhelifiEtAl2023}.
+    \item \textbf{Comportements non physiques potentiels :} Des choix inappropriés de \( p(\rho) \) peuvent conduire à des densités maximales multiples ou à des vitesses négatives dans certaines conditions \cite{FanWork2015}. Des versions modifiées (e.g., GARZ) visent à corriger cela \cite{FanHertySeibold2014}.
+\end{itemize}
+
+Malgré ces défis, le modèle ARZ constitue une base solide et flexible pour modéliser la dynamique complexe du trafic, y compris dans des contextes hétérogènes.
+
+\section{Modélisation de l'hétérogénéité du trafic}
+\label{sec:revue_heterogeneite}
+
+Le trafic réel est rarement homogène. Il est composé de différents types de véhicules (voitures, camions, bus, motos, vélos) ayant des tailles, des capacités dynamiques (accélération, freinage) et des comportements de conduite variés. Cette hétérogénéité influence fortement la dynamique globale du flux, en particulier dans les pays en développement comme le Bénin où la diversité des véhicules est grande et où les motos jouent un rôle prépondérant.
+
+\subsection{Modélisation multi-classe}
+\label{subsec:revue_multiclasse}
+
+Pour tenir compte de cette diversité, les modèles macroscopiques peuvent être étendus en approches \textbf{multi-classes}. L'idée est de considérer le flux de trafic comme étant composé de plusieurs "fluides" interagissant, chacun représentant une classe de véhicules.
+
+\textbf{Approches dans les modèles LWR :}
+\begin{itemize}
+    \item \textbf{Diagrammes fondamentaux spécifiques à chaque classe :} Utiliser des relations vitesse-densité \( V_{e,i}(\rho) \) distinctes pour chaque classe \( i \), reflétant leurs différentes vitesses et occupations spatiales\footnote{\url{https://en.wikipedia.org/wiki/Fundamental_diagram_of_traffic_flow}}.
+    \item \textbf{Coefficients d'équivalence (PCE/PCU) :} Convertir tous les véhicules en un nombre équivalent de voitures particulières pour utiliser un diagramme fondamental unique ou calculer des variables agrégées \cite{RambhaN/ACE269Lec12}.
+    \item \textbf{Flux interagissant :} Modéliser des flux distincts pour chaque classe avec des interactions définies (e.g., allocation d'espace, densité effective) \cite{RambhaN/ACE269Lec12}.
+\end{itemize}
+
+\textbf{Approches dans les modèles ARZ :}
+\begin{itemize}
+    \item \textbf{Équations distinctes par classe :} Formuler un système d'équations ARZ pour chaque classe \( i \), avec des densités \( \rho_i \), des vitesses \( v_i \), et potentiellement des fonctions de pression \( p_i(\rho) \) spécifiques \cite{FanWork2015, ColomboMarcellini2020}. Le système pour N classes serait :
+        \[
+        \frac{\partial \rho_i}{\partial t} + \frac{\partial (\rho_i v_i)}{\partial x} = 0
+        \]
+        \[
+        \frac{\partial (v_i + p_i(\rho))}{\partial t} + v_i \frac{\partial (v_i + p_i(\rho))}{\partial x} = \frac{V_{e,i}(\rho) - v_i}{\tau_i} \quad (\text{avec relaxation})
+        \]
+        où les fonctions \( p_i \), \( V_{e,i} \), et \( \tau_i \) peuvent dépendre des densités et/ou vitesses de toutes les classes pour modéliser les interactions \cite{FanWork2015, ColomboMarcellini2020, WongWong2002, BenzoniGavageColombo2003}.
+    \item \textbf{Occupation spatiale et densité de congestion :} Utiliser un concept de densité de congestion maximale commune ou effective pour assurer un comportement réaliste lorsque la densité totale approche le maximum \cite{FanWork2015}.
+    \item \textbf{Paramètres spécifiques par classe :} Attribuer des vitesses de flux libre, des longueurs de véhicule, et des temps de relaxation différents à chaque classe\footnote{\url{https://en.wikipedia.org/wiki/Microscopic_traffic_flow_model}}.
+\end{itemize}
+
+\textbf{Limitations actuelles :} Bien que prometteuses, les extensions multi-classes existantes, notamment pour ARZ, supposent souvent des interactions simplifiées (e.g., vitesse unique par classe ou interactions basées uniquement sur les densités) et peinent à capturer des comportements fins comme l'entrelacement complexe des motos.
+
+\subsection{Modélisation du trafic dominé par les motos}
+\label{subsec:revue_motos}
+
+Le contexte béninois est marqué par une prédominance des motos, en particulier les taxis-motos ("Zémidjans"). Ces véhicules présentent des comportements spécifiques qui affectent significativement la dynamique du trafic :
+
+\begin{itemize}
+    \item \textbf{Remplissage d'interstices (Gap-filling) :} Capacité des motos à utiliser les espaces entre les véhicules plus grands, leur permettant de progresser même en congestion \cite{khan2021macroscopic}. Les modèles microscopiques montrent qu'elles acceptent des intervalles plus petits \cite{NguyenEtAl2012}. Au niveau macroscopique, cela pourrait être modélisé par une réduction de la densité effective perçue par les motos ou par des termes d'anticipation modifiés \cite{khan2021macroscopic}.
+    \item \textbf{Entrelacement (Interweaving) / Filtrage / Remontée de file :} Mouvements latéraux continus des motos entre les files de véhicules, surtout à basse vitesse ou à l'arrêt \cite{DiFrancescoEtAl2015, TiwariEtAl2007}. Ce comportement optimise l'utilisation de l'espace mais peut perturber le flux des autres véhicules. La modélisation macroscopique de ce phénomène est complexe et pourrait nécessiter des approches bidimensionnelles ou des modèles à "voies flexibles" \cite{ColomboMarcelliniRossi2023}.
+\end{itemize}
+
+\textbf{Adaptations macroscopiques (notamment pour ARZ) :}
+\begin{itemize}
+    \item \textbf{Modèles ARZ multi-classes :} Traiter les motos comme une classe distincte avec des paramètres \( V_{e,moto} \), \( p_{moto}(\rho) \), \( \tau_{moto} \) spécifiques \cite{FanWork2015}.
+    \item \textbf{Termes d'interaction spécifiques :} Introduire des termes dans les équations ARZ qui reflètent explicitement le "gap-filling" (e.g., modification de \( p(\rho) \) pour les motos) ou l'"interweaving".
+    \item \textbf{Vitesses d'équilibre ajustées :} Modifier \( V_{e,moto}(\rho) \) pour refléter l'agilité des motos et leur capacité à maintenir une certaine vitesse même à haute densité \cite{TiwariEtAl2007}.
+    \item \textbf{Modèles basés sur des analogies physiques :} Utiliser des analogies comme l'effusion de gaz pour le "gap-filling" \cite{khan2021macroscopic} ou traiter les motos comme un fluide dans un milieu poreux (les autres véhicules) \cite{khan2021macroscopic}.
+\end{itemize}
+
+La littérature existante sur la modélisation macroscopique spécifique aux motos est encore limitée, en particulier concernant l'intégration de ces comportements dans des modèles de second ordre comme ARZ\footnote{\url{https://www.youtube.com/watch?v=oA1w4RMcSGI}}.
+
+\subsection{Modélisation du comportement de "Creeping"}
+\label{subsec:revue_creeping}
+
+Le "creeping" (reptation ou avancée lente) désigne la capacité de certains véhicules, notamment les motos, à continuer de se déplacer très lentement dans des conditions de congestion extrême, alors que les véhicules plus grands sont complètement arrêtés \cite{FanWork2015, Saumtally2012}. Ce comportement est lié à la petite taille et à la maniabilité des motos, leur permettant de se faufiler dans les moindres espaces \cite{Saumtally2012, FanWork2015}.
+
+\textbf{Approches de modélisation :}
+\begin{itemize}
+    \item \textbf{Modèles de transition de phase :} Définir différents régimes de trafic (fluide, congestionné, creeping) avec des ensembles d'équations distincts. Dans la phase "creeping", les motos pourraient suivre une loi de vitesse spécifique leur permettant de maintenir une vitesse résiduelle non nulle \cite{FanWork2015, Saumtally2012}.
+    \item \textbf{Modification des paramètres du modèle :}
+        \begin{itemize}
+            \item \textbf{Réduction de la pression \( p(\rho) \) pour les motos :} Simuler leur capacité à circuler même à très haute densité \cite{ChanutBuisson2003}.
+            \item \textbf{Fonction de relaxation \( \tau(\rho) \) spécifique :} Permettre aux motos d'ajuster leur vitesse différemment en congestion \cite{FanWork2015}.
+            \item \textbf{Vitesse d'équilibre modifiée \( V_e(\rho) \) :} Assurer une vitesse minimale non nulle pour les motos lorsque la densité approche le maximum.
+            \item \textbf{Occupation spatiale effective :} Considérer que les motos occupent moins d'espace effectif en congestion, leur permettant de bouger.
+        \end{itemize}
+\end{itemize}
+
+Le comportement de "creeping" est encore peu étudié dans les modèles macroscopiques, en particulier dans le cadre ARZ et pour des contextes comme celui du Bénin \cite{Saumtally2012}. Les modèles existants nécessitent une adaptation et une validation spécifiques.
+
+\section{Modélisation de contextes et phénomènes spécifiques}
+\label{sec:revue_contextes}
+
+\subsection{Modélisation de réseaux et d'intersections}
+\label{subsec:revue_reseaux}
+
+L'application des modèles macroscopiques à des réseaux routiers complexes nécessite de traiter spécifiquement les \textbf{intersections} (jonctions ou nœuds). Celles-ci constituent des points de discontinuité où les flux entrants sont distribués vers les flux sortants.
+
+\textbf{Approches générales :}
+\begin{itemize}
+    \item \textbf{Conservation du flux :} Le flux total entrant doit égaler le flux total sortant\footnote{\url{https://www.researchgate.net/publication/322175742_Macroscopic_traffic_model_for_large_scale_urban_traffic_network_design}}; \cite{CostesequeSlides}.
+    \item \textbf{Règles de distribution :} Utilisation de matrices de distribution ou de coefficients de partage pour déterminer la proportion du flux allant de chaque entrée vers chaque sortie \cite{kolb2018pareto}.
+    \item \textbf{Règles de priorité / Demande et offre :} Modélisation de la capacité limitée de la jonction et des priorités entre les flux concurrents (e.g., modèle de Daganzo CTM, approches de Lebacque \cite{Lebacque1996}).
+\end{itemize}
+
+\textbf{Défis avec les modèles de second ordre (ARZ) :}
+\begin{itemize}
+    \item \textbf{Gestion de la variable de second ordre :} La variable supplémentaire (e.g., \( w = v + p(\rho) \)) doit également être traitée à la jonction. Des approches consistent à imposer des conditions spécifiques sur cette variable, comme la conservation de \( w \) ou son homogénéisation pour le flux sortant \cite{kolb2018pareto, HertyEtAl2007}.
+    \item \textbf{Solveurs de Riemann aux jonctions :} Le développement de solveurs de Riemann spécifiques pour les systèmes ARZ aux jonctions est un domaine de recherche actif \cite{CostesequeSlides}.
+    \item \textbf{Complexité des intersections réelles :} La modélisation détaillée des feux de signalisation, des mouvements tournants complexes, et des interactions fines reste un défi pour les approches macroscopiques.
+\end{itemize}
+
+\subsection{Impact de l'infrastructure}
+\label{subsec:revue_infra}
+
+La qualité et le type de l'infrastructure routière (état de la chaussée, largeur des voies, présence d'accotements, etc.) ont un impact direct sur les paramètres du flux de trafic.
+
+\begin{itemize}
+    \item \textbf{Influence sur les paramètres du modèle :} La qualité de la route affecte principalement la \textbf{vitesse de flux libre} \( V_{max} \) et la \textbf{capacité} (débit maximal) \( q_{max} \), qui sont des paramètres clés des diagrammes fondamentaux \( V_e(\rho) \) utilisés dans les modèles LWR et ARZ \cite{JollyEtAl2005}\footnote{\url{https://www.youtube.com/watch?v=oA1w4RMcSGI}}. Des routes dégradées ou des voies étroites entraînent généralement une réduction de ces valeurs \cite{GuraraEtAl2022}.
+    \item \textbf{Intégration dans les modèles :}
+        \begin{itemize}
+            \item \textbf{Ajustement des paramètres :} Utiliser des valeurs différentes pour \( V_{max} \), \( q_{max} \), ou d'autres paramètres du diagramme fondamental en fonction du type ou de l'état de la route\footnote{\url{https://www.youtube.com/watch?v=oA1w4RMcSGI}}.
+            \item \textbf{Coefficients de friction/rugosité :} Intégrer des termes liés à l'état de la surface dans l'expression de \( V_e(\rho) \) \cite{GuraraEtAl2022}.
+            \item \textbf{Modélisation des discontinuités :} Traiter les changements brusques de qualité de route comme des discontinuités spatiales dans les paramètres du modèle.
+        \end{itemize}
+\end{itemize}
+
+L'intégration de l'impact de l'infrastructure est particulièrement pertinente au Bénin, où l'état des routes peut être très variable \cite{NwankwoEtAl2019}.
+
+\subsection{Traffic Flow in Developing Economies}
+\label{subsec:revue_dev_economies}
+
+La modélisation du trafic dans les économies en développement, comme le Bénin, présente des défis uniques par rapport aux contextes des pays développés où la plupart des modèles ont été initialement conçus.
+
+\textbf{Caractéristiques et défis spécifiques :}
+\begin{itemize}
+    \item \textbf{Hétérogénéité extrême :} Mélange très diversifié de véhicules motorisés (motos, voitures, camions, bus) et non motorisés (vélos, charrettes), ainsi que des piétons partageant souvent le même espace routier \cite{Chanut2004}.
+    \item \textbf{Prédominance des motos :} Rôle central des deux-roues motorisés (souvent comme taxis) dans la mobilité quotidienne \cite{Kalieu2016}.
+    \item \textbf{Manque de discipline de voie :} Comportements de conduite moins contraints par les voies, avec des mouvements latéraux fréquents et une utilisation opportuniste de l'espace \cite{easts2011modeling}.
+    \item \textbf{Règles de conduite informelles :} Moindre respect des règles formelles, notamment aux intersections, nécessitant potentiellement des modèles non-FIFO (First-In-First-Out).
+    \item \textbf{Limitations de l'infrastructure :} Qualité variable des routes, capacité souvent inadéquate, manque de signalisation ou de marquage au sol \cite{Chanut2004}.
+    \item \textbf{Disponibilité des données :} Collecte de données de trafic souvent plus difficile et moins systématique.
+\end{itemize}
+
+\textbf{Efforts de modélisation :}
+\begin{itemize}
+    \item Des études spécifiques ont été menées dans des contextes similaires (e.g., Inde, Vietnam, autres pays africains) pour adapter les modèles existants ou en développer de nouveaux \cite{TiwariEtAl2007}.
+    \item L'accent est mis sur la modélisation multi-classe, l'intégration des comportements spécifiques des motos, et la prise en compte des interactions complexes dans un environnement moins structuré \cite{FanWork2015}.
+    \item L'utilisation de modèles ARZ étendus apparaît comme une voie prometteuse pour capturer à la fois la dynamique hors équilibre et l'hétérogénéité prononcée \cite{khan2021macroscopic}.
+\end{itemize}
+
+Cependant, la littérature spécifiquement dédiée à la modélisation macroscopique avancée (type ARZ) pour le contexte précis du Bénin reste limitée.
+
+\section{Méthodes numériques pour les modèles macroscopiques}
+\label{sec:revue_methodes_num}
+
+La résolution numérique des modèles macroscopiques de trafic, qui sont formulés comme des systèmes d'équations aux dérivées partielles (EDP) hyperboliques (LWR, ARZ), nécessite des méthodes robustes capables de traiter les discontinuités (ondes de choc) et de préserver les propriétés physiques du flux.
+
+\textbf{Méthodes courantes :}
+\begin{itemize}
+    \item \textbf{Méthodes des Volumes Finis (FVM) :} Largement utilisées pour les lois de conservation. Elles discrétisent le domaine spatial en volumes de contrôle et assurent la conservation des quantités (densité, quantité de mouvement) à travers les interfaces des cellules \cite{FanWork2015}. Elles sont bien adaptées aux discontinuités et peuvent gérer des géométries complexes \cite{FanWork2015, FanHertySeibold2014}.
+    \item \textbf{Schémas de type Godunov :} Une classe spécifique de FVM basée sur la résolution (exacte ou approchée) de problèmes de Riemann à chaque interface entre les cellules pour calculer les flux numériques \cite{MammarEtAl2009}. Le Cell Transmission Model (CTM) de Daganzo est un exemple populaire de schéma Godunov de premier ordre pour LWR. Ces schémas sont connus pour leur capacité à capturer nettement les chocs \cite{FanWork2015}.
+    \item \textbf{Schémas d'ordre élevé (e.g., WENO, MUSCL) :} Pour améliorer la précision des FVM, des techniques de reconstruction d'ordre supérieur (comme WENO - Weighted Essentially Non-Oscillatory) peuvent être utilisées pour interpoler les valeurs dans les cellules avant de résoudre le problème de Riemann \cite{Giorgi2002}.
+    \item \textbf{Traitement des termes sources (pour ARZ avec relaxation) :} Lorsque des termes sources (comme le terme de relaxation \( (V_e - v)/\tau \)) sont présents, des techniques spécifiques comme le \textit{splitting} d'opérateur (séparation des parties hyperboliques et sources) ou des discrétisations adaptées des termes sources sont nécessaires pour maintenir la précision et la stabilité \cite{kolb2018pareto}.
+    \item \textbf{Schémas spécifiques pour ARZ :} Des solveurs de Riemann approchés \cite{ZhangEtAl2003} et des schémas spécifiques comme les schémas central-upwind \cite{Giorgi2002} ont été développés pour le système ARZ.
+\end{itemize}
+
+\textbf{Condition de stabilité :} Les schémas explicites (comme la plupart des FVM et Godunov) sont soumis à une condition de stabilité, typiquement la condition de Courant-Friedrichs-Lewy (CFL), qui lie le pas de temps \( \Delta t \) au pas d'espace \( \Delta x \) et aux vitesses d'onde maximales du système pour garantir la convergence \cite{BiswasUddin2015Metanet}.
+
+Le choix de la méthode numérique dépend de la complexité du modèle (LWR vs ARZ, mono- vs multi-classe), du niveau de précision requis, et des ressources computationnelles disponibles.
+
+\section{Synthèse et Lacune de Recherche}
+\label{sec:revue_synthese_lacune}
+
+\textbf{Synthèse critique :}
+La revue de la littérature montre une progression claire depuis les modèles macroscopiques de premier ordre (LWR), simples mais limités, vers les modèles de second ordre (notamment ARZ), plus complexes mais capables de capturer des dynamiques hors équilibre essentielles comme l'hystérésis et les oscillations \textit{stop-and-go}. Le modèle ARZ, avec son respect de l'anisotropie et sa flexibilité, apparaît comme un cadre théorique particulièrement prometteur.
+
+La nécessité de représenter l'hétérogénéité du trafic a conduit au développement d'approches multi-classes pour LWR et ARZ. Ces approches permettent de distinguer différents types de véhicules, mais les modèles actuels peinent encore à capturer finement les interactions complexes et les comportements spécifiques, en particulier ceux des motos (gap-filling, interweaving, creeping) qui sont prédominants dans des contextes comme celui du Bénin \cite{Saumtally2012}.
+
+La modélisation du trafic dans les économies en développement fait face à des défis supplémentaires liés à l'hétérogénéité extrême, aux infrastructures variables, et aux comportements de conduite spécifiques. Bien que des études existent, l'application et la validation de modèles macroscopiques avancés, spécifiquement adaptés et calibrés pour le contexte béninois, restent limitées.
+
+\textbf{Lacune spécifique de recherche :}
+La principale lacune identifiée est le \textbf{manque de modèles ARZ multi-classes étendus, spécifiquement développés, calibrés et validés pour le contexte unique du trafic au Bénin}. Plus précisément :
+\begin{enumerate}
+    \item Les extensions multi-classes existantes d'ARZ sont souvent rudimentaires et ne capturent pas adéquatement les comportements spécifiques et dominants des motos béninoises (Zémidjans), tels que le \textbf{gap-filling}, l'\textbf{interweaving}, et le \textbf{creeping} en conditions de congestion \cite{Saumtally2012}.
+    \item Il manque une \textbf{paramétrisation réaliste} des fonctions clés du modèle ARZ (vitesse d'équilibre \( V_e(\rho) \), fonction de pression \( p(\rho) \), temps de relaxation \( \tau \)) qui intègre l'impact de la \textbf{qualité variable de l'infrastructure} routière locale \cite{JollyEtAl2005}.
+    \item Il n'existe pas de modèle ARZ multi-classe qui intègre \textbf{simultanément} l'hétérogénéité extrême du trafic béninois, l'impact infrastructurel, et les comportements spécifiques des motos, et qui soit validé par des \textbf{données empiriques collectées localement}.
+\end{enumerate}
+
+\textbf{Contribution de ce travail :}
+Ce travail vise à combler cette lacune en développant et validant une \textbf{extension du modèle ARZ multi-classes} spécifiquement conçue pour le contexte du Bénin. Cette extension incorporera :
+\begin{itemize}
+    \item Des équations et/ou des termes spécifiques pour modéliser les comportements clés des motos (creeping, gap-filling, interweaving).
+    \item Une paramétrisation adaptée aux caractéristiques des véhicules locaux et à l'état des infrastructures routières béninoises.
+    \item Une calibration et une validation rigoureuses basées sur des données de trafic réelles collectées au Bénin.
+\end{itemize}
+
+L'objectif final est de fournir un outil de modélisation plus réaliste et pertinent pour l'analyse et la gestion du trafic dans les villes béninoises.

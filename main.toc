@@ -1,0 +1,84 @@
+\babel@toc {french}{}\relax 
+\babel@toc {french}{}\relax 
+\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Contexte et Problématique Générale}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Problématique Spécifique et Justification du Modèle ARZ}{2}{section.1.2}%
+\contentsline {section}{\numberline {1.3}But et Objectifs de la Recherche}{3}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Questions de Recherche}{4}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Portée et Pertinence de l'Étude}{4}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Structure du Document}{5}{section.1.6}%
+\contentsline {chapter}{\numberline {2}Revue de la Littérature}{7}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Vue d'ensemble des approches de modélisation du flux de trafic}{7}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Modèles de second ordre}{8}{subsection.2.1.1}%
+\contentsline {section}{\numberline {2.2}Modélisation de l'hétérogénéité du trafic}{9}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Modélisation multi-classe}{10}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Modélisation du trafic dominé par les motos}{11}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}Modélisation du comportement de "Creeping"}{11}{subsection.2.2.3}%
+\contentsline {section}{\numberline {2.3}Modélisation de contextes et phénomènes spécifiques}{12}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Modélisation de réseaux et d'intersections}{12}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Impact de l'infrastructure}{13}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}Traffic Flow in Developing Economies}{13}{subsection.2.3.3}%
+\contentsline {section}{\numberline {2.4}Méthodes numériques pour les modèles macroscopiques}{14}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Synthèse et Lacune de Recherche}{15}{section.2.5}%
+\contentsline {chapter}{\numberline {3}Caractéristiques du Trafic Routier au Bénin}{17}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Contexte Socio-Économique et Défis du Transport}{17}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Le Réseau Routier Béninois}{18}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Hétérogénéité des Infrastructures Routières}{18}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Organisation Spatiale du Réseau}{19}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Gestion des Intersections et Régulation du Trafic}{19}{subsection.3.2.3}%
+\contentsline {section}{\numberline {3.3}Composition Hétérogène du Parc Automobile}{20}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Comportements Spécifiques des Motos et Impact sur le Trafic}{21}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Pratiques de Conduite Distinctives}{21}{subsection.3.4.1}%
+\contentsline {subsubsection}{Gap-Filling (Remplissage des Espaces)}{21}{subsubsection*.5}%
+\contentsline {subsubsection}{Interweaving (Circulation en Zigzag / Mouvement Latéral)}{21}{subsubsection*.6}%
+\contentsline {subsubsection}{Front-Loading aux Intersections}{21}{subsubsection*.7}%
+\contentsline {subsubsection}{Adaptation aux Infrastructures et "Creeping"}{21}{subsubsection*.8}%
+\contentsline {subsection}{\numberline {3.4.2}Impact sur la Dynamique Globale du Trafic}{22}{subsection.3.4.2}%
+\contentsline {section}{\numberline {3.5}Méthodologie de Collecte et d'Analyse des Données}{22}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Défis et Besoins pour la Modélisation (Conclusion du Chapitre)}{24}{section.3.6}%
+\contentsline {chapter}{\numberline {4}Extended Multiclass ARZ Model Formulation for Benin}{25}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Base Multiclass ARZ Framework Selection}{25}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Modeling Road Pavement Effects on Equilibrium Speed}{27}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Modeling Motorcycle Gap-Filling in ARZ}{28}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Modeling Motorcycle Interweaving Effects in ARZ}{30}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Modeling Motorcycle "Creeping" in Congestion}{32}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Intersection Model: Source/Sink Terms and Coupling Conditions}{34}{section.4.6}%
+\contentsline {section}{\numberline {4.7}The Complete Extended ARZ Model Equations}{37}{section.4.7}%
+\contentsline {paragraph}{Fonctions de Pression \( p_i(\rho _m, \rho _c) \):}{37}{paragraph*.9}%
+\contentsline {paragraph}{Fonctions de Vitesse d'Équilibre \( V_{e,i}(\rho , R(x)) \):}{38}{paragraph*.10}%
+\contentsline {paragraph}{Fonctions de Temps de Relaxation \( \tau _i(\rho ) \):}{38}{paragraph*.11}%
+\contentsline {chapter}{\numberline {5}Mathematical Analysis and Numerical Implementation}{41}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Mathematical Properties of the Extended Model}{41}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Hyperbolicity}{41}{subsection.5.1.1}%
+\contentsline {subsection}{\numberline {5.1.2}Eigenvalues and Characteristic Speeds}{42}{subsection.5.1.2}%
+\contentsline {subsection}{\numberline {5.1.3}Characteristic Analysis (Wave Structure)}{43}{subsection.5.1.3}%
+\contentsline {section}{\numberline {5.2}Riemann Problem Structure (Conceptual)}{44}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Linear Stability Analysis}{45}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Numerical Scheme}{48}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}Finite Volume Formulation}{48}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}Approximate Riemann Solver: Central-Upwind Scheme}{48}{subsection.5.4.2}%
+\contentsline {subsection}{\numberline {5.4.3}Handling of Source Terms (Relaxation) via Strang Splitting}{50}{subsection.5.4.3}%
+\contentsline {subsection}{\numberline {5.4.4}Handling of Spatial Dependencies (R(x))}{50}{subsection.5.4.4}%
+\contentsline {subsection}{\numberline {5.4.5}Temporal Discretization (Hyperbolic Step) and Stability (CFL)}{50}{subsection.5.4.5}%
+\contentsline {section}{\numberline {5.5}Implementation Details}{51}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}Software Environment}{51}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}Core Algorithm Specifics}{52}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}Handling Numerical Challenges}{53}{subsection.5.5.3}%
+\contentsline {chapter}{\numberline {6}Simulation Numérique et Analyse du Modèle ARZ Étendu}{55}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Stratégie d'Estimation des Paramètres et Jeu de Base}{55}{section.6.1}%
+\contentsline {subsection}{\numberline {6.1.1}Stratégie Générale d'Estimation des Paramètres}{55}{subsection.6.1.1}%
+\contentsline {subsection}{\numberline {6.1.2}Paramètres d'Infrastructure (Dérivés d'OSM \texttt {roads})}{56}{subsection.6.1.2}%
+\contentsline {subsubsection}{Source et Traitement des Données OSM}{57}{subsubsection*.12}%
+\contentsline {subsubsection}{Classification des Types de Route \( R(x) \)}{57}{subsubsection*.13}%
+\contentsline {subsubsection}{Estimation \textit {a priori} des Vitesses Maximales en Flux Libre \( V_{max,i}(R) \)}{58}{subsubsection*.14}%
+\contentsline {subsection}{\numberline {6.1.3}Estimation des Paramètres Comportementaux et Dynamiques}{59}{subsection.6.1.3}%
+\contentsline {subsubsection}{Paramètre de Gap-filling/Interweaving (\(\alpha \))}{59}{subsubsection*.16}%
+\contentsline {subsubsection}{Vitesse de Creeping (\(V_{creeping}\))}{60}{subsubsection*.17}%
+\contentsline {subsubsection}{Fonctions de Pression (\(P_m, P_c\)) et Densité de Blocage (\(\rho _{jam}\))}{60}{subsubsection*.18}%
+\contentsline {subsubsection}{Fonctions de Vitesse d'Équilibre (\(g_m, g_c\))}{62}{subsubsection*.19}%
+\contentsline {subsubsection}{Temps de Relaxation (\(\tau _m, \tau _c\))}{62}{subsubsection*.20}%
+\contentsline {subsubsection}{Composition du Flux de Base}{63}{subsubsection*.21}%
+\contentsline {subsection}{\numberline {6.1.4}Tableau Récapitulatif du Jeu de Paramètres de Base}{63}{subsection.6.1.4}%
+\contentsline {subsection}{\numberline {6.1.5}Tests de Convergence}{63}{subsection.6.1.5}%
+\contentsline {subsection}{\numberline {6.1.6}Vérification de la Conservation de la Masse}{66}{subsection.6.1.6}%
+\contentsline {subsection}{\numberline {6.1.7}Vérification de la Positivité des Densités}{67}{subsection.6.1.7}%

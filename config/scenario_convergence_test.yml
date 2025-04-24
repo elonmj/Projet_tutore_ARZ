@@ -1,0 +1,38 @@
+# Scenario Configuration: Convergence Test with Smooth Initial Condition
+
+scenario_name: convergence_test_sine
+
+# Grid Parameters (Will be overridden by run_convergence_test.py)
+N: 100          # Placeholder - Number of physical cells
+xmin: 0.0
+xmax: 1000.0    # 1 km segment
+
+# Simulation Time Parameters (SI units: s)
+t_final: 10.0   # Short time to avoid shock formation
+output_dt: 10.0 # Only store the final state
+
+# Road Quality Definition (Now defined via 'road' block in base or scenario,
+# or explicitly via R_val in IC if needed for equilibrium calculation)
+
+# Initial Conditions
+initial_conditions:
+  type: sine_wave_perturbation
+  # R_val needed for equilibrium velocity calculation within this IC type
+  R_val: 3 # Corresponds to road quality type 3 (Residential/Local)
+  background_state:
+    rho_m: 50.0e-3  # 50 veh/km
+    rho_c: 20.0e-3  # 20 veh/km
+  perturbation:
+    amplitude: 5.0e-3 # 5 veh/km amplitude (10% of rho_m_bg)
+    wave_number: 1    # One full wave across the domain
+
+# Boundary Conditions
+boundary_conditions:
+  left:
+    type: periodic
+  right:
+    type: periodic
+
+# Note: Physical parameters (alpha, Vmax, pressure, etc.) and
+# numerical parameters (cfl_number, ode_solver, etc.)
+# are loaded from config_base.yml by default.

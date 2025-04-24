@@ -1,0 +1,112 @@
+\chapter{Introduction}
+\label{chap:introduction}
+
+% Section 1.1: Background and Context
+\section{Contexte et Problématique Générale}
+\label{sec:intro_contexte}
+
+La modélisation du trafic routier est devenue un outil essentiel pour la planification et la gestion des infrastructures de transport à travers le monde. Elle permet notamment d'anticiper les congestions, d'optimiser les flux de véhicules, d'évaluer les impacts des politiques de transport et d'améliorer la sécurité routière \cite{placeholder_traffic_modeling_importance}. Dans un contexte de croissance urbaine rapide et de ressources souvent limitées, comme celui du Bénin, ces outils sont particulièrement précieux pour guider un développement durable et efficace des systèmes de transport.
+
+Cependant, la modélisation du trafic dans les économies en développement présente des défis uniques \cite{Chanut2004}. Le réseau routier béninois, en particulier, est caractérisé par des spécificités qui rendent l'application directe des modèles de trafic classiques, souvent développés pour des contextes de pays industrialisés, particulièrement difficile :
+\begin{itemize}
+    \item \textbf{Hétérogénéité extrême du parc roulant} : Une coexistence marquée de véhicules aux caractéristiques très diverses (voitures particulières, camions, bus, tricycles) avec une prédominance écrasante des deux-roues motorisés \cite{DiFrancescoEtAl2015}.
+    \item \textbf{Rôle central des motos} : Les motocyclettes, et notamment les taxis-motos appelés "Zémidjans", représentent une part majoritaire du trafic urbain (souvent plus de 70-80\%) et constituent un pilier de la mobilité quotidienne \cite{NewApproachMotorcycles}. Leurs comportements spécifiques (agilité, capacité à se faufiler) influencent profondément la dynamique globale du flux.
+    \item \textbf{Infrastructures variables et contraintes} : Le réseau est composé de routes bitumées, pavées, et de nombreuses voies en terre, souvent dans un état de dégradation variable, avec une capacité fréquemment inadéquate et un manque de signalisation ou de marquage clair \cite{IntroTrafficEPFL}.
+    \item \textbf{Comportements de conduite adaptatifs} : Les conducteurs, en particulier ceux des motos, adoptent des stratégies spécifiques pour naviguer dans ce contexte, telles que le remplissage d'interstices ("gap-filling"), l'entrelacement ou la remontée de file ("interweaving", "filtering"), et une faible discipline de voie \cite{ModelingMixedTrafficDiscreteChoice}.
+    \item \textbf{Réglementation et interactions informelles} : Un respect parfois limité des règles de conduite formelles, notamment aux intersections, où les négociations informelles peuvent jouer un rôle important.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    % Assurez-vous que le chemin vers l'image est correct par rapport à main.tex
+    % Par exemple, si l'image est dans assets/figures/introduction/
+    \includegraphics[width=0.8\textwidth]{introduction/traffic.jpg}
+    \caption{Exemple de trafic typique à Cotonou illustrant la prédominance des motos (Zémidjans) et leur interaction avec d'autres véhicules dans un environnement urbain dense.}\label{fig:trafic_cotonou_intro}
+\end{figure}
+
+Ces caractéristiques complexes nécessitent des approches de modélisation qui vont au-delà des hypothèses simplificatrices des modèles standards.
+
+% Section 1.2: Problem Statement
+\section{Problématique Spécifique et Justification du Modèle ARZ}
+\label{sec:intro_problematique}
+
+Face à la complexité du trafic béninois, les modèles macroscopiques classiques de premier ordre, tels que le modèle Lighthill-Whitham-Richards (LWR) \cite{LighthillWhitham1955, Richards1956}, montrent des limites fondamentales. Bien que simple et robuste, le modèle LWR repose sur l'hypothèse d'une relation d'équilibre instantanée entre la vitesse et la densité (le diagramme fondamental), et suppose un flux homogène \cite{TrafficFlowModelingAnalogies}. Ces hypothèses sont inadéquates pour le contexte béninois car :
+\begin{itemize}
+    \item Elles ignorent l'\textbf{hétérogénéité fondamentale} du trafic et les interactions spécifiques entre les différentes classes de véhicules, notamment les motos.
+    \item Elles ne peuvent pas capturer les \textbf{phénomènes hors équilibre} cruciaux observés dans le trafic réel, tels que les ondes stop-and-go, l'hystérésis (différence de comportement entre la formation et la dissipation de la congestion), ou les temps d'adaptation des conducteurs \cite{GenericSecondOrderModels, TrafficRelaxationHysteresis}.
+    \item Elles négligent l'\textbf{impact de la qualité variable de l'infrastructure} sur le comportement du flux.
+\end{itemize}
+
+Pour surmonter ces limitations, les modèles macroscopiques de **second ordre** ont été développés. Ils introduisent une équation dynamique supplémentaire, typiquement pour la vitesse, permettant de modéliser l'inertie du flux et les états hors équilibre \cite{GrokRevMotivation}. Parmi eux, le modèle **Aw-Rascle-Zhang (ARZ)** \cite{AwRascle2000, Zhang2002} se distingue par ses propriétés mathématiques avantageuses et sa capacité à représenter de manière plus réaliste la dynamique du trafic \cite{MITMathematicsTraffic}. Ses principaux atouts incluent :
+\begin{itemize}
+    \item Le respect de l'\textbf{anisotropie} (les conducteurs réagissent à ce qui se passe devant eux).
+    \item La capacité à modéliser l'\textbf{hystérésis} et les \textbf{oscillations stop-and-go}.
+    \item Une base flexible pour les extensions \textbf{multi-classes}, permettant de différencier les comportements de divers types de véhicules \cite{MultiClassTrafficModeling}.
+\end{itemize}
+
+Cependant, comme souligné dans la revue de la littérature (Chapitre \ref{chap:revue_litterature}), il existe une **lacune significative** : le manque de modèles ARZ multi-classes spécifiquement étendus, calibrés et validés pour capturer la dynamique unique du trafic dominé par les motos dans le contexte béninois, en intégrant les comportements spécifiques comme le "gap-filling", l'"interweaving", et le "creeping" (reptation en congestion), ainsi que l'impact de l'infrastructure \cite{FeldheimLybaert2000, Saumtally2012}.
+
+La problématique centrale de ce mémoire est donc de combler cette lacune en développant un modèle ARZ multi-classes étendu, spécifiquement adapté aux réalités du trafic routier au Bénin.
+
+% Section 1.3: Research Aim and Objectives
+\section{But et Objectifs de la Recherche}
+\label{sec:intro_objectifs}
+
+Le \textbf{but principal} de cette recherche est de développer, implémenter et évaluer un modèle de flux de trafic macroscopique de second ordre multi-classes, basé sur le cadre ARZ, qui soit spécifiquement adapté aux conditions de circulation au Bénin, en mettant l'accent sur la représentation réaliste des interactions et des comportements spécifiques des motocyclettes, y compris le phénomène de "creeping".
+
+Pour atteindre ce but, les \textbf{objectifs spécifiques} suivants sont définis :
+\begin{enumerate}
+    \item Réaliser une revue approfondie de la littérature sur les modèles macroscopiques (LWR, ARZ), la modélisation multi-classes, la dynamique du trafic moto, et les méthodes numériques associées.
+    \item Formuler une extension multi-classes du modèle ARZ intégrant des termes spécifiques pour représenter l'impact de l'infrastructure et les comportements clés des motos (gap-filling, interweaving, creeping) observés au Bénin.
+    \item Développer et implémenter une méthode numérique robuste (basée sur les volumes finis) pour résoudre le système d'équations aux dérivées partielles du modèle ARZ étendu.
+    \item Calibrer les paramètres du modèle en utilisant des données de trafic réelles ou réalistes représentatives du contexte béninois.
+    \item Valider le modèle étendu en vérifiant ses propriétés numériques et sa capacité à reproduire qualitativement et quantitativement les phénomènes de trafic observés au Bénin.
+    \item Comparer les performances du modèle ARZ étendu avec celles d'une extension similaire basée sur le modèle LWR pour évaluer les avantages de l'approche de second ordre.
+    \item Analyser les résultats des simulations pour mieux comprendre la dynamique du trafic au Bénin et évaluer la sensibilité du modèle à ses paramètres clés.
+\end{enumerate}
+
+% Section 1.4: Research Questions (Optional)
+\section{Questions de Recherche}
+\label{sec:intro_questions}
+
+Cette étude cherche à répondre aux questions de recherche suivantes :
+\begin{enumerate}
+    \item Comment le cadre théorique du modèle ARZ peut-il être étendu de manière cohérente pour intégrer l'hétérogénéité extrême du trafic béninois et les comportements spécifiques observés des motocyclettes (gap-filling, interweaving, creeping) ?
+    \item Quelles paramétrisations des fonctions clés du modèle ARZ (vitesse d'équilibre, fonction de pression, temps de relaxation) permettent de refléter l'influence de la qualité variable de l'infrastructure routière au Bénin ?
+    \item Quelle méthode numérique basée sur les volumes finis est la plus appropriée pour résoudre le système ARZ multi-classes étendu, en garantissant la stabilité et la précision ?
+    \item Dans quelle mesure le modèle ARZ étendu et calibré parvient-il à reproduire quantitativement et qualitativement les dynamiques de trafic observées au Bénin, et comment ses performances se comparent-elles à celles d'un modèle LWR étendu ?
+\end{enumerate}
+
+% Section 1.5: Significance and Scope
+\section{Portée et Pertinence de l'Étude}
+\label{sec:intro_portee}
+
+Cette recherche revêt une importance particulière tant sur le plan théorique que pratique. Sur le plan théorique, elle contribue à l'avancement de la modélisation macroscopique du trafic en proposant une extension spécifique du modèle ARZ pour des conditions de trafic complexes et hétérogènes, rarement étudiées en profondeur avec des modèles de second ordre. Elle vise à formaliser mathématiquement des comportements spécifiques aux motos qui sont souvent décrits qualitativement mais peu intégrés dans les modèles macroscopiques.
+
+Sur le plan pratique, cette étude vise à fournir un outil de modélisation plus réaliste et pertinent pour les ingénieurs et les planificateurs des transports au Bénin et dans d'autres contextes similaires. Un modèle mieux adapté aux réalités locales peut conduire à une meilleure compréhension des phénomènes de congestion, à une évaluation plus précise des projets d'infrastructure, et à la conception de stratégies de gestion du trafic plus efficaces, contribuant ainsi à améliorer la mobilité urbaine et la sécurité routière.
+
+La \textbf{portée} de cette étude se concentre sur la modélisation macroscopique (décrivant le flux en termes de densité, vitesse moyenne, débit) de segments de route ou de réseaux simples. Elle se focalise sur l'extension du modèle ARZ pour intégrer explicitement les classes de véhicules prédominantes au Bénin (notamment voitures et motos) et leurs interactions spécifiques (gap-filling, interweaving, creeping), ainsi que l'effet de l'état de la chaussée. L'étude inclut le développement numérique, la calibration (basée sur des données disponibles ou des estimations réalistes) et la validation par simulation de scénarios typiques. Elle ne prétend pas aborder la modélisation microscopique détaillée, ni la modélisation de réseaux urbains très complexes avec des systèmes de contrôle sophistiqués.
+
+% Section 1.6: Thesis Outline
+\section{Structure du Document}
+\label{sec:intro_structure}
+
+Ce mémoire est structuré de manière à guider le lecteur depuis les concepts fondamentaux jusqu'aux contributions spécifiques de cette recherche et à leurs implications.
+
+\begin{itemize}
+    \item Le \textbf{Chapitre \ref{chap:revue_litterature}} présente une revue critique de la littérature sur la modélisation macroscopique du trafic (LWR et ARZ), les approches multi-classes, la modélisation des comportements spécifiques des motos, l'impact de l'infrastructure, les défis de la modélisation dans les pays en développement, et les méthodes numériques pertinentes. Il identifie la lacune de recherche que ce mémoire vise à combler.
+
+    \item Le \textbf{Chapitre \ref{chap:specificites_benin}} décrit en détail les caractéristiques spécifiques du contexte béninois : contexte socio-économique, infrastructure routière, composition du parc de véhicules, et analyse qualitative des comportements de trafic observés, notamment ceux des motos. Il discute également de la disponibilité et des limitations des données locales.
+
+    \item Le \textbf{Chapitre \ref{chap:formulation_modele_arz}} développe la formulation mathématique de l'extension multi-classes du modèle ARZ proposée pour le Bénin. Il détaille l'intégration des effets de l'infrastructure et des termes spécifiques modélisant le gap-filling, l'interweaving et le creeping des motos.
+
+    \item Le \textbf{Chapitre \ref{chap:analyse_numerique}} aborde l'analyse mathématique préliminaire du modèle étendu (propriétés hyperboliques) et présente en détail le schéma numérique basé sur les volumes finis choisi pour sa résolution, y compris le traitement des termes sources et des conditions aux limites.
+
+    \item Le \textbf{Chapitre \ref{chap:resultats}} expose les résultats de la calibration des paramètres du modèle, sa validation numérique et phénoménologique à travers divers scénarios de simulation. Il inclut une comparaison quantitative et qualitative avec un modèle LWR étendu et une analyse de sensibilité.
+
+    \item Le \textbf{Chapitre \ref{chap:discussion}} interprète les résultats obtenus, évalue les performances (forces et limites) du modèle ARZ étendu dans le contexte béninois, discute de sa pertinence par rapport au modèle LWR, et explore les implications potentielles pour la gestion du trafic au Bénin ainsi que les pistes pour de futures recherches.
+
+    \item Le \textbf{Chapitre \ref{chap:conclusion}} résume les travaux effectués, rappelle les principales conclusions et contributions du travail, reconnaît ses limitations et offre des remarques finales.
+\end{itemize}
+
+Les références bibliographiques et d'éventuelles annexes (contenant des détails de calculs, des données supplémentaires ou du pseudo-code) complètent le document.

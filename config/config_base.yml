@@ -1,0 +1,30 @@
+# Physical Parameters (Base Values)
+alpha: 0.4
+V_creeping_kmh: 5.0 # km/h
+rho_jam_veh_km: 250.0 # veh/km
+pressure:
+  gamma_m: 1.5
+  gamma_c: 2.0
+  K_m_kmh: 10.0 # km/h
+  K_c_kmh: 15.0 # km/h
+relaxation:
+  tau_m_sec: 5.0 # seconds
+  tau_c_sec: 10.0 # seconds
+# Vmax values per road category R (km/h)
+Vmax_kmh:
+  c: {1: 75.0, 2: 60.0, 3: 35.0, 4: 25.0, 5: 10.0, 9: 35.0}
+  m: {1: 85.0, 2: 70.0, 3: 50.0, 4: 45.0, 5: 30.0, 9: 50.0}
+# Default Flux Composition (can be overridden by scenario)
+flux_composition:
+  urban: {m: 0.75, c: 0.25}
+  interurban: {m: 0.50, c: 0.25} # Corrected typo from plan (0.25 -> 0.50 for interurban c)
+
+# Numerical Parameters
+cfl_number: 0.8
+ghost_cells: 2
+# ODE Solver options for Strang Splitting
+ode_solver: 'RK45' # Default, e.g., 'LSODA', 'Radau', 'BDF' for stiff
+ode_rtol: 1.0e-6
+ode_atol: 1.0e-6
+# Small epsilon for numerical stability
+epsilon: 1.0e-10

@@ -1,0 +1,276 @@
+import numpy as np
+from numba import njit
+from .parameters import ModelParameters # Use absolute import
+
+
+# --- Physical Constants and Conversions ---
+KM_TO_M = 1000.0  # meters per kilometer
+H_TO_S = 3600.0   # seconds per hour
+M_TO_KM = 1.0 / KM_TO_M
+S_TO_H = 1.0 / H_TO_S
+
+# Derived conversion factors
+KMH_TO_MS = KM_TO_M / H_TO_S  # km/h to m/s
+MS_TO_KMH = H_TO_S / KM_TO_M  # m/s to km/h
+
+# Vehicle density conversions
+VEH_KM_TO_VEH_M = 1.0 / KM_TO_M # veh/km to veh/m
+VEH_M_TO_VEH_KM = KM_TO_M       # veh/m to veh/km
+# ----------------------------------------
+
+@njit
+def calculate_pressure(rho_m: np.ndarray, rho_c: np.ndarray,
+                       alpha: float, rho_jam: float, epsilon: float,
+                       K_m: float, gamma_m: float,
+                       K_c: float, gamma_c: float) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Calculates the pressure terms for motorcycles (m) and cars (c).
+    (Numba-optimized version)
+
+    Args:
+        rho_m: Density of motorcycles (veh/m).
+        rho_c: Density of cars (veh/m).
+        alpha: Interaction parameter.
+        rho_jam: Jam density (veh/m).
+        epsilon: Small number for numerical stability.
+        K_m: Pressure coefficient for motorcycles (m/s).
+        gamma_m: Pressure exponent for motorcycles.
+        K_c: Pressure coefficient for cars (m/s).
+        gamma_c: Pressure exponent for cars.
+
+
+    Returns:
+        A tuple (p_m, p_c) containing pressure terms (m/s).
+    """
+    # Numba doesn't support raising ValueError with strings easily in nopython mode
+    # Validation should happen before calling this njit function
+    # if rho_jam <= 0:
+    #     raise ValueError("Jam density rho_jam must be positive.")
+
+    # Ensure densities are non-negative
+    rho_m = np.maximum(rho_m, 0.0)
+    rho_c = np.maximum(rho_c, 0.0)
+
+    rho_eff_m = rho_m + alpha * rho_c
+    rho_total = rho_m + rho_c
+
+    # Avoid division by zero or issues near rho_jam
+    # Calculate normalized densities, ensuring they don't exceed 1
+    norm_rho_eff_m = np.minimum(rho_eff_m / rho_jam, 1.0 - epsilon)
+    norm_rho_total = np.minimum(rho_total / rho_jam, 1.0 - epsilon)
+
+    # Ensure base of power is non-negative
+    norm_rho_eff_m = np.maximum(norm_rho_eff_m, 0.0)
+    norm_rho_total = np.maximum(norm_rho_total, 0.0)
+
+    p_m = K_m * (norm_rho_eff_m ** gamma_m)
+    p_c = K_c * (norm_rho_total ** gamma_c)
+
+    # Ensure pressure is zero if respective density is zero
+    p_m = np.where(rho_m <= epsilon, 0.0, p_m)
+    p_c = np.where(rho_c <= epsilon, 0.0, p_c)
+    # Also ensure p_m is zero if rho_eff_m is zero (can happen if rho_m=0 and rho_c=0)
+    p_m = np.where(rho_eff_m <= epsilon, 0.0, p_m)
+
+
+    return p_m, p_c
+
+def calculate_equilibrium_speed(rho_m: np.ndarray, rho_c: np.ndarray, R_local: np.ndarray, params: ModelParameters) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Calculates the equilibrium speeds for motorcycles (m) and cars (c).
+
+    Args:
+        rho_m: Density of motorcycles (veh/m).
+        rho_c: Density of cars (veh/m).
+        R_local: Array of local road quality indices for each cell.
+        params: ModelParameters object.
+
+    Returns:
+        A tuple (Ve_m, Ve_c) containing equilibrium speeds (m/s).
+    """
+    if params.rho_jam <= 0:
+        raise ValueError("Jam density rho_jam must be positive.")
+
+    # Ensure densities are non-negative
+    rho_m = np.maximum(rho_m, 0.0)
+    rho_c = np.maximum(rho_c, 0.0)
+
+    rho_total = rho_m + rho_c
+
+    # Calculate reduction factor g, ensuring it's between 0 and 1
+    g = np.maximum(0.0, 1.0 - rho_total / params.rho_jam)
+
+    # Get Vmax based on local road quality R_local
+    # Use np.vectorize or direct array indexing if R_local is an array of indices
+    try:
+        Vmax_m_local = np.array([params.Vmax_m[int(r)] for r in R_local])
+        Vmax_c_local = np.array([params.Vmax_c[int(r)] for r in R_local])
+    except KeyError as e:
+        raise ValueError(f"Invalid road category index found in R_local: {e}. Valid keys: {list(params.Vmax_m.keys())}") from e
+    except TypeError: # Handle scalar R_local
+         Vmax_m_local = params.Vmax_m[int(R_local)]
+         Vmax_c_local = params.Vmax_c[int(R_local)]
+
+
+    Ve_m = params.V_creeping + (Vmax_m_local - params.V_creeping) * g
+    Ve_c = Vmax_c_local * g
+
+    # Ensure speeds are non-negative
+    Ve_m = np.maximum(Ve_m, 0.0)
+    Ve_c = np.maximum(Ve_c, 0.0)
+
+    return Ve_m, Ve_c
+
+def calculate_relaxation_time(rho_m: np.ndarray, rho_c: np.ndarray, params: ModelParameters) -> tuple[float, float]:
+    """
+    Calculates the relaxation times for motorcycles (m) and cars (c).
+    Currently returns constant values based on params.
+
+    Args:
+        rho_m: Density of motorcycles (veh/m). (Currently unused)
+        rho_c: Density of cars (veh/m). (Currently unused)
+        params: ModelParameters object.
+
+    Returns:
+        A tuple (tau_m, tau_c) containing relaxation times (s).
+    """
+    # Future: Could implement density-dependent relaxation times here
+    return params.tau_m, params.tau_c
+
+@njit
+def calculate_physical_velocity(w_m: np.ndarray, w_c: np.ndarray, p_m: np.ndarray, p_c: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Calculates the physical velocities from Lagrangian variables and pressure.
+
+    Args:
+        w_m: Lagrangian variable for motorcycles (m/s).
+        w_c: Lagrangian variable for cars (m/s).
+        p_m: Pressure term for motorcycles (m/s).
+        p_c: Pressure term for cars (m/s).
+
+    Returns:
+        A tuple (v_m, v_c) containing physical velocities (m/s).
+    """
+    v_m = w_m - p_m
+    v_c = w_c - p_c
+    return v_m, v_c
+
+def _calculate_pressure_derivative(rho_val, K, gamma, rho_jam, epsilon):
+    """ Helper to calculate dP/d(rho_eff) or dP/d(rho_total). """
+    if rho_jam <= 0 or gamma <= 0:
+        return 0.0 # Or raise error
+    if rho_val <= epsilon:
+        return 0.0 # Derivative is zero at zero density
+
+    # Ensure normalized density is slightly less than 1 for calculation
+    norm_rho = min(rho_val / rho_jam, 1.0 - epsilon)
+    # Derivative of K * (x/rho_jam)^gamma = K * gamma * x^(gamma-1) / rho_jam^gamma
+    derivative = K * gamma * (norm_rho**(gamma - 1.0)) / rho_jam
+    return max(derivative, 0.0) # Ensure non-negative derivative
+
+def calculate_eigenvalues(rho_m: np.ndarray, v_m: np.ndarray, rho_c: np.ndarray, v_c: np.ndarray, params: ModelParameters) -> list[np.ndarray]:
+    """
+    Calculates the four eigenvalues (characteristic speeds) of the system.
+
+    Args:
+        rho_m: Density of motorcycles (veh/m).
+        v_m: Velocity of motorcycles (m/s).
+        rho_c: Density of cars (veh/m).
+        v_c: Velocity of cars (m/s).
+        params: ModelParameters object.
+
+    Returns:
+        A list containing four numpy arrays: [lambda1, lambda2, lambda3, lambda4] (m/s).
+        Each array has the same shape as the input density/velocity arrays.
+    """
+    if params.rho_jam <= 0:
+        raise ValueError("Jam density rho_jam must be positive.")
+
+    # Ensure densities are non-negative
+    rho_m = np.maximum(rho_m, params.epsilon) # Use epsilon to avoid issues in derivative calc
+    rho_c = np.maximum(rho_c, params.epsilon)
+
+    rho_eff_m = rho_m + params.alpha * rho_c
+    rho_total = rho_m + rho_c
+
+    # Calculate pressure derivatives dP/d(arg) where arg is rho_eff_m or rho_total
+    # Need to handle scalar vs array inputs if vectorizing
+    if isinstance(rho_m, np.ndarray):
+        P_prime_m = np.array([_calculate_pressure_derivative(r_eff, params.K_m, params.gamma_m, params.rho_jam, params.epsilon) for r_eff in rho_eff_m])
+        P_prime_c = np.array([_calculate_pressure_derivative(r_tot, params.K_c, params.gamma_c, params.rho_jam, params.epsilon) for r_tot in rho_total])
+    else: # Scalar case
+        P_prime_m = _calculate_pressure_derivative(rho_eff_m, params.K_m, params.gamma_m, params.rho_jam, params.epsilon)
+        P_prime_c = _calculate_pressure_derivative(rho_total, params.K_c, params.gamma_c, params.rho_jam, params.epsilon)
+
+
+    lambda1 = v_m
+    lambda2 = v_m - rho_m * P_prime_m
+    lambda3 = v_c
+    lambda4 = v_c - rho_c * P_prime_c
+
+    return [lambda1, lambda2, lambda3, lambda4]
+
+
+@njit
+def calculate_source_term(U: np.ndarray,
+                          # Pressure params
+                          alpha: float, rho_jam: float, K_m: float, gamma_m: float, K_c: float, gamma_c: float,
+                          # Equilibrium speeds (pre-calculated)
+                          Ve_m: np.ndarray, Ve_c: np.ndarray,
+                          # Relaxation times (pre-calculated)
+                          tau_m: float, tau_c: float,
+                          # Epsilon
+                          epsilon: float) -> np.ndarray:
+    """
+    Calculates the source term vector S = (0, Sm, 0, Sc) for the ODE step.
+    (Numba-optimized version)
+
+    Args:
+        U: State vector (or array of state vectors) [rho_m, w_m, rho_c, w_c].
+           Shape (4,) or (4, N). Assumes SI units.
+        alpha, rho_jam, K_m, gamma_m, K_c, gamma_c: Parameters for pressure calculation.
+        Ve_m, Ve_c: Pre-calculated equilibrium speeds (m/s).
+        tau_m, tau_c: Pre-calculated relaxation times (s).
+        epsilon: Small number for numerical stability.
+
+
+    Returns:
+        Source term vector S (or array of source vectors). Shape (4,) or (4, N).
+    """
+    rho_m = U[0]
+    w_m = U[1]
+    rho_c = U[2]
+    w_c = U[3]
+
+    # Ensure densities are non-negative for calculations
+    rho_m_calc = np.maximum(rho_m, 0.0)
+    rho_c_calc = np.maximum(rho_c, 0.0)
+
+    # Calculate pressure using the Numba-fied function
+    p_m, p_c = calculate_pressure(rho_m_calc, rho_c_calc,
+                                  alpha, rho_jam, epsilon,
+                                  K_m, gamma_m, K_c, gamma_c)
+
+    # Calculate physical velocity (this function is simple NumPy, likely okay for Numba)
+    v_m, v_c = calculate_physical_velocity(w_m, w_c, p_m, p_c)
+
+    # Equilibrium speeds (Ve_m, Ve_c) and relaxation times (tau_m, tau_c) are now inputs
+
+    # Avoid division by zero if relaxation times are zero
+    Sm = (Ve_m - v_m) / (tau_m + epsilon)
+    Sc = (Ve_c - v_c) / (tau_c + epsilon)
+
+    # Source term is zero if density is zero
+    Sm = np.where(rho_m <= epsilon, 0.0, Sm)
+    Sc = np.where(rho_c <= epsilon, 0.0, Sc)
+
+    # Construct source vector S
+    # Numba handles array creation and assignment efficiently
+    S = np.zeros_like(U)
+    S[1] = Sm
+    S[3] = Sc
+    # The scalar case check 'if isinstance(rho_m, np.ndarray)' is not needed
+    # as Numba compiles based on input types. If U is (4,), S will be (4,).
+    # If U is (4, N), S will be (4, N).
+
+    return S
