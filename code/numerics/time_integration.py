@@ -62,9 +62,21 @@ def _ode_rhs(t: float, y: np.ndarray, cell_index: int, grid: Grid1D, params: Mod
     )
     return source
 
+
 def solve_ode_step(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
     """
     Solves the ODE system dU/dt = S(U) for each cell over a time step dt_ode.
+
+    Args:
+        U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
+        dt_ode (float): Time step for the ODE integration.
+        grid (Grid1D): Grid object.
+        params (ModelParameters): Model parameters.
+
+    Returns:
+        np.ndarray: Output state array after the ODE step. Shape (4, N_total).
+    Solves the ODE system dU/dt = S(U) for each cell over a time step dt_ode.
+    (Serial version)
 
     Args:
         U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
