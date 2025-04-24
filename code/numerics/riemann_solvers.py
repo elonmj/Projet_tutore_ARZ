@@ -2,6 +2,7 @@ import numpy as np
 from numba import cuda # Import cuda
 import math # Import math for CUDA device functions
 from ..core.parameters import ModelParameters
+from ..core import physics # Import the physics module itself
 # Import specific CUDA device functions from physics
 from ..core.physics import (
     _calculate_pressure_cuda,

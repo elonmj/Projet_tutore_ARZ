@@ -2,6 +2,11 @@
 
 scenario_name: mass_conservation_test
 
+# Grid parameters (moved to top level)
+N: 200
+xmin: 0.0
+xmax: 1000.0
+
 # Inherit base parameters (assuming config loader handles this, otherwise copy relevant sections)
 # base: config_base.yml
 
@@ -11,6 +16,7 @@ boundary_conditions:
 
 initial_conditions: # Changed key to plural
   type: sine_wave_perturbation
+  R_val: 1 # Explicitly define R for IC equilibrium calculation
   # Background state values should be in internal units (veh/m, m/s)
   # Ensure these are consistent with ModelParameters loading/conversion
   background_state:
@@ -26,12 +32,12 @@ simulation:
   output_dt_sec: 10.0 # Define even if full state output isn't primary goal
 
 numerical:
-  N: 200 # Example resolution
+  # N: 200 # Moved to top level
   cfl_number: 0.8
 
 grid:
-  xmin: 0.0
-  xmax: 1000.0 # Example length (m)
+  # xmin: 0.0 # Moved to top level
+  # xmax: 1000.0 # Moved to top level
   num_ghost_cells: 2 # Should match base config or be explicitly set
 
 road:
