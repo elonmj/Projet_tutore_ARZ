@@ -1,6 +1,13 @@
 import numpy as np
+from numba import cuda # Import cuda
+import math # Import math for CUDA device functions
 from ..core.parameters import ModelParameters
-from ..core import physics # Import the physics module
+# Import specific CUDA device functions from physics
+from ..core.physics import (
+    _calculate_pressure_cuda,
+    _calculate_physical_velocity_cuda,
+    _calculate_eigenvalues_cuda
+)
 
 def central_upwind_flux(U_L: np.ndarray, U_R: np.ndarray, params: ModelParameters) -> np.ndarray:
     """
@@ -80,6 +87,171 @@ def central_upwind_flux(U_L: np.ndarray, U_R: np.ndarray, params: ModelParameter
         F_CU = term1 + term2
 
     return F_CU
+
+
+# --- CUDA Device Function for Central-Upwind Flux ---
+
+@cuda.jit(device=True)
+def _central_upwind_flux_cuda(U_L_i, U_R_i,
+                              alpha, rho_jam, epsilon,
+                              K_m, gamma_m, K_c, gamma_c,
+                              F_CU_out_i):
+    """
+    CUDA device function to calculate the numerical flux at a single interface
+    using the first-order Central-Upwind scheme.
+
+    Args:
+        U_L_i (cuda.devicearray): State vector [rho_m, w_m, rho_c, w_c] left of interface.
+        U_R_i (cuda.devicearray): State vector [rho_m, w_m, rho_c, w_c] right of interface.
+        alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c (float): Model parameters.
+        F_CU_out_i (cuda.devicearray): Output array to store the calculated flux [4,].
+    """
+    # Extract states
+    rho_m_L, w_m_L, rho_c_L, w_c_L = U_L_i[0], U_L_i[1], U_L_i[2], U_L_i[3]
+    rho_m_R, w_m_R, rho_c_R, w_c_R = U_R_i[0], U_R_i[1], U_R_i[2], U_R_i[3]
+
+    # Ensure densities are non-negative for calculations
+    rho_m_L_calc = max(rho_m_L, 0.0)
+    rho_c_L_calc = max(rho_c_L, 0.0)
+    rho_m_R_calc = max(rho_m_R, 0.0)
+    rho_c_R_calc = max(rho_c_R, 0.0)
+
+    # Calculate pressures and velocities for L and R states using CUDA device functions
+    p_m_L, p_c_L = _calculate_pressure_cuda(rho_m_L_calc, rho_c_L_calc,
+                                            alpha, rho_jam, epsilon,
+                                            K_m, gamma_m, K_c, gamma_c)
+    v_m_L, v_c_L = _calculate_physical_velocity_cuda(w_m_L, w_c_L, p_m_L, p_c_L)
+
+    p_m_R, p_c_R = _calculate_pressure_cuda(rho_m_R_calc, rho_c_R_calc,
+                                            alpha, rho_jam, epsilon,
+                                            K_m, gamma_m, K_c, gamma_c)
+    v_m_R, v_c_R = _calculate_physical_velocity_cuda(w_m_R, w_c_R, p_m_R, p_c_R)
+
+    # Calculate eigenvalues for L and R states using CUDA device function
+    lambda1_L, lambda2_L, lambda3_L, lambda4_L = _calculate_eigenvalues_cuda(
+        rho_m_L_calc, v_m_L, rho_c_L_calc, v_c_L,
+        alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+    )
+    lambda1_R, lambda2_R, lambda3_R, lambda4_R = _calculate_eigenvalues_cuda(
+        rho_m_R_calc, v_m_R, rho_c_R_calc, v_c_R,
+        alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+    )
+
+    # Calculate local one-sided wave speeds (a+ and a-)
+    # Note: Numba CUDA device functions don't have default arguments for max/min
+    max_lambda_L = max(lambda1_L, max(lambda2_L, max(lambda3_L, lambda4_L)))
+    max_lambda_R = max(lambda1_R, max(lambda2_R, max(lambda3_R, lambda4_R)))
+    min_lambda_L = min(lambda1_L, min(lambda2_L, min(lambda3_L, lambda4_L)))
+    min_lambda_R = min(lambda1_R, min(lambda2_R, min(lambda3_R, lambda4_R)))
+
+    a_plus = max(max_lambda_L, max_lambda_R, 0.0)
+    a_minus = min(min_lambda_L, min_lambda_R, 0.0)
+
+    # Define the approximate physical flux F(U) = (rho_m*v_m, w_m, rho_c*v_c, w_c)^T
+    # Cannot create numpy arrays inside device function, use local variables or tuples if needed
+    F_L_0 = rho_m_L_calc * v_m_L
+    F_L_1 = w_m_L
+    F_L_2 = rho_c_L_calc * v_c_L
+    F_L_3 = w_c_L
+
+    F_R_0 = rho_m_R_calc * v_m_R
+    F_R_1 = w_m_R
+    F_R_2 = rho_c_R_calc * v_c_R
+    F_R_3 = w_c_R
+
+    # Calculate the Central-Upwind numerical flux
+    denominator = a_plus - a_minus
+    if abs(denominator) < epsilon:
+        # Handle case where a+ approx equals a-
+        F_CU_out_i[0] = 0.5 * (F_L_0 + F_R_0)
+        F_CU_out_i[1] = 0.5 * (F_L_1 + F_R_1)
+        F_CU_out_i[2] = 0.5 * (F_L_2 + F_R_2)
+        F_CU_out_i[3] = 0.5 * (F_L_3 + F_R_3)
+    else:
+        inv_denominator = 1.0 / denominator
+        factor = a_plus * a_minus * inv_denominator
+
+        F_CU_out_i[0] = (a_plus * F_L_0 - a_minus * F_R_0) * inv_denominator + factor * (U_R_i[0] - U_L_i[0])
+        F_CU_out_i[1] = (a_plus * F_L_1 - a_minus * F_R_1) * inv_denominator + factor * (U_R_i[1] - U_L_i[1])
+        F_CU_out_i[2] = (a_plus * F_L_2 - a_minus * F_R_2) * inv_denominator + factor * (U_R_i[2] - U_L_i[2])
+        F_CU_out_i[3] = (a_plus * F_L_3 - a_minus * F_R_3) * inv_denominator + factor * (U_R_i[3] - U_L_i[3])
+
+
+# --- CUDA Kernel Wrapper for Central-Upwind Flux ---
+
+@cuda.jit
+def central_upwind_flux_cuda_kernel(U,
+                                    alpha, rho_jam, epsilon,
+                                    K_m, gamma_m, K_c, gamma_c,
+                                    F_CU_out):
+    """
+    CUDA kernel to calculate the Central-Upwind flux for all interfaces.
+    Each thread calculates the flux for one interface idx (between cell idx and idx+1).
+    """
+    idx = cuda.grid(1) # Global thread index, corresponds to interface index
+
+    # U has shape (4, N_total)
+    # F_CU_out has shape (4, N_total)
+    # We calculate N_total fluxes, corresponding to interfaces 0 to N_total-1
+    if idx < U.shape[1] - 1: # Check bounds: Need U_L=U[:,idx] and U_R=U[:,idx+1]
+        U_L_i = U[:, idx]
+        U_R_i = U[:, idx + 1]
+        F_CU_out_i = F_CU_out[:, idx] # Output flux for interface idx
+
+        _central_upwind_flux_cuda(U_L_i, U_R_i,
+                                  alpha, rho_jam, epsilon,
+                                  K_m, gamma_m, K_c, gamma_c,
+                                  F_CU_out_i)
+    # Note: The flux at the last interface (N_total-1) is not calculated here,
+    # as it would require U[:, N_total]. This might need adjustment depending
+    # on how boundary conditions are handled in the GPU hyperbolic step.
+    # For now, it calculates N_total-1 fluxes.
+
+
+# --- Wrapper function to call the CUDA kernel ---
+
+def central_upwind_flux_gpu(U: np.ndarray, params: ModelParameters) -> cuda.devicearray:
+    """
+    Calculates the numerical flux at all interfaces using the Central-Upwind scheme on the GPU.
+
+    Args:
+        U (np.ndarray): State array (including ghost cells) on the CPU. Shape (4, N_total).
+        params (ModelParameters): Model parameters object.
+
+    Returns:
+        cuda.devicearray: The numerical flux vectors F_CU at all interfaces. Shape (4, N_total) on the GPU.
+                          The flux at index j corresponds to the interface between cell j and j+1.
+                          The last column might be zero or uninitialized depending on kernel logic.
+    """
+    # Ensure inputs are contiguous and on CPU
+    U_cpu = np.ascontiguousarray(U)
+    N_total = U_cpu.shape[1]
+
+    # Allocate device memory
+    d_U = cuda.to_device(U_cpu)
+    # Allocate output array for fluxes. Size N_total to match CPU version's expectation,
+    # even though the kernel currently calculates N_total-1 fluxes.
+    d_F_CU = cuda.device_array((4, N_total), dtype=U_cpu.dtype)
+
+    # Configure the kernel launch
+    # Launch threads for N_total-1 interfaces
+    threadsperblock = 256
+    blockspergrid = ( (N_total - 1) + (threadsperblock - 1)) // threadsperblock
+
+    # Launch the kernel
+    central_upwind_flux_cuda_kernel[blockspergrid, threadsperblock](
+        d_U,
+        params.alpha, params.rho_jam, params.epsilon,
+        params.K_m, params.gamma_m, params.K_c, params.gamma_c,
+        d_F_CU
+    )
+
+    # Return the fluxes directly on the GPU device
+    # The last column (interface N_total-1) is not calculated by the kernel.
+    # The consuming function (solve_hyperbolic_step_gpu) needs to be aware of this
+    # or handle the boundary flux appropriately if needed.
+    return d_F_CU
+
 
 # Example Usage (for testing purposes)
 # if __name__ == '__main__':
