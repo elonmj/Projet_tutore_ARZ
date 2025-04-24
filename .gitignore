@@ -1,0 +1,44 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+.env/
+*.env
+
+
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data and Results (Uncomment if they become large or transient)
+# data/
+# results/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+#latex stuff
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.run.xml
+*.fdb_latexmk
+*.synctex
+*.run.xml
+*.bcf
+*.lof

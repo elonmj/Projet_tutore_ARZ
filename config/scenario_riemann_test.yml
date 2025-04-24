@@ -1,0 +1,36 @@
+# Scenario Configuration: Simple Riemann Problem Test
+
+scenario_name: riemann_test
+
+# Grid Parameters (SI units: m)
+N: 100          # Number of physical cells
+xmin: 0.0
+xmax: 1000.0    # 1 km segment
+
+# Simulation Time Parameters (SI units: s)
+t_final: 60.0   # Simulate for 60 seconds
+output_dt: 5.0  # Store output every 5 seconds
+
+# Road Quality Definition
+# Can be an integer (uniform R), a list of integers (R per cell), or a file path (string)
+road_quality_definition: 3 # Uniform road quality type 3 (Residential/Local)
+
+# Initial Conditions
+initial_conditions:
+  type: riemann
+  # State vectors [rho_m, w_m, rho_c, w_c] in SI units (veh/m, m/s)
+  # Example: Faster, less dense flow meeting slower, more dense flow
+  U_L: [20.0e-3, 25.0, 10.0e-3, 22.0] # 20 veh/km motos, 10 veh/km cars
+  U_R: [80.0e-3, 8.0, 40.0e-3, 6.0]  # 80 veh/km motos, 40 veh/km cars
+  split_pos: 500.0 # Discontinuity at 500m
+
+# Boundary Conditions
+boundary_conditions:
+  left:
+    type: inflow
+    # Inflow state should match U_L for a standard Riemann problem setup
+    state: [20.0e-3, 25.0, 10.0e-3, 22.0]
+  right:
+    type: outflow # Allow waves to exit the domain
+
+# Note: Other physical and numerical parameters are loaded from config_base.yml

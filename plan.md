@@ -10,8 +10,6 @@
 **Abstract**
 *(A concise summary of the entire thesis: problem, methods, key findings, conclusions)*
 
-**Acknowledgements**
-*(Thanking supervisors, institutions, data providers, family, etc.)*
 
 **Table of Contents**
 
@@ -76,18 +74,74 @@
 *   **5.4 Numerical Scheme:** Detailed description (Finite Volume Method, chosen approximate Riemann solver, handling of source terms and spatial dependencies).
 *   **5.5 Implementation Details:** Software, libraries, handling numerical challenges.
 
-**Model Calibration, Validation, and Simulation Results**
+Okay, c'est un choix compréhensible de vouloir se concentrer entièrement sur le modèle ARZ que vous avez développé en détail. Voici le plan du Chapitre 6 révisé **sans la section 6.5 (Analyse Comparative)** :
 
-*   **6.1 Parameter Estimation and Calibration:** Strategy, data used, final parameter values.
-*   **6.2 Model Validation:**
-    *   **6.2.1 Numerical Validation:** Convergence tests, conservation checks.
-    *   **6.2.2 Phenomenological Validation:** Testing reproduction of key Beninese behaviors (motorcycle speed on poor roads, gap-filling benefit, interweaving disruption, front-loading, *creeping* in jams).
-*   **6.3 Simulation Scenarios and Results:**
-    *   Standard scenarios (Red light, Shock/Rarefaction, Degraded Road, Traffic Jam).
-    *   ARZ-specific scenarios (Stop-and-go wave formation, hysteresis).
-    *   Specific "Creeping" scenario validation.
-*   **6.4 Comparative Analysis: Extended ARZ vs. Extended LWR:** Quantitative (error metrics) and qualitative comparison across scenarios.
-*   **6.5 Sensitivity Analysis:** Investigating the impact of key parameters (relaxation, gap-filling, interweaving, creeping).
+**Chapitre 6 : Simulation Numérique et Analyse du Modèle ARZ Étendu**
+
+*   **6.1 Stratégie d'Estimation des Paramètres et Jeu de Base**
+    *   **6.1.1 Stratégie Générale :**
+        *   Justification de l'approche d'estimation/hypothèses raisonnées faute de données de calibration suffisantes.
+        *   Sources utilisées : Données OSM pour l'infrastructure, littérature sur le trafic mixte, observations qualitatives béninoises, estimations de vitesse Google (pour \(V_{max}\) initiaux).
+        *   Objectif : Définir un jeu de paramètres de base plausible pour l'analyse phénoménologique et de sensibilité.
+    *   **6.1.2 Paramètres d'Infrastructure (Dérivés d'OSM) :**
+        *   Présentation de la classification finale \(R(x)\) basée sur `fclass`.
+        *   Tableau ou description des estimations *a priori* pour \(V_{max,m}(R)\) et \(V_{max,c}(R)\) pour chaque catégorie \(R\), justifiées par le type de route et potentiellement informées par les vitesses Google en flux libre.
+    *   **6.1.3 Paramètres Comportementaux et Dynamiques (Estimés) :**
+        *   Justification des valeurs/formes de base choisies pour :
+            *   Paramètre de Gap-filling/Interweaving (\(\alpha\)).
+            *   Vitesse de Creeping (\(V_{creeping}\)).
+            *   Fonctions de Pression (\(P_m(\cdot), P_c(\cdot)\)) : Forme fonctionnelle et paramètres clés (ex: \(K_i, \gamma_i\)).
+            *   Fonctions de Vitesse d'Équilibre (\(g_m(\cdot), g_c(\cdot)\)) : Forme fonctionnelle et paramètres (ex: \(\rho_{jam}\), pentes relatives).
+            *   Temps de Relaxation (\(\tau_m(\cdot), \tau_c(\cdot)\)) : Valeurs constantes ou formes fonctionnelles de base.
+        *   Justification de la composition de flux de base (ex: 75% motos, 25% voitures).
+        *   Références à la littérature pour étayer les ordres de grandeur si possible.
+    *   **6.1.4 Tableau Récapitulatif du Jeu de Paramètres de Base :**
+        *   Tableau synthétique listant tous les paramètres du modèle (\(\alpha, V_{creeping}, \rho_{jam}, V_{max,i}(R), \tau_i\), etc.) et leurs valeurs (ou formes fonctionnelles) de base utilisées dans les simulations suivantes.
+
+*   **6.2 Validation Numérique du Schéma**
+    *   **6.2.1 Tests de Convergence :**
+        *   Méthodologie : Scénario test simple, raffinement de \(\Delta x\) (et \(\Delta t\) via CFL).
+        *   Résultats : Calcul de l'ordre de convergence observé (probablement proche de 1), graphiques d'erreur (si solution de référence disponible).
+    *   **6.2.2 Vérification de la Conservation de la Masse :**
+        *   Méthodologie : Simulation longue durée, calcul de la masse totale de chaque classe au cours du temps.
+        *   Résultats : Graphique montrant la conservation à la précision machine.
+    *   **6.2.3 Vérification de la Positivité des Densités :**
+        *   Confirmation que les densités restent positives dans tous les scénarios simulés ou description de la gestion si un plancher a été nécessaire.
+
+*   **6.3 Validation Phénoménologique via Scénarios de Simulation**
+    *   **6.3.1 Objectif :** Évaluer la capacité du modèle (avec les paramètres de base) à reproduire qualitativement les phénomènes clés attendus.
+    *   **6.3.2 Scénarios Tests et Résultats Qualitatifs :** *(Présenter pour chaque scénario : la configuration, les résultats clés (graphiques espace-temps de densité/vitesse par classe), et l'analyse qualitative)*
+        *   *Scénario "Route Dégradée" :* Analyse de l'impact différentiel de \(R(x)\) sur \(v_m\) et \(v_c\).
+        *   *Scénario "Feu Rouge / Congestion" :* Analyse de la formation de la queue, des vitesses relatives en congestion, du redémarrage (effets \(\alpha, \tau_m\)).
+        *   *Scénario "Bouchon Extrême" (Creeping) :* Analyse du maintien de \(v_m > 0\) quand \(v_c \approx 0\) (effet \(V_{creeping}\)).
+        *   *Scénario "Onde Stop-and-Go / Hystérésis" :* Analyse de la capacité du modèle ARZ à générer ces dynamiques non-linéaires.
+
+*   **6.4 Analyse de Sensibilité Paramétrique**
+    *   **6.4.1 Objectif :** Quantifier l'influence des paramètres estimés les plus incertains sur la dynamique simulée.
+    *   **6.4.2 Paramètres Clés Étudiés :** Focus sur \(\alpha, V_{creeping}, \tau_m/\tau_c\), \(V_{max,m}(R)/V_{max,c}(R)\), paramètres de \(P_m\).
+    *   **6.4.3 Méthodologie :** Variation d'un paramètre à la fois (OAT) autour de la valeur de base. Scénarios tests utilisés (ex: Feu Rouge, Bouchon). Indicateurs quantitatifs mesurés (débit, vitesse moyenne, temps de parcours, longueur max de queue, etc.).
+    *   **6.4.4 Résultats et Discussion :** Présentation des résultats (graphiques de sensibilité, tableaux). Identification des paramètres ayant le plus d'impact sur les phénomènes spécifiques (gap-filling, creeping, etc.). Discussion des implications pour la robustesse du modèle et les besoins futurs de calibration.
+
+*   **6.5 Comparaison Qualitative avec des Estimations de Vitesse Externes (Google)**
+    *   **6.5.1 Objectif :** Évaluer la plausibilité des ordres de grandeur des vitesses simulées par le modèle en les comparant à des estimations externes issues de Google Maps (API Directions ou couche trafic).
+    *   **6.5.2 Méthodologie de Collecte des Données Google :** Décrire brièvement comment les données de vitesse Google ont été obtenues (ex: requêtes API Directions pour des itinéraires et heures spécifiques, interprétation qualitative des couleurs de la couche trafic). **Insister sur le caractère indicatif et non exhaustif de ces données.**
+    *   **6.5.3 Sélection des Points de Comparaison :** Choisir quelques scénarios simulés (ex: trafic fluide sur route primaire, congestion en heure de pointe sur un axe de Cotonou) pour lesquels une estimation Google comparable a pu être obtenue.
+    *   **6.5.4 Résultats et Discussion :** Présenter la comparaison entre les vitesses simulées (par classe si pertinent) et les estimations Google. Discuter les points de concordance (ordres de grandeur similaires) et de divergence. Analyser les raisons possibles des écarts (limites des données Google, limites du modèle/paramètres, complexité du trafic réel non capturée). Conclure sur l'apport limité mais utile de cette comparaison pour une évaluation qualitative de la plausibilité du modèle.
+
+*   **6.6 Analyse Contextuelle Complémentaire (OSM `places`, `traffic`)** *(Nouvelle Section, placée ici)*
+    *   **6.6.1 Objectif :** Fournir un éclairage supplémentaire sur la distribution spatiale des types de routes et d'intersections au Bénin en utilisant les données OSM `places` et `traffic`, afin de mieux contextualiser les simulations précédentes et d'identifier des pistes pour des études futures plus localisées.
+    *   **6.6.2 Analyse Spatiale des Types de Routes et Zones (`places`) :**
+        *   Cartographie des types de routes (R) et leur concentration relative dans les zones urbaines majeures (Cotonou, Porto-Novo, etc.) versus les zones rurales.
+        *   Discussion sur la pertinence potentielle d'adapter les paramètres (en particulier la composition du flux) selon la zone géographique.
+    *   **6.6.3 Analyse des Points de Contrôle de Trafic (`traffic`) :**
+        *   Identification et cartographie de la localisation des feux de signalisation et des stops recensés dans OSM.
+        *   Discussion sur la densité et la distribution de ces points de contrôle, et leur implication pour la modélisation réaliste des intersections dans un réseau complet.
+    *   **6.6.4 Mise en Perspective des Résultats de Simulation :**
+        *   Comment cette analyse contextuelle permet-elle de mieux interpréter les résultats des scénarios (6.3) ou de l'analyse de sensibilité (6.4) ? Par exemple, confirmer que les scénarios sur routes dégradées (R=3, 4) sont très pertinents vu leur abondance spatiale.
+    *   **6.6.5 Implications pour des Études Futures :** Réitérer comment ces données pourraient être utilisées pour des modèles de réseau plus détaillés, des scénarios spécifiques à certaines villes ou intersections, ou des modèles intégrant la demande de trafic.
+
+
+
 
 **Discussion and Perspectives**
 

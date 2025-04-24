@@ -1,0 +1,37 @@
+# config/scenario_degraded_road.yml
+scenario_name: degraded_road_test
+
+# Inherit from base config for physical/numerical params
+inherits: config_base.yml
+
+grid:
+  N: 200            # Example resolution (adjust if needed)
+  xmin: 0.0
+  xmax: 1000.0      # meters
+  num_ghost_cells: 2 # Consistent with numerical scheme
+
+road:
+  quality_type: from_file # Use file-based definition for R(x)
+  # Path relative to project root (where main_simulation.py is run from)
+  quality_file: data/R_degraded_road_N200.txt
+
+initial_conditions:
+  type: uniform_equilibrium # Use equilibrium calculation
+  # Provide parameters directly for uniform_equilibrium type
+  # Densities in veh/km (will be converted internally by ModelParameters)
+  rho_m: 15.0 # Example: 75% motorcycles
+  rho_c: 5.0  # Example: 25% cars (Total 20 veh/km)
+  R_val: 1    # Road quality for which to calculate equilibrium state
+  # w_m, w_c will be calculated by initial_conditions.uniform_state_from_equilibrium
+
+boundary_conditions:
+  left:
+    type: inflow
+    # Use the same state as the initial condition (physical units)
+    state: [15.0, 5.0, 85.0, 75.0] # [rho_m, rho_c, v_m, v_c]
+  right:
+    type: outflow # Allow vehicles to leave freely
+
+simulation:
+  t_final_sec: 120.0 # Simulate long enough for steady state (adjust as needed)
+  output_dt_sec: 5.0 # Frequency for saving full state snapshots

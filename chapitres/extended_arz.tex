@@ -1,0 +1,308 @@
+\chapter{Extended Multiclass ARZ Model Formulation for Benin}
+\label{chap:formulation_modele}
+
+% Introduction au chapitre
+Ce chapitre est dédié à la formulation mathématique détaillée du modèle macroscopique de trafic routier proposé pour le contexte béninois. Comme établi dans la revue de la littérature (Chapitre \ref{chap:revue_litterature}), les modèles de premier ordre comme le LWR sont insuffisants pour capturer la complexité dynamique observée, notamment les phénomènes hors équilibre et l'hétérogénéité marquée du parc de véhicules. Le modèle Aw-Rascle-Zhang (ARZ) \cite{AwKlarMaterneRascle2000, ZhangEtAl2003} a été identifié comme une base théorique plus appropriée en raison de ses propriétés mathématiques avantageuses et de sa capacité intrinsèque à modéliser l'anisotropie, l'hystérésis et les ondes \textit{stop-and-go} \cite{FanHertySeibold2014, yu2024traffic}.
+
+L'objectif de ce chapitre est de construire une \textit{extension multi-classes} de ce cadre ARZ, spécifiquement conçue pour intégrer les caractéristiques distinctives du trafic au Bénin, telles que décrites au Chapitre \ref{chap:caracteristiques_benin}. Cela inclut la prédominance écrasante des motocyclettes (Zémidjans), leurs comportements spécifiques (gap-filling, interweaving, creeping), et l'impact de la qualité variable de l'infrastructure routière.
+
+\section{Base Multiclass ARZ Framework Selection}
+\label{sec:base_multiclass_arz}
+
+% Justification du multi-classe
+La première étape cruciale dans la formulation du modèle est de reconnaître l'impératif d'une approche \textbf{multi-classes}. Le trafic au Bénin, comme démontré au Chapitre \ref{chap:caracteristiques_benin}, est caractérisé par une \textbf{hétérogénéité extrême}, où les motocyclettes constituent la majorité écrasante du flux (souvent plus de 70-80\% en milieu urbain \cite{Djossou_ZemidjanCotonou}) et coexistent avec des voitures particulières, des camions, des bus et des tricycles. Les différences fondamentales en termes de taille, de capacités dynamiques (accélération, freinage), de manœuvrabilité, et surtout de comportements de conduite (voir Section \ref{subsec:comportements_motos}) entre les motos et les autres véhicules rendent tout modèle homogène (qui suppose un seul type de véhicule ou des comportements moyennés) intrinsèquement incapable de reproduire fidèlement la dynamique observée \cite{WongWong2002}. L'utilisation d'un modèle multi-classes permet de distinguer explicitement les propriétés et les interactions de différents groupes de véhicules.
+
+% Choix du cadre ARZ multi-classe spécifique
+Plusieurs approches existent pour étendre le modèle ARZ à un cadre multi-classes \cite{BenzoniGavageColombo2003, FanWork2015, ColomboMarcellini2020}. Pour ce travail, nous adoptons une formulation courante qui consiste à écrire un système d'équations ARZ pour chaque classe de véhicules, où les interactions entre les classes sont modélisées à travers les dépendances des fonctions clés (comme la vitesse d'équilibre et la fonction de pression) par rapport à l'état global du trafic (densités et/ou vitesses de toutes les classes).
+
+Compte tenu de la dichotomie majeure observée au Bénin, nous considérerons initialement \textbf{deux classes} principales :
+\begin{itemize}
+    \item Classe \( m \): Motocyclettes (incluant les Zémidjans)
+    \item Classe \( c \): Autres véhicules (principalement voitures particulières, mais pouvant regrouper conceptuellement les véhicules plus larges et moins agiles)
+\end{itemize}
+Cette simplification initiale permet de se concentrer sur l'interaction fondamentale moto-voiture, tout en gardant la possibilité d'ajouter d'autres classes (camions, bus) dans des travaux futurs si nécessaire.
+
+% Equations de base (avant extensions spécifiques)
+Le système de base ARZ multi-classes, avant l'intégration des spécificités béninoises, s'écrit sous la forme suivante, incluant un terme de relaxation vers une vitesse d'équilibre. Pour chaque classe \( i \in \{m, c\} \):
+
+\begin{align}
+    \label{eq:arz_mass_conservation_i}
+    \frac{\partial \rho_i}{\partial t} + \frac{\partial (\rho_i v_i)}{\partial x} &= 0 \\
+    \label{eq:arz_momentum_relaxation_i}
+    \frac{\partial w_i}{\partial t} + v_i \frac{\partial w_i}{\partial x} &= \frac{1}{\tau_i} (V_{e,i}(\rho_m, \rho_c) - v_i) \quad \text{avec} \quad w_i = v_i + p_i(\rho_m, \rho_c)
+\end{align}
+
+Où :
+\begin{itemize}
+    \item \( \rho_i(x, t) \) est la densité partielle de la classe \( i \) (nombre de véhicules de la classe \( i \) par unité de longueur) à la position \( x \) et au temps \( t \). La densité totale est \( \rho = \rho_m + \rho_c \).
+    \item \( v_i(x, t) \) est la vitesse moyenne de la classe \( i \).
+    \item \( w_i(x, t) = v_i + p_i \) est la variable lagrangienne (parfois appelée "vitesse généralisée" ou "variable de Riemann") pour la classe \( i \).
+    \item \( p_i(\rho_m, \rho_c) \) est la fonction de "pression" pour la classe \( i \). Elle représente l'anticipation ou l'hésitation des conducteurs de la classe \( i \) face à la densité environnante. Dans les modèles multi-classes, elle dépend généralement des densités de toutes les classes présentes.
+    \item \( V_{e,i}(\rho_m, \rho_c) \) est la vitesse d'équilibre souhaitée par les conducteurs de la classe \( i \). Elle dépend également, en général, des densités des différentes classes et représente la vitesse que les conducteurs de la classe \( i \) adopteraient en conditions stables pour une densité donnée.
+    \item \( \tau_i \) est le temps de relaxation caractéristique pour la classe \( i \), représentant le temps nécessaire aux conducteurs pour ajuster leur vitesse vers la vitesse d'équilibre. Il peut être constant ou dépendre des densités.
+\end{itemize}
+
+La formulation (\ref{eq:arz_momentum_relaxation_i}) est une forme non-conservative de l'équation de moment intégrant la relaxation. Le choix de la forme exacte (conservative ou non-conservative) et la manière dont \( p_i \), \( V_{e,i} \) et \( \tau_i \) sont définis pour capturer les interactions inter-classes constituent le cœur de la modélisation multi-classes \cite{FanWork2015, ColomboMarcellini2020}.
+
+Ce système (\ref{eq:arz_mass_conservation_i})-(\ref{eq:arz_momentum_relaxation_i}) forme le \textbf{squelette} de notre modèle. Il capture déjà la dynamique de second ordre et la distinction entre les classes. Cependant, sous cette forme générique, il ne prend pas encore en compte les effets spécifiques du revêtement routier, ni les comportements particuliers des motos comme le gap-filling, l'interweaving ou le creeping. L'intégration de ces éléments fera l'objet des sections suivantes de ce chapitre.
+
+
+\section{Modeling Road Pavement Effects on Equilibrium Speed}
+\label{sec:modeling_pavement}
+
+% Introduction et justification
+L'une des caractéristiques marquantes du réseau routier béninois, comme souligné au Chapitre \ref{chap:caracteristiques_benin} (Section \ref{subsubsec:heterogeneite_infra}), est la grande \textbf{variabilité de l'état et du type de revêtement}. On y trouve des routes bitumées de qualité variable (allant de neuves à fortement dégradées), des routes en terre ou latérite (sensibles aux conditions climatiques), des pistes informelles et, plus récemment, des routes pavées. Cette hétérogénéité infrastructurelle influence de manière significative le comportement de conduite et, par conséquent, les paramètres clés du flux de trafic \cite{NwankwoEtAl2019}.
+
+Dans le cadre du modèle ARZ, la \textbf{vitesse d'équilibre \( V_{e,i} \)} est le paramètre qui représente la vitesse que les conducteurs de la classe \( i \) souhaitent atteindre dans des conditions de flux stabilisées, pour une densité donnée. Il est donc naturel de supposer que la qualité de la chaussée affecte directement cette vitesse souhaitée. En particulier, on s'attend à ce que la \textbf{vitesse maximale atteignable en flux libre} (lorsque la densité tend vers zéro), souvent notée \( V_{max,i} \), soit réduite sur les routes de mauvaise qualité \cite{JollyEtAl2005 }.
+
+% Approche de modélisation
+Nous proposons d'intégrer cet effet en rendant la fonction de vitesse d'équilibre \( V_{e,i} \) explicitement dépendante non seulement des densités \( \rho_m \) et \( \rho_c \), mais aussi d'un indicateur de la qualité de la route au point \( x \), que nous noterons \( R(x) \). Cet indicateur \( R(x) \) peut être une variable discrète (par exemple, un indice catégorisant le type et l'état : 1 pour bitume neuf, 2 pour bitume dégradé, 3 pour latérite, etc.) ou une variable continue (par exemple, un indice de rugosité ou un score de qualité normalisé). Pour la suite, nous considérons \( R(x) \) comme un paramètre spatialement variable qui caractérise localement l'infrastructure.
+
+La vitesse d'équilibre pour la classe \( i \) devient alors une fonction \( V_{e,i}(\rho_m, \rho_c, R(x)) \). L'implémentation la plus directe consiste à moduler la vitesse en flux libre \( V_{max,i} \) en fonction de \( R(x) \):
+\begin{equation}
+    V_{max,i} = V_{max,i}(R(x))
+\end{equation}
+Ainsi, la forme fonctionnelle de \( V_{e,i} \) (par exemple, linéaire type Greenshields, exponentielle type Underwood, ou autre) utilisera cette valeur de \( V_{max,i} \) adaptée localement. Par exemple, pour une forme générale :
+\begin{equation}
+    \label{eq:Ve_depends_on_R}
+    V_{e,i}(\rho_m, \rho_c, R(x)) = V_{max,i}(R(x)) \cdot f_i(\rho_m, \rho_c)
+\end{equation}
+où \( f_i(\rho_m, \rho_c) \) est une fonction décroissante de la (des) densité(s), normalisée telle que \( f_i(0, 0) = 1 \).
+
+% Impact différentiel sur les classes
+Un aspect crucial, observé qualitativement au Bénin (voir Section \ref{subsec:comportements_motos} et \cite{IMF_Benin_ArtIV_2022}), est que les \textbf{motocyclettes (classe \( m \)) sont généralement moins sensibles à la dégradation de la chaussée que les voitures (classe \( c \))}. Elles peuvent maintenir une vitesse plus élevée sur des routes en terre ou bitumées dégradées. Ce comportement différentiel doit être reflété dans le modèle. Mathématiquement, cela signifie que la fonction \( V_{max,m}(R(x)) \) doit être moins sensible aux variations de \( R(x) \) (représentant une dégradation) que la fonction \( V_{max,c}(R(x)) \).
+
+Par exemple, si \( R=1 \) représente une route en excellent état et \( R=2 \) une route dégradée :
+\begin{itemize}
+    \item \( V_{max,m}(R=2) \) sera inférieure à \( V_{max,m}(R=1) \), mais la réduction sera relativement modérée.
+    \item \( V_{max,c}(R=2) \) sera inférieure à \( V_{max,c}(R=1) \), et la réduction sera proportionnellement plus importante que pour les motos.
+\end{itemize}
+La calibration du modèle (Chapitre \ref{chap:calibration_validation}) devra estimer ces différentes fonctions \( V_{max,i}(R) \) en se basant sur des données observées ou des estimations raisonnables pour chaque type de route pertinent au Bénin.
+
+% Conséquences pour le modèle
+L'introduction de cette dépendance spatiale \( R(x) \) dans \( V_{e,i} \) signifie que le terme source de relaxation dans l'équation (\ref{eq:arz_momentum_relaxation_i}) devient lui-même spatialement dépendant :
+\[
+\frac{1}{\tau_i} (V_{e,i}(\rho_m, \rho_c, R(x)) - v_i)
+\]
+De plus, si la fonction de pression \( p_i \) est également liée à la vitesse d'équilibre ou à la vitesse maximale (ce qui est parfois le cas dans certaines variantes d'ARZ), elle pourrait aussi hériter de cette dépendance spatiale. Cela a des implications importantes pour l'analyse mathématique (le système devient non-homogène spatialement même en l'absence de relaxation explicite si \(p_i\) dépend de R) et surtout pour la résolution numérique (Chapitre \ref{chap:implementation_numerique}), qui devra correctement prendre en compte ces variations spatiales des paramètres physiques. Les changements brusques de type de revêtement (par exemple, passage de bitume à latérite) devront être traités comme des discontinuités dans les paramètres du modèle.
+
+
+\section{Modeling Motorcycle Gap-Filling in ARZ}
+\label{sec:modeling_gap_filling}
+
+% Introduction au gap-filling
+Comme décrit en Section \ref{subsec:comportements_motos}, une caractéristique essentielle du comportement des motocyclistes au Bénin (et dans d'autres contextes de trafic hétérogène dominé par les deux-roues) est le \textbf{"gap-filling" (remplissage d'interstices)}. Ce phénomène désigne la capacité des motos à exploiter les petits espaces longitudinaux et latéraux disponibles entre les véhicules plus larges, leur permettant de progresser et de maintenir une certaine mobilité même dans des conditions de densité modérée à élevée où les voitures sont fortement ralenties ou arrêtées \cite{khan2021macroscopic, NguyenEtAl2012}. L'effet macroscopique du gap-filling est une utilisation plus efficace de l'espace routier et une capacité potentiellement accrue du flux, en particulier pour les motos, dans des situations de congestion \cite{khan2021macroscopic}.
+
+% Comment l'intégrer dans ARZ multi-classes
+Pour intégrer ce comportement dans le modèle ARZ multi-classes défini en Section \ref{sec:base_multiclass_arz}, nous devons modifier la manière dont les motos perçoivent et réagissent à la densité environnante par rapport aux autres véhicules (voitures). Dans le cadre ARZ, cette perception et cette réaction sont principalement capturées par la \textbf{fonction de pression \( p_i \)} et potentiellement par la \textbf{vitesse d'équilibre \( V_{e,i} \)}.
+
+Le gap-filling peut être interprété comme une réduction de la "pression" ou du "malaise" ressenti par les motocyclistes en présence de densité, car ils disposent de moyens (l'accès aux interstices) pour atténuer l'impact de cette densité sur leur mouvement. De plus, leur capacité à exploiter ces espaces leur permet de maintenir une vitesse souhaitée plus élevée dans des conditions autrement congestionnées.
+
+Nous choisissons de modéliser le gap-filling principalement en ajustant la \textbf{fonction de pression \( p_m \)} pour la classe des motocyclettes, en s'inspirant d'approches utilisées dans des modèles hétérogènes \cite{FanWork2015}. La fonction de pression \( p_i(\rho_m, \rho_c) \) représente la résistance interne du flux de la classe \( i \) due aux interactions de proximité avec les véhicules des deux classes. Le gap-filling suggère que les motos sont moins sensibles à la densité totale ou, plus spécifiquement, à la densité des voitures que ne le sont les voitures elles-mêmes.
+
+% Formulation mathématique via densité effective perçue
+Une manière mathématiquement cohérente d'intégrer cela est d'introduire le concept de \textbf{densité effective perçue} par chaque classe. La densité effective réelle, basée sur l'occupation spatiale, peut être approchée par une somme pondérée des densités en fonction de la longueur effective des véhicules. Soient \( l_m \) et \( l_c \) les longueurs effectives des motos et des voitures, respectivement, avec \( l_m < l_c \). L'occupation spatiale totale est proportionnelle à \( \rho_m l_m + \rho_c l_c \). La densité de bouchon théorique (\( \rho_{jam} \)) est atteinte lorsque l'occupation est maximale.
+
+Nous définissons la \textbf{densité effective perçue par la classe \( i \)}, notée \( \rho_{eff,i} \), comme suit :
+\begin{itemize}
+    \item Pour les voitures (classe \( c \)), la densité effective perçue est la densité totale ou une densité basée sur l'occupation spatiale de toutes les classes : \( \rho_{eff,c} = \rho_m + \rho_c \) ou, plus précisément, une mesure qui croît avec la présence de tous les véhicules, par exemple basée sur l'occupation totale \(\rho_m l_m + \rho_c l_c\). Pour la simplicité, considérons d'abord qu'elle dépend de la densité totale \(\rho = \rho_m + \rho_c\), éventuellement pondérée par les longueurs : \( \rho_{eff,c} = \rho_m \frac{l_m}{l_c} + \rho_c \).
+    \item Pour les motocyclettes (classe \( m \)), le gap-filling leur permet de percevoir une densité effective \textit{inférieure} à la densité réelle, en particulier en présence de voitures. Nous modélisons cela en introduisant un paramètre \( \alpha \in [0, 1] \) qui réduit l'impact de la densité des voitures sur la densité effective perçue par les motos :
+    \begin{equation}
+        \label{eq:rho_eff_m}
+        \rho_{eff,m} = \rho_m + \alpha \rho_c
+    \end{equation}
+    Où \( \alpha < 1 \) pour modéliser le gap-filling. Si \( \alpha = 0 \), les motos ne seraient "gênées" que par les autres motos, ce qui est irréaliste. Une valeur \( \alpha > 0 \) mais inférieure à \( 1 \) signifie que la présence des voitures est perçue par les motos comme moins contraignante (en terme d'espace ou de blocage) que leur propre présence ou que la présence des motos perçue par les voitures. La valeur de \( \alpha \) reflète l'efficacité moyenne du gap-filling.
+\end{itemize}
+
+Les fonctions de pression \( p_i \) pour chaque classe \( i \) dépendront alors de leur densité effective perçue respective : \( p_i = P_i(\rho_{eff,i}) \). Une forme usuelle pour la fonction \( P_i(\cdot) \) est une fonction croissante qui tend vers l'infini lorsque la densité effective perçue approche d'une densité de blocage ou d'une occupation maximale perçue. En adoptant une approche similaire à \cite{FanWork2015}, nous pouvons définir les pressions comme :
+\begin{align}
+    p_m(\rho_m, \rho_c) &= P_m(\rho_{eff,m}) = P_m(\rho_m + \alpha \rho_c) \\
+    p_c(\rho_m, \rho_c) &= P_c(\rho_{eff,c}) \quad (\text{avec, par ex., } \rho_{eff,c} = \rho_m + \rho_c)
+\end{align}
+Les fonctions \( P_m \) et \( P_c \) peuvent être différentes pour refléter d'autres spécificités de comportement entre classes, mais le paramètre \( \alpha < 1 \) dans \( \rho_{eff,m} \) est le mécanisme clé pour le gap-filling. Une forme possible pour \( P_i(x) \) pourrait être \( K_i \left(\frac{x}{1-x}\right) \) où \( x \) est une densité effective normalisée par la densité de bouchon perçue, ou une forme exponentielle. La sélection précise de la forme fonctionnelle et des paramètres \( K_m, K_c, \alpha \) sera déterminée lors de la calibration (Chapitre \ref{chap:calibration_validation}).
+
+% Lien avec Ve et tau
+Bien que la modification de la pression soit le mécanisme principal choisi ici pour le gap-filling, il est important de noter que ce comportement influence également la vitesse à laquelle les motos circulent en conditions denses. Cela peut se refléter dans la fonction de vitesse d'équilibre \( V_{e,m}(\rho_m, \rho_c, R(x)) \). En raison du gap-filling, la vitesse d'équilibre des motos diminuera moins rapidement avec l'augmentation de \(\rho_m\) et \(\rho_c\) que celle des voitures (\(V_{e,c}\)). Cette caractéristique sera implicitement capturée par la forme spécifique de la fonction \(V_{e,m}\) choisie et calibrée, qui travaillera conjointement avec la fonction de pression \(p_m\) pour reproduire le comportement de maintien de vitesse en congestion. Le temps de relaxation \(\tau_m\) pourrait également être ajusté pour refléter une capacité d'adaptation plus rapide des motos aux changements de densité locaux permis par le gap-filling.
+
+En résumé, le gap-filling est modélisé en introduisant une \textbf{densité effective perçue réduite pour les motos} (\( \rho_{eff,m} \le \rho \)) lors du calcul de leur fonction de pression \( p_m \). Ceci, combiné à une fonction de vitesse d'équilibre \( V_{e,m} \) appropriée, permettra au modèle de capturer la capacité des motos à maintenir une certaine mobilité et à exploiter l'espace dans des conditions de trafic hétérogène dense.
+
+\section{Modeling Motorcycle Interweaving Effects in ARZ}
+\label{sec:modeling_interweaving}
+
+% Introduction à l'entrelacement
+L'\textbf{entrelacement} (ou \textit{interweaving}, \textit{filtering}, \textit{remontée de file}) est un autre comportement distinctif des motocyclistes en trafic hétérogène et dense au Bénin (Section \ref{subsec:comportements_motos}). Il se caractérise par des mouvements latéraux fréquents et agiles des motos entre les files de véhicules plus larges, en particulier à basse vitesse ou à l'arrêt \cite{TiwariEtAl2007, DiFrancescoEtAl2015, easts2011modeling}. Contrairement au "gap-filling" qui met l'accent sur l'utilisation des espaces longitudinaux, l'entrelacement implique une dynamique plus latérale et une capacité à changer de position sur la chaussée pour trouver un passage. Ce comportement permet aux motos d'éviter d'être bloquées derrière des véhicules plus lents et d'optimiser leur propre temps de parcours, mais peut également perturber le flux des véhicules plus larges et réduire la discipline de voie générale \cite{easts2011modeling}.
+
+% Défis pour les modèles 1D macroscopiques
+La modélisation de l'entrelacement dans un cadre macroscopique \textbf{unidimensionnel} comme le modèle ARZ multi-classes est intrinsèquement difficile, car le modèle ne représente pas explicitement les positions latérales ou les voies multiples. Par conséquent, nous ne chercherons pas à simuler le mouvement latéral précis, mais plutôt à capturer les \textbf{effets macroscopiques nets} de ce comportement sur les variables d'état unidimensionnelles (\(\rho_i, v_i\)) et la dynamique du flux.
+
+Les effets macroscopiques de l'entrelacement incluent :
+\begin{itemize}
+    \item Une capacité accrue perçue et une vitesse moyenne plus élevée pour les motos en conditions de congestion, car elles peuvent "filtrer" à travers le trafic.
+    \item Une potentielle légère perturbation pour les véhicules plus larges qui doivent réagir aux motos s'entrelacant.
+    \item Une adaptation plus rapide des motos aux changements locaux de densité ou d'opportunités de mouvement.
+\end{itemize}
+
+% Comment l'intégrer dans ARZ multi-classes via la modification des paramètres
+Similairement au gap-filling, l'entrelacement peut être modélisé en adaptant les fonctions clés du modèle ARZ multi-classes : la fonction de pression \( p_i \), la vitesse d'équilibre \( V_{e,i} \), et le temps de relaxation \( \tau_i \).
+
+1.  \textbf{Influence sur la Fonction de Pression \( p_m \):} L'entrelacement renforce l'effet du gap-filling en permettant aux motos de naviguer plus facilement dans le trafic dense. Cela réduit davantage la sensation de "pression" ou de contrainte due à la présence des autres véhicules. La formulation utilisant la densité effective perçue, \( \rho_{eff,m} = \rho_m + \alpha \rho_c \) (Section \ref{sec:modeling_gap_filling}), peut déjà partiellement capturer cet effet. L'entrelacement justifie une valeur de \( \alpha \) (réduisant l'impact de \(\rho_c\) sur la densité perçue par les motos) potentiellement plus faible que si seul le gap-filling longitudinal était considéré. Autrement dit, le paramètre \(\alpha\) dans notre modèle multi-classes représentera l'effet combiné du gap-filling et de l'entrelacement sur la perception de la densité par les motos.
+
+2.  \textbf{Influence sur la Vitesse d'Équilibre \( V_{e,m} \):} L'entrelacement permet aux motos de maintenir une vitesse non nulle, même lorsque les files adjacentes de voitures sont arrêtées. Ce comportement est étroitement lié au "creeping" (Section \ref{sec:modeling_creeping}). L'entrelacement est en fait un mécanisme qui permet ce maintien de vitesse à haute densité. La fonction de vitesse d'équilibre \( V_{e,m}(\rho_m, \rho_c, R(x)) \) doit donc être spécifiée et calibrée pour refléter que \( V_{e,m} \) décroît moins rapidement avec l'augmentation de la densité (totale ou de voitures) que \( V_{e,c} \), permettant ainsi aux motos de conserver une vitesse souhaitée résiduelle même à des densités élevées. Cette adaptation de \( V_{e,m} \) est essentielle pour reproduire l'avantage de vitesse des motos en congestion et sera traitée conjointement avec le modèle de "creeping".
+
+3.  \textbf{Influence sur le Temps de Relaxation \( \tau_m \):} L'entrelacement est une manœuvre active qui permet aux motocyclistes de réagir rapidement aux opportunités de passage ou aux blocages. Leur agilité latérale leur permet d'adapter leur position et, par conséquent, leur vitesse effective plus vite que les véhicules plus larges ne le peuvent. Ceci peut être modélisé en attribuant un \textbf{temps de relaxation \( \tau_m \) plus court} aux motos qu'aux voitures (\( \tau_m < \tau_c \)). De plus, la capacité d'entrelacement est particulièrement pertinente et utilisée en conditions de densité moyenne à élevée, ou à basse vitesse. Il peut être pertinent de considérer un temps de relaxation \( \tau_m \) qui dépend de la densité ou de la vitesse locale, devenant plus court lorsque le trafic ralentit et que l'entrelacement devient le moyen principal de progression.
+
+    Nous pouvons spécifier des fonctions \( \tau_i(\rho_m, \rho_c) \) pour chaque classe. Pour les motos, \( \tau_m \) pourrait être une fonction décroissante de la densité (ou croissante de l'inverse de la vitesse), traduisant une adaptation plus rapide en conditions difficiles où l'entrelacement est actif. Pour les voitures, \( \tau_c \) pourrait être plus grand et moins sensible à la densité ou à la vitesse.
+
+% Potentiels termes d'interaction (Alternative ou complément pour recherches futures)
+Une approche plus complexe, généralement considérée pour des modèles plus avancés ou des recherches futures, pourrait impliquer l'ajout de termes sources d'interaction explicites aux équations de moment (\ref{eq:arz_momentum_relaxation_i}). Ces termes modéliseraient le transfert de "quantité de mouvement" ou de "pression" entre les classes. Par exemple, un terme positif dans l'équation de moment des motos (accélération due au filtrage) et un terme négatif dans celle des voitures (décélération due à la perturbation) pourraient être envisagés. Cependant, la formulation mathématique rigoureuse de tels termes, leur calibration et l'analyse des propriétés du système résultant sont des tâches non triviales dans un cadre hyperbolique non linéaire, pouvant introduire des problèmes de stabilité ou nécessiter des schémas numériques spécifiques. Dans le cadre de ce mémoire, nous privilégions la modification des fonctions \( p_i, V_{e,i}, \tau_i \) comme mécanisme principal pour intégrer les effets macroscopiques de l'entrelacement, car cela s'inscrit plus directement dans les extensions usuelles du cadre ARZ multi-classes \cite{FanWork2015}.
+
+En conclusion, les effets de l'entrelacement des motos seront principalement modélisés en affinant la \textbf{densité effective perçue} pour le calcul de \( p_m \), en ajustant la forme de la \textbf{vitesse d'équilibre \( V_{e,m} \)} pour permettre une vitesse résiduelle en congestion, et surtout en spécifiant un \textbf{temps de relaxation \( \tau_m \) plus court et potentiellement dépendant de la densité} pour refléter la capacité d'adaptation rapide des motos due à leur agilité latérale.
+
+\section{Modeling Motorcycle "Creeping" in Congestion}
+\label{sec:modeling_creeping}
+
+% Introduction au creeping
+Le "creeping" (ou reptation) est un phénomène spécifique observé en conditions de \textbf{congestion extrême} au Bénin, où les motocyclistes parviennent à maintenir une \textbf{vitesse très faible mais non nulle} en se faufilant dans les espaces minimes entre les véhicules largement immobilisés \cite{FanWork2015, Saumtally2012}. Ce comportement est une manifestation extrême de l'agilité et de la capacité à exploiter l'espace (gap-filling, interweaving) des motos dans les situations de plus haute densité (Section \ref{subsec:comportements_motos}). Il est crucial pour reproduire fidèlement la dynamique de bouchon observée localement.
+
+% Pourquoi les modèles standard ont du mal
+Dans un modèle macroscopique standard, la vitesse d'équilibre \( V_e(\rho) \) tend généralement vers zéro (ou devient nulle) lorsque la densité \( \rho \) atteint ou dépasse la densité de bouchon (\( \rho_{jam} \)). Le modèle ARZ de base \cite{AwKlarMaterneRascle2000} et ses extensions multi-classes usuelles \cite{FanWork2015, BenzoniGavageColombo2003} ne prévoient pas intrinsèquement qu'une classe de véhicules puisse maintenir une vitesse positive à cette densité maximale perçue par les véhicules plus larges.
+
+% Mécanismes choisis pour l'intégration dans ARZ
+Pour intégrer le "creeping" dans notre modèle ARZ multi-classes pour le Bénin, nous nous appuierons principalement sur la modification de deux composants clés, étroitement liés aux observations comportementales et aux mécanismes discutés dans les sections précédentes (notamment 4.3 sur le gap-filling) :
+
+1.  \textbf{Adaptation de la Vitesse d'Équilibre pour les Motos (\( V_{e,m} \)):} C'est le mécanisme le plus direct pour assurer une vitesse non nulle en congestion. La fonction de vitesse d'équilibre pour les motos, \( V_{e,m}(\rho_m, \rho_c, R(x)) \), doit être spécifiée de manière à ce qu'elle n'atteigne pas zéro lorsque la densité totale \( \rho = \rho_m + \rho_c \) approche la densité de bouchon "physique" (\( \rho_{jam} \)), c'est-à-dire la densité maximale d'occupation de l'espace par les véhicules (principalement déterminée par les véhicules les plus larges comme les voitures).
+
+    Alors que pour les voitures (classe \( c \)), \( V_{e,c}(\rho_m, \rho_c, R(x)) \) tendra vers zéro lorsque \( \rho \to \rho_{jam} \), pour les motos, \( V_{e,m}(\rho_m, \rho_c, R(x)) \) doit tendre vers une petite valeur positive, que nous appellerons la \textbf{vitesse de creeping \( V_{creeping} \)}.
+    Une forme fonctionnelle pour \( V_{e,m} \) pourrait être construite en modifiant une fonction de vitesse d'équilibre standard \( V_{e,m}^{standard} \) qui irait à zéro à \(\rho_{jam}\), par exemple :
+    \begin{equation}
+        \label{eq:Ve_m_creeping}
+        V_{e,m}(\rho_m, \rho_c, R(x)) = V_{creeping} + \left(V_{max,m}(R(x)) - V_{creeping}\right) \cdot g_m(\rho_m, \rho_c)
+    \end{equation}
+    où \( V_{creeping} > 0 \) est la vitesse résiduelle en bouchon, et \( g_m(\rho_m, \rho_c) \) est une fonction décroissante de la densité qui varie de 1 à faible densité à 0 lorsque \( \rho = \rho_m + \rho_c \) approche \( \rho_{jam} \). La fonction \( V_{e,c} \) pour les voitures garderait une forme similaire mais avec \( V_{creeping} = 0 \). Le paramètre \( V_{creeping} \) sera un paramètre de calibration crucial pour reproduire ce phénomène.
+
+2.  \textbf{Cohérence avec la Perception de l'Espace (\( p_m \) via \( \rho_{eff,m} \)):} Le fait que les motos puissent maintenir une vitesse positive en congestion est rendu possible par leur capacité à percevoir et à utiliser les espaces résiduels. Ce mécanisme est déjà partiellement capturé par l'utilisation de la \textbf{densité effective perçue \( \rho_{eff,m} = \rho_m + \alpha \rho_c \)} (Section \ref{sec:modeling_gap_filling}) dans le calcul de la fonction de pression \( p_m \). Pour le "creeping", cela signifie que la fonction de pression \( P_m(\rho_{eff,m}) \) pour les motos doit être bien définie et finie (bien que potentiellement très élevée) même lorsque la densité totale \( \rho = \rho_m + \rho_c \) est très proche de \( \rho_{jam} \). La capacité des motos à continuer de "pousser" ou de trouver un chemin est reflétée par le fait que leur "pression" ne diverge pas nécessairement au même point ni de la même manière que celle des voitures. La fonction \( P_m \) doit être spécifiée sur la plage de densités effectives \( [0, \rho_{eff,m}^{max}] \) où \(\rho_{eff,m}^{max}\) correspond à la densité effective perçue par les motos lorsque la densité totale est à son maximum physique \(\rho_{jam}\). Grâce au paramètre \(\alpha < 1\), cette densité effective maximale perçue par les motos sera inférieure à la densité maximale perçue par les voitures (\(\rho_{eff,c}^{max} \approx \rho_{jam}\) si l'on ignore l'effet des longueurs différentielles sur la perception par les voitures elles-mêmes).
+
+    En adoptant cette approche, le modèle reste dans le cadre ARZ standard avec relaxation, en ajustant les fonctions \( V_{e,i} \) et \( p_i \) pour chaque classe en fonction des densités (réelles ou effectives) et de la qualité de la route. L'alternative consistant à introduire des modèles de transition de phase distincts pour le régime de "creeping" \cite{FanWork2015, Saumtally2012} ajouterait une complexité significative en termes de critères de transition entre les régimes et de résolution numérique des fronts de changement de régime. La modification des fonctions \( V_{e,m} \) et \( p_m \) est plus directe et permet de représenter la transition vers le comportement de creeping de manière continue (ou lissée numériquement) dans le cadre d'un système unique d'équations.
+
+En résumé, le comportement de "creeping" est modélisé en modifiant la \textbf{fonction de vitesse d'équilibre des motos \( V_{e,m} \)} pour qu'elle maintienne une petite valeur positive (\( V_{creeping} \)) même à très haute densité, et en s'assurant que la \textbf{fonction de pression \( p_m \)}, calculée sur la base d'une densité effective perçue (\( \rho_{eff,m} \)) qui reflète la capacité des motos à utiliser l'espace, est compatible avec l'atteinte de ces hautes densités. La calibration permettra de déterminer la valeur de \( V_{creeping} \) et la forme précise des fonctions \( V_{e,m} \) et \( p_m \).
+
+\section{Intersection Model: Source/Sink Terms and Coupling Conditions}
+\label{sec:modeling_intersections}
+
+% Introduction
+La modélisation du trafic routier sur un réseau implique de connecter les modèles de segment unidimensionnels définis précédemment (Sections \ref{sec:base_multiclass_arz} à \ref{sec:modeling_creeping}) par des \textbf{modèles de nœuds} (intersections, jonctions, entrées/sorties). Ces nœuds sont des points critiques où la structure du réseau change, et où les flux sont distribués ou fusionnent. Leur traitement correct est essentiel pour capturer la dynamique globale, y compris la formation et la propagation des ondes de choc et de raréfaction à travers le réseau.
+
+% Défis généraux de modélisation des intersections macroscopiques
+Dans les modèles macroscopiques, une intersection est généralement représentée par un \textbf{nœud} connectant un ensemble d'arcs entrants (entrées de l'intersection) à un ensemble d'arcs sortants (sorties). La modélisation à un nœud doit satisfaire plusieurs principes \cite{Lebacque1996, HertyEtAl2007} :
+\begin{itemize}
+    \item \textbf{Conservation de la masse (des véhicules) :} Le nombre total de véhicules (ou leur masse totale) entrant dans le nœud par les arcs entrants doit, en l'absence de sources ou de puits, être égal au nombre total sortant par les arcs sortants. Pour chaque classe \(i\), cela se traduit par :
+    \begin{equation}
+        \label{eq:conservation_node}
+        \sum_{a \in \text{Entrants}} q_{i,a}^{in} = \sum_{b \in \text{Sortants}} q_{i,b}^{out}
+    \end{equation}
+    où \( q_{i,a}^{in} \) est le débit de la classe \( i \) entrant dans le nœud depuis l'arc \( a \), et \( q_{i,b}^{out} \) est le débit de la classe \( i \) sortant du nœud vers l'arc \( b \).
+    \item \textbf{Règles de distribution/priorité :} Ces règles déterminent comment la "demande" des arcs entrants est répartie sur les arcs sortants, potentiellement limitée par la "capacité" des arcs sortants ou par des règles de priorité entre arcs concurrents (par exemple, feux de signalisation, règles de priorité à droite, dynamique des ronds-points).
+    \item \textbf{Relation demande-offre :} La quantité de trafic pouvant traverser le nœud est limitée par l'offre des arcs sortants (s'ils sont congestionnés en aval) et par la demande des arcs entrants.
+\end{itemize}
+
+% Spécificités et défis pour les modèles de second ordre (ARZ)
+Pour les modèles de second ordre comme ARZ, la modélisation des intersections présente un défi supplémentaire majeur : comment coupler ou traiter la \textbf{seconde variable (\( w_i \))} au niveau du nœud \cite{HertyEtAl2007, kolb2018pareto}. La variable \( w_i = v_i + p_i(\rho_m, \rho_c) \) est un invariant lagrangien sur les segments homogènes, mais sa valeur peut changer brusquement en traversant une discontinuité comme un nœud. Simplement conserver \( w_i \) à travers le nœud n'est généralement pas physiquement pertinent ou mathématiquement correct sans justification rigoureuse issue de l'analyse des problèmes de Riemann aux jonctions \cite{MammarEtAl2009}.
+
+Plusieurs approches existent dans la littérature pour traiter la variable \( w_i \) aux jonctions ARZ \cite{HertyEtAl2007, kolb2018pareto}:
+\begin{itemize}
+    \item \textbf{Solveurs de Riemann aux jonctions :} La méthode la plus rigoureuse consiste à résoudre un problème de Riemann multi-état et multi-classes au niveau du nœud, en connectant les solutions sur chaque arc entrant et sortant via des conditions de compatibilité \cite{HertyEtAl2007, kolb2018pareto}. Cette approche est mathématiquement complexe et devient d'autant plus difficile avec des fonctions \(p_i\) et \(V_{e,i}\) dépendant de multiples classes et de paramètres spatiaux (\(R(x)\)), comme dans notre modèle étendu.
+    \item \textbf{Conditions de couplage simplifiées :} Des approches plus numériques ou phénoménologiques proposent d'imposer des conditions spécifiques sur \( w_i \) aux interfaces du nœud, par exemple en moyennant les valeurs entrantes ou en définissant des valeurs spécifiques pour les arcs sortants basées sur l'état du nœud \cite{kolb2018pareto}.
+\end{itemize}
+
+% Approche Proposée pour le Contexte Béninois
+Compte tenu de la complexité mathématique du modèle de segment développé (avec \(p_i\) dépendant de \(\rho_m, \rho_c\), \(V_{e,i}\) dépendant de \(\rho_m, \rho_c, R(x)\), et \(\tau_i\) potentiellement dépendant de \(\rho_m, \rho_c\)), et de la nature souvent peu structurée des intersections au Bénin (dominance des ronds-points, feux peu fiables, règles informelles, voir Section \ref{subsubsec:gestion_intersections}), une approche simplifiée mais phénoménologiquement pertinente pour les nœuds est plus appropriée dans le cadre de ce mémoire.
+
+Nous proposons le modèle de nœud suivant :
+\begin{enumerate}
+    \item \textbf{Conservation de la masse par classe :} L'équation (\ref{eq:conservation_node}) est appliquée pour chaque classe \( i \). Les débits \( q_i = \rho_i v_i \) sont calculés aux frontières du nœud sur chaque arc.
+    \item \textbf{Règles de distribution basées sur la demande et des coefficients de partage :} Pour chaque arc entrant, la demande par classe est déterminée à partir de l'état du trafic en amont. Cette demande est ensuite distribuée vers les arcs sortants selon des coefficients de répartition (matrices de giration) fixés ou dépendant potentiellement de l'origine-destination. Les débits sortants sont limités par la capacité des arcs en aval (offre) et par des règles de priorité simplifiées au nœud (par exemple, un modèle de capacité de rond-point simple, ou des priorités fixes). Pour le contexte béninois, où les règles informelles et la dominance des motos influencent fortement le passage, ces règles pourraient être adaptées. Par exemple, la capacité perçue d'un arc sortant par les motos pourrait être plus élevée en congestion grâce à leur capacité à se faufiler (lié au gap-filling/interweaving). Les modèles demande-offre multi-classes devront être utilisés pour déterminer les débits effectifs qui traversent le nœud.
+    \item \textbf{Traitement de la variable \( w_i \) : } Étant donné la complexité des solveurs de Riemann exacts pour notre modèle étendu, nous adopterons une approche basée sur des \textbf{conditions de couplage aux interfaces}. Pour chaque arc sortant \(b\), la valeur de la variable \(w_i\) en amont de l'interface (juste après le nœud) sera déterminée en fonction des valeurs de \(w_j\) sur les arcs entrants \(a\) et de l'état dans le nœud. Une approche possible est de considérer que la "vitesse généralisée" des véhicules entrant dans un arc sortant est une moyenne pondérée des vitesses généralisées des véhicules provenant des arcs entrants correspondants, potentiellement ajustée par la dynamique spécifique du nœud. Alternativement, une condition plus simple pourrait consister à imposer que la vitesse sur l'arc sortant en aval du nœud tende vers la vitesse d'équilibre correspondant à la densité agrégée à la sortie du nœud \cite{kolb2018pareto}, ce qui revient à définir la valeur de \(w_i\) requise pour satisfaire cette vitesse d'équilibre. Le choix précis de la condition de couplage pour \(w_i\) aux nœuds nécessitera une analyse plus approfondie des propriétés numériques et de la capacité à reproduire les observations (par exemple, la formation de files d'attente et la dynamique de redémarrage).
+\end{enumerate}
+
+\textbf{Termes Source et Puits (Entrées/Sorties du réseau) : } Aux frontières du domaine de simulation (entrées et sorties du réseau modélisé), le système d'EDP nécessite des conditions aux limites. Celles-ci sont généralement formulées comme des termes sources (pour les entrées, représentant le flux arrivant sur le réseau) ou des termes puits (pour les sorties, représentant les véhicules quittant le réseau). Pour un modèle multi-classes, ces termes sources/puits doivent être spécifiés pour chaque classe, définissant les débits et potentiellement les valeurs des variables d'état (densité, vitesse, ou \(w\)) entrant ou sortant du domaine. Par exemple, à une entrée, on pourrait spécifier un débit total entrant et une proportion par classe, ainsi qu'une vitesse ou une valeur de \(w\) correspondant à un trafic non perturbé en flux libre.
+
+\textbf{Anticipation au niveau des Intersections : } L'effet d'anticipation des conducteurs à l'approche d'une intersection (par exemple, décélération en vue d'un feu rouge ou d'un rond-point congestionné) est partiellement intégré dans le modèle ARZ par la fonction de pression \(p_i\). La dépendance de \(p_i\) aux densités locales en amont de l'intersection (sur les arcs entrants) contribue à ralentir le trafic à mesure que la file d'attente se forme. De plus, le terme de relaxation guide la vitesse vers la vitesse d'équilibre, qui dépend également de la densité locale. Pour capturer une anticipation plus explicite, on pourrait envisager de rendre la fonction de pression ou le temps de relaxation dépendants non seulement de la densité locale, mais aussi de la densité ou de la vitesse en aval (par exemple, en utilisant une densité "anticipée"). Cependant, pour rester dans le cadre d'une extension raisonnable du modèle ARZ standard, nous nous appuierons sur les mécanismes implicites d'anticipation fournis par \(p_i\) et la relaxation, combinés à un modèle de nœud qui gère correctement la formation de files et les redémarrages.
+
+En conclusion, la modélisation des intersections dans notre cadre ARZ multi-classes pour le Bénin s'appuiera sur une approche de conservation de la masse par classe, des règles demande-offre/distribution adaptées (potentiellement en tenant compte des spécificités locales comme les ronds-points et la fluidité relative des motos), et des conditions de couplage spécifiquement développées pour la variable \(w_i\) qui évitent la complexité d'un solveur de Riemann complet tout en assurant une dynamique réaliste de formation/dissipation des files d'attente.
+
+
+\section{The Complete Extended ARZ Model Equations}
+\label{sec:complete_model_equations}
+
+% Introduction
+Dans les sections précédentes, nous avons établi le cadre de base du modèle ARZ multi-classes (Section \ref{sec:base_multiclass_arz}) et proposé des mécanismes spécifiques pour intégrer les caractéristiques uniques du trafic béninois : l'impact du revêtement routier (Section \ref{sec:modeling_pavement}), le gap-filling (Section \ref{sec:modeling_gap_filling}), l'entrelacement (Section \ref{sec:modeling_interweaving}) et le creeping (Section \ref{sec:modeling_creeping}). Ce comportement de creeping est intrinsèquement lié à la capacité des motos à exploiter l'espace (gap-filling/interweaving) et à maintenir une vitesse positive en congestion extrême.
+
+Cette section présente le \textbf{système complet d'équations différentielles partielles} décrivant la dynamique du trafic pour les deux classes (motos, \( i=m \); autres véhicules, \( i=c \)) sur un segment de route homogène du point de vue de sa géométrie, mais potentiellement hétérogène du point de vue du revêtement \( R(x) \).
+
+% Système d'EDP pour chaque classe
+Le modèle étendu est un système de \(2 \times 2 = 4\) EDP non linéaires couplées pour les variables d'état \(\rho_i(x, t)\) (densité) et \(w_i(x, t)\) (variable lagrangienne/vitesse généralisée). Pour chaque classe \(i \in \{m, c\}\), les équations sont :
+
+\begin{align}
+    \label{eq:full_mass_i}
+    \frac{\partial \rho_i}{\partial t} + \frac{\partial (\rho_i v_i)}{\partial x} &= 0 \\
+    \label{eq:full_momentum_i}
+    \frac{\partial w_i}{\partial t} + v_i \frac{\partial w_i}{\partial x} &= \frac{1}{\tau_i(\rho)} (V_{e,i}(\rho, R(x)) - v_i)
+\end{align}
+
+où la vitesse \(v_i\) de chaque classe est liée à la variable lagrangienne \(w_i\) et à la fonction de pression \(p_i\) par la relation :
+\begin{equation}
+    \label{eq:full_vi_wi_pi}
+    v_i = w_i - p_i(\rho_m, \rho_c)
+\end{equation}
+En substituant (\ref{eq:full_vi_wi_pi}) dans (\ref{eq:full_mass_i}) et (\ref{eq:full_momentum_i}), on obtient le système en termes de \((\rho_m, w_m, \rho_c, w_c)\) :
+
+\begin{align}
+    \label{eq:full_system_rho_w_i}
+    \frac{\partial \rho_i}{\partial t} + \frac{\partial (\rho_i (w_i - p_i(\rho_m, \rho_c)))}{\partial x} &= 0 \\
+    \frac{\partial w_i}{\partial t} + (w_i - p_i(\rho_m, \rho_c)) \frac{\partial w_i}{\partial x} &= \frac{1}{\tau_i(\rho)} (V_{e,i}(\rho, R(x)) - (w_i - p_i(\rho_m, \rho_c)))
+\end{align}
+pour \( i \in \{m, c\} \), et où \( \rho = \rho_m + \rho_c \) est la densité totale.
+
+% Définition des fonctions spécifiques
+Les fonctions \( p_i \), \( V_{e,i} \), et \( \tau_i \) incorporent les mécanismes de modélisation spécifiques discutés :
+
+\paragraph{Fonctions de Pression \( p_i(\rho_m, \rho_c) \):}
+Basées sur le concept de densité effective perçue pour modéliser le gap-filling et l'entrelacement (Section \ref{sec:modeling_gap_filling}):
+\begin{align}
+    \rho_{eff,m}(\rho_m, \rho_c) &= \rho_m + \alpha \rho_c, \quad \text{avec } \alpha \in [0, 1) \\
+    \rho_{eff,c}(\rho_m, \rho_c) &= \rho_m + \rho_c = \rho \quad (\text{Densité totale comme base pour les voitures})
+\end{align}
+où \( \alpha \in [0, 1) \) est le paramètre clé (\(\alpha<1\) pour le gap-filling/interweaving). Les fonctions de pression sont alors définies comme :
+\begin{align}
+    p_m(\rho_m, \rho_c) &= P_m(\rho_{eff,m}(\rho_m, \rho_c)) \\
+    p_c(\rho_m, \rho_c) &= P_c(\rho)
+\end{align}
+où \( P_m(\cdot) \) et \( P_c(\cdot) \) sont des fonctions croissantes de leur argument, spécifiques à chaque classe, tendant vers l'infini lorsque la densité effective perçue approche de la densité de blocage perçue (\(\rho_{jam,i}^{eff}\)). Par exemple, des formes classiques comme \(P_i(x) = K_i x^{\gamma_i}\) (\(K_i, \gamma_i > 0\)) ou \(P_i(x) = K_i \left(\frac{x}{1 - x/\rho_{jam,i}^{eff}}\right)\) peuvent être utilisées. La forme exacte de \( P_m \) et \( P_c \), ainsi que la valeur de \( \alpha \) et des paramètres des fonctions \( P_i \), seront déterminées par calibration (Chapitre \ref{chap:calibration_validation}). Il est crucial que les fonctions \( P_m \) et \( P_c \) soient choisies de manière à garantir l'\textbf{hyperbolicité} du système d'EDP, une propriété mathématique nécessaire pour la bonne formulation et la résolution numérique \cite{AwKlarMaterneRascle2000, FanHertySeibold2014}.
+
+\paragraph{Fonctions de Vitesse d'Équilibre \( V_{e,i}(\rho, R(x)) \):}
+Dépendent de la densité totale \( \rho = \rho_m + \rho_c \) et de la qualité du revêtement \( R(x) \), intégrant les effets du revêtement (Section \ref{sec:modeling_pavement}) et du creeping pour les motos (Section \ref{sec:modeling_creeping}).
+\begin{align}
+    V_{e,m}(\rho, R(x)) &= V_{creeping} + \left(V_{max,m}(R(x)) - V_{creeping}\right) \cdot g_m(\rho) \\
+    V_{e,c}(\rho, R(x)) &= V_{max,c}(R(x)) \cdot g_c(\rho)
+\end{align}
+où :
+\begin{itemize}
+    \item \( V_{creeping} \ge 0 \) est la vitesse résiduelle des motos en bouchon extrême (\( V_{creeping} > 0 \) pour le creeping).
+    \item \( V_{max,i}(R(x)) \) est la vitesse maximale en flux libre pour la classe \( i \) sur un revêtement de qualité \( R(x) \). Ce sont des fonctions dépendant spatialement de \( R(x) \), où \( V_{max,m}(R) \) est calibré pour être moins sensible à la dégradation que \( V_{max,c}(R) \). Par exemple, si \(R\) est un indice discret (1=bon bitume, 2=latérite, ...), \(V_{max,i}(R)\) est une fonction en escalier.
+    \item \( g_m(\rho) \) et \( g_c(\rho) \) sont des fonctions décroissantes de la densité totale \( \rho \), telles que \( g_i(0)=1 \) et \( g_i(\rho_{jam})=0 \). La forme de \( g_m \) pourrait décroître moins rapidement que \( g_c \). Une forme simple type Greenshields est \(g_i(\rho) = (1 - \rho / \rho_{jam})_+\), où \( (x)_+ = \max(x, 0) \) et \( \rho_{jam} \) est la densité de bouchon physique maximale.
+    \item \( \rho_{jam} \) est la densité de bouchon physique, une constante positive fixée.
+    \item \( R(x) \) est un paramètre spatialement variable caractérisant la qualité de la route au point \( x \).
+\end{itemize}
+Les formes exactes de \( V_{max,i}(\cdot) \) et \( g_i(\cdot) \), ainsi que la valeur de \( V_{creeping} \), sont déterminées par calibration.
+
+\paragraph{Fonctions de Temps de Relaxation \( \tau_i(\rho) \):}
+Représentent le temps d'ajustement des conducteurs (Section \ref{sec:modeling_interweaving}), dépendant de la densité totale \( \rho \).
+\begin{itemize}
+    \item \( \tau_m(\rho) \): Fonction représentant un temps de relaxation relativement court pour les motos, potentiellement décroissant avec la densité \(\rho\).
+    \item \( \tau_c(\rho) \): Fonction représentant un temps de relaxation généralement plus long pour les voitures, potentiellement constant.
+\end{itemize}
+Une première approche simple consiste à utiliser des temps de relaxation constants, \( \tau_m < \tau_c \). Des formes dépendant de la densité peuvent être explorées lors de la calibration si nécessaire.
+
+% Conclusion de la section
+Ce système de 4 EDP couplées pour \((\rho_m, w_m, \rho_c, w_c)\), complété par la définition des fonctions \(p_i, V_{e,i}, \tau_i\) qui intègrent les spécificités du trafic béninois et dont la structure a été détaillée ci-dessus, constitue le \textbf{modèle étendu ARZ multi-classes sur un segment}. Il est à noter que ce modèle étendu, bien que conçu pour être plus réaliste, introduit un nombre significatif de paramètres (\(\alpha, V_{creeping}, \rho_{jam}\), ainsi que les paramètres définissant les fonctions \(P_i, V_{max,i}(R), g_i, \tau_i\)) dont l'estimation précise lors de la calibration (Chapitre \ref{chap:calibration_validation}) sera une étape critique. La modélisation à l'échelle du réseau nécessitera de résoudre ce système sur chaque segment et d'appliquer les conditions de couplage aux nœuds (Section \ref{sec:modeling_intersections}), ainsi que les conditions aux limites aux entrées/sorties du réseau. La résolution numérique de ce système complexe et la calibration de ses nombreux paramètres font l'objet des chapitres suivants.
+

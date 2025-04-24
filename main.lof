@@ -1,2 +1,11 @@
 \babel@toc {french}{}\relax 
 \babel@toc {french}{}\relax 
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {1.1}{\ignorespaces Exemple de trafic typique à Cotonou illustrant la prédominance des motos (Zémidjans) et leur interaction avec d'autres véhicules dans un environnement urbain dense.}}{2}{figure.caption.4}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Graphique Log-Log de l'erreur L1 en fonction du pas de grille \( \Delta x \) pour les quatre variables d'état. Les lignes pointillée et tiretée indiquent des pentes théoriques d'ordre 1 et 2, respectivement.}}{66}{figure.caption.24}%
+\contentsline {figure}{\numberline {6.2}{\ignorespaces Évolution de l'erreur relative de conservation de la masse pour les motos (\(E_{rel, m}\)) et les voitures (\(E_{rel, c}\)) au cours du temps, sur une échelle logarithmique.}}{67}{figure.caption.25}%

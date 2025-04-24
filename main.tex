@@ -4,11 +4,19 @@
 % Loads all packages and configurations from the config/ directory
 \input{config/preamble.tex}
 
+% --- Load Glossary Definitions ---
+\input{glossaire.tex}
+
 % --- Document Starts Here ---
 \begin{document}
 
 % --- Front Matter ---
 \frontmatter % Use roman numerals for page numbers, disable chapter numbering
+
+
+% --- Preliminary Pages ---
+\input{pages_preliminaires/titlepage.tex}
+\input{pages_preliminaires/resume_francais.tex}
 
 % Include Title Page, Abstract, Dedication, Acknowledgements, TOC, LOF, LOT
 
@@ -23,11 +31,26 @@
 % --- Main Matter ---
 \mainmatter % Switch to arabic page numbers, enable chapter numbering
 
-% Include Chapters from the content/ directory
 
+
+% --- Chapters ---
+\input{chapitres/introduction.tex}
+\input{chapitres/litterature_review.tex}
+\input{chapitres/specificites_benin.tex}
+
+\input{chapitres/extended_arz.tex}
+\input{chapitres/mathematical_analysis.tex}
+% Add other chapters here
+% Include Chapters from the content/ directory
+\input{chapitres/simulations_analyse.tex}
 
 % --- Back Matter ---
 \backmatter % Further sections like appendices, bibliography
+
+% --- Glossary/Acronyms ---
+\printnoidxglossary[type=\acronymtype, title={Liste des Abréviations}, toctitle={Liste des Abréviations}]
+\printnoidxglossary[title={Glossaire}, toctitle={Glossaire}]
+
 
 % Include Appendices
 \appendix % Changes chapter numbering to letters (A, B, ...)
@@ -35,6 +58,7 @@
 % \include{content/99_appendices/appendix_B_data} % Uncomment if used
 
 % --- Bibliography ---
-\printbibliography[heading=bibintoc] % Print the bibliography, add to TOC
+\printbibliography[heading=bibintoc] % Print the bibliography, add to TOC 
+% Bibliography
 
 \end{document}

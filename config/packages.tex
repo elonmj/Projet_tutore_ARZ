@@ -1,8 +1,8 @@
 % --- Core Packages ---
-\usepackage[utf8]{inputenc}         % Input encoding (UTF-8 recommended)
-\usepackage[T1]{fontenc}            % Font encoding (for better hyphenation and accented characters)
-\usepackage{lmodern}              % Latin Modern font (good default, scalable version of CM)
-% \usepackage{fontspec}             % Use if compiling with XeLaTeX or LuaLaTeX for wider font choices
+% \usepackage[utf8]{inputenc}         % Not needed with Xe/LuaLaTeX + fontspec
+% \usepackage[T1]{fontenc}            % fontspec handles this
+% \usepackage{lmodern}              % Replaced by fontspec definitions
+\usepackage{fontspec}             % Use if compiling with XeLaTeX or LuaLaTeX for wider font choices
 
 % --- Language and Babel ---
 \usepackage[english,french,shorthands=off]{babel} % Support for French and English, disable French shorthands to avoid conflicts
@@ -62,6 +62,10 @@
 \usepackage{todonotes}              % Add TODO notes in the margin
 \usepackage{import}                 % Allows importing files from other directories (\subimport, \import)
 
+% --- Glossary ---
+
+\usepackage[acronym, nonumberlist, toc, section=chapter]{glossaries-extra} % For acronyms and glossary
 % --- Graphics Path ---
+\makenoidxglossaries % Initialize glossaries
 % Define where LaTeX should look for graphics files
-\graphicspath{{../assets/figures/}} % Relative path from main.tex to figures folder
+\graphicspath{{assets/}} % Relative path from main.tex to assets folder
