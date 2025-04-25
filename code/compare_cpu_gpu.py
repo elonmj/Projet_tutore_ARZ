@@ -95,6 +95,11 @@ def main():
     fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
     # Call the method to get physical cell centers
+    print(f"DEBUG: cpu_grid.N_physical = {cpu_grid.N_physical}")
+    print(f"DEBUG: cpu_grid.num_ghost_cells = {cpu_grid.num_ghost_cells}")
+    print(f"DEBUG: cpu_data['states'][-1].shape = {cpu_data['states'][-1].shape}")
+    print(f"DEBUG: phys_slice = {phys_slice}")
+    print(f"DEBUG: cpu_state_final.shape = {cpu_state_final.shape}")
     x_coords = cpu_grid.cell_centers(include_ghost=False)
 
     # Density Plot
