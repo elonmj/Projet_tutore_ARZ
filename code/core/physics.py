@@ -224,7 +224,75 @@ def calculate_equilibrium_speed(rho_m: np.ndarray, rho_c: np.ndarray, R_local: n
     Ve_c = np.maximum(Ve_c, 0.0)
 
     return Ve_m, Ve_c
+# --- CUDA Device Function for Equilibrium Speed ---
+@cuda.jit(device=True)
+def calculate_equilibrium_speed_gpu(rho_m_i: float, rho_c_i: float, R_local_i: int,
+                                    # Pass relevant scalar parameters explicitly
+                                    rho_jam: float, V_creeping: float,
+                                    # Vmax values for different road categories
+                                    # Assuming max 3 categories for simplicity in if/elif
+                                    v_max_m_cat1: float, v_max_m_cat2: float, v_max_m_cat3: float,
+                                    v_max_c_cat1: float, v_max_c_cat2: float, v_max_c_cat3: float
+                                    ) -> tuple[float, float]:
+    """
+    Calculates the equilibrium speeds for a single cell on the GPU.
+    Uses if/elif for Vmax lookup based on R_local_i.
+    """
+    if rho_jam <= 0:
+        # Cannot raise errors in device code easily, return 0 or handle upstream
+        return 0.0, 0.0
 
+    # Ensure densities are non-negative
+    rho_m_calc = max(rho_m_i, 0.0)
+    rho_c_calc = max(rho_c_i, 0.0)
+
+    rho_total = rho_m_calc + rho_c_calc
+
+    # Calculate reduction factor g, ensuring it's between 0 and 1
+    g = max(0.0, 1.0 - rho_total / rho_jam)
+
+    # Get Vmax based on local road quality R_local_i using if/elif
+    # --- This section MUST be adapted based on your actual road categories ---
+    Vmax_m_local_i = 0.0
+    Vmax_c_local_i = 0.0
+    if R_local_i == 1:
+        Vmax_m_local_i = v_max_m_cat1
+        Vmax_c_local_i = v_max_c_cat1
+    elif R_local_i == 2:
+         Vmax_m_local_i = v_max_m_cat2 # Assuming category 2 exists
+         Vmax_c_local_i = v_max_c_cat2
+    elif R_local_i == 3:
+        Vmax_m_local_i = v_max_m_cat3
+        Vmax_c_local_i = v_max_c_cat3
+    # Add more elif conditions if you have more categories
+    # else:
+        # Handle unknown category? Default to a known one or lowest speed?
+        # Vmax_m_local_i = v_max_m_cat3 # Example: Default to category 3
+        # Vmax_c_local_i = v_max_c_cat3
+
+    # Calculate equilibrium speeds
+    Ve_m_i = V_creeping + (Vmax_m_local_i - V_creeping) * g
+    Ve_c_i = Vmax_c_local_i * g
+
+    # Ensure speeds are non-negative
+    Ve_m_i = max(Ve_m_i, 0.0)
+    Ve_c_i = max(Ve_c_i, 0.0)
+
+    return Ve_m_i, Ve_c_i
+
+# --- CUDA Device Function for Relaxation Time ---
+@cuda.jit(device=True)
+def calculate_relaxation_time_gpu(rho_m_i: float, rho_c_i: float,
+                                  # Pass relevant scalar parameters explicitly
+                                  tau_m: float, tau_c: float
+                                  ) -> tuple[float, float]:
+    """
+    Calculates the relaxation times for a single cell on the GPU.
+    Currently returns constant values based on params.
+    """
+    # rho_m_i and rho_c_i are unused for now, but kept for signature consistency
+    # Future: Could implement density-dependent relaxation times here
+    return tau_m, tau_c
 def calculate_relaxation_time(rho_m: np.ndarray, rho_c: np.ndarray, params: ModelParameters) -> tuple[float, float]:
     """
     Calculates the relaxation times for motorcycles (m) and cars (c).
@@ -479,6 +547,51 @@ def calculate_source_term(U: np.ndarray,
     Sc = (Ve_c - v_c) / (tau_c + epsilon)
 
     # Source term is zero if density is zero
+# --- CUDA Device Function for Source Term Calculation ---
+@cuda.jit(device=True)
+def calculate_source_term_gpu(y, # Local state vector [rho_m, w_m, rho_c, w_c]
+                              # Pressure params
+                              alpha: float, rho_jam: float, K_m: float, gamma_m: float, K_c: float, gamma_c: float,
+                              # Equilibrium speeds (pre-calculated for this cell)
+                              Ve_m_i: float, Ve_c_i: float,
+                              # Relaxation times (pre-calculated for this cell)
+                              tau_m_i: float, tau_c_i: float,
+                              # Epsilon
+                              epsilon: float) -> tuple[float, float, float, float]:
+    """
+    Calculates the source term vector S = (0, Sm, 0, Sc) for a single cell on the GPU.
+    Calls other CUDA device functions for pressure and velocity.
+    """
+    rho_m_i = y[0]
+    w_m_i = y[1]
+    rho_c_i = y[2]
+    w_c_i = y[3]
+
+    # Ensure densities are non-negative for calculations
+    rho_m_calc = max(rho_m_i, 0.0)
+    rho_c_calc = max(rho_c_i, 0.0)
+
+    # Calculate pressure using the CUDA device function
+    p_m_i, p_c_i = _calculate_pressure_cuda(rho_m_calc, rho_c_calc,
+                                            alpha, rho_jam, epsilon,
+                                            K_m, gamma_m, K_c, gamma_c)
+
+    # Calculate physical velocity using the CUDA device function
+    v_m_i, v_c_i = _calculate_physical_velocity_cuda(w_m_i, w_c_i, p_m_i, p_c_i)
+
+    # Equilibrium speeds (Ve_m_i, Ve_c_i) and relaxation times (tau_m_i, tau_c_i) are inputs
+
+    # Avoid division by zero if relaxation times are zero
+    Sm_i = 0.0
+    if tau_m_i > epsilon and rho_m_calc > epsilon: # Only calculate if density > 0 and tau > 0
+        Sm_i = (Ve_m_i - v_m_i) / tau_m_i
+
+    Sc_i = 0.0
+    if tau_c_i > epsilon and rho_c_calc > epsilon: # Only calculate if density > 0 and tau > 0
+        Sc_i = (Ve_c_i - v_c_i) / tau_c_i
+
+    # Source term vector S = (0, Sm, 0, Sc)
+    return 0.0, Sm_i, 0.0, Sc_i
     Sm = np.where(rho_m <= epsilon, 0.0, Sm)
     Sc = np.where(rho_c <= epsilon, 0.0, Sc)
 
