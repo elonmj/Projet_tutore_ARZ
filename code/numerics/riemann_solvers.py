@@ -180,33 +180,86 @@ def _central_upwind_flux_cuda(U_L_i, U_R_i,
 
 # --- CUDA Kernel Wrapper for Central-Upwind Flux ---
 
+# Define block size constant for shared memory allocation
+TPB_FLUX = 256 # Threads per block for flux kernel
+
 @cuda.jit
-def central_upwind_flux_cuda_kernel(U,
+def central_upwind_flux_cuda_kernel(d_U_in,
                                     alpha, rho_jam, epsilon,
                                     K_m, gamma_m, K_c, gamma_c,
-                                    F_CU_out):
+                                    d_F_CU_out):
     """
-    CUDA kernel to calculate the Central-Upwind flux for all interfaces.
+    CUDA kernel to calculate the Central-Upwind flux for all interfaces using shared memory.
     Each thread calculates the flux for one interface idx (between cell idx and idx+1).
     """
-    idx = cuda.grid(1) # Global thread index, corresponds to interface index
+    # Shared memory for U state: 4 variables, TPB threads + 1 extra cell for right neighbor
+    s_U = cuda.shared.array(shape=(4, TPB_FLUX + 1), dtype=float64)
 
-    # U has shape (4, N_total)
-    # F_CU_out has shape (4, N_total)
-    # We calculate N_total fluxes, corresponding to interfaces 0 to N_total-1
-    if idx < U.shape[1] - 1: # Check bounds: Need U_L=U[:,idx] and U_R=U[:,idx+1]
-        U_L_i = U[:, idx]
-        U_R_i = U[:, idx + 1]
-        F_CU_out_i = F_CU_out[:, idx] # Output flux for interface idx
+    # Global thread index (corresponds to the *left* cell index for the interface)
+    idx = cuda.grid(1)
+    # Local thread index
+    tx = cuda.threadIdx.x
+    # Block ID
+    bx = cuda.blockIdx.x
+    # Block width
+    bw = cuda.blockDim.x # Should be TPB_FLUX
 
-        _central_upwind_flux_cuda(U_L_i, U_R_i,
+    N_total = d_U_in.shape[1]
+
+    # --- Load data into shared memory ---
+    # Each thread loads its corresponding cell state U[:, idx] into s_U[:, tx]
+    if idx < N_total:
+        s_U[0, tx] = d_U_in[0, idx]
+        s_U[1, tx] = d_U_in[1, idx]
+        s_U[2, tx] = d_U_in[2, idx]
+        s_U[3, tx] = d_U_in[3, idx]
+
+    # The last thread in the block needs to load the state for the cell to its right
+    # This cell's global index is blockDim.x * (blockIdx.x + 1)
+    # Or simply idx + 1 for the last thread if idx = blockDim.x * (blockIdx.x + 1) - 1
+    if tx == bw - 1:
+        idx_right_neighbor = idx + 1
+        if idx_right_neighbor < N_total:
+            s_U[0, tx + 1] = d_U_in[0, idx_right_neighbor]
+            s_U[1, tx + 1] = d_U_in[1, idx_right_neighbor]
+            s_U[2, tx + 1] = d_U_in[2, idx_right_neighbor]
+            s_U[3, tx + 1] = d_U_in[3, idx_right_neighbor]
+        # else: # Handle boundary case if needed (e.g., load zeros or extrapolate)
+            # For now, assume subsequent steps handle boundary fluxes correctly
+            # and we don't need to explicitly load beyond N_total-1 here.
+            # If idx_right_neighbor == N_total, s_U[:, tx+1] remains uninitialized.
+
+    # Synchronize threads within the block to ensure all shared memory is loaded
+    cuda.syncthreads()
+
+    # --- Calculate flux using shared memory ---
+    # Each thread calculates flux at interface 'idx' (between cell idx and idx+1)
+    # Check bounds: We need U_L=s_U[:,tx] and U_R=s_U[:,tx+1]
+    # The kernel calculates fluxes for interfaces 0 to N_total-2
+    if idx < N_total - 1:
+        # Get U_L and U_R from shared memory
+        # Need temporary arrays or tuples to pass to device function if it expects array-like
+        U_L_s = (s_U[0, tx], s_U[1, tx], s_U[2, tx], s_U[3, tx])
+        U_R_s = (s_U[0, tx + 1], s_U[1, tx + 1], s_U[2, tx + 1], s_U[3, tx + 1])
+
+        # Allocate temporary local array for the output flux of this thread
+        F_CU_out_i = cuda.local.array(4, dtype=float64)
+
+        # Call the device function (assuming it takes tuples/scalars now)
+        # We need to adapt _central_upwind_flux_cuda or create a new version
+        # Let's assume _central_upwind_flux_cuda is adapted to take tuples/scalars
+        _central_upwind_flux_cuda(U_L_s, U_R_s, # Pass tuples
                                   alpha, rho_jam, epsilon,
                                   K_m, gamma_m, K_c, gamma_c,
-                                  F_CU_out_i)
-    # Note: The flux at the last interface (N_total-1) is not calculated here,
-    # as it would require U[:, N_total]. This might need adjustment depending
-    # on how boundary conditions are handled in the GPU hyperbolic step.
-    # For now, it calculates N_total-1 fluxes.
+                                  F_CU_out_i) # Pass local array for output
+
+        # Write the result to global memory
+        d_F_CU_out[0, idx] = F_CU_out_i[0]
+        d_F_CU_out[1, idx] = F_CU_out_i[1]
+        d_F_CU_out[2, idx] = F_CU_out_i[2]
+        d_F_CU_out[3, idx] = F_CU_out_i[3]
+
+    # Note: Flux at interface N_total-1 is not calculated.
 
 
 # --- Wrapper function to call the CUDA kernel ---
@@ -237,7 +290,7 @@ def central_upwind_flux_gpu(d_U_in: cuda.devicearray.DeviceNDArray, params: Mode
 
     # Configure the kernel launch
     # Launch threads for N_total-1 interfaces (from j=0 to j=N_total-2)
-    threadsperblock = 256
+    threadsperblock = TPB_FLUX # Use the constant defined above
     blockspergrid = ( (N_total - 1) + (threadsperblock - 1)) // threadsperblock
 
     # Launch the kernel
