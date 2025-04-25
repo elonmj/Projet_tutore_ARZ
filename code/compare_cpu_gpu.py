@@ -94,7 +94,7 @@ def main():
     print(f"\n--- Generating Visual Comparison Plot ({args.plot_output}) ---")
     fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
-    x_coords = cpu_grid.cell_centers[phys_slice] # Use physical cell centers (FIXED TYPO)
+    x_coords = cpu_grid.x_centers[phys_slice] # Use physical cell centers
 
     # Density Plot
     axes[0].plot(x_coords, cpu_state_final[0, :], 'b-', label='CPU rho_m')
