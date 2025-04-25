@@ -120,9 +120,12 @@ def solve_ode_step_cpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
 @cuda.jit
 def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cells,
                      # Pass necessary parameters explicitly
-                     alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
-                     v_max_m, v_max_c, rho_max_m, rho_max_c, beta_m, beta_c, n_m, n_c,
-                     tau_relax_m, tau_relax_c, epsilon):
+                     alpha, rho_jam, K_m, gamma_m, K_c, gamma_c, # Pressure
+                     rho_jam_eq, V_creeping, # Equilibrium Speed base params
+                     v_max_m_cat1, v_max_m_cat2, v_max_m_cat3, # Motorcycle Vmax per category
+                     v_max_c_cat1, v_max_c_cat2, v_max_c_cat3, # Car Vmax per category
+                     tau_relax_m, tau_relax_c, # Relaxation times
+                     epsilon):
     """
     CUDA kernel for explicit Euler step for the ODE source term.
     Updates U_out based on U_in and the source term S(U_in).
@@ -152,12 +155,16 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
         rho_c_calc = max(y[2], 0.0)
 
         # Assume physics functions have @cuda.jit(device=True) versions
-        # Placeholder names used here - replace with actual function names if different
-        Ve_m, Ve_c = physics.calculate_equilibrium_speed_gpu(rho_m_calc, rho_c_calc, R_local,
-                                                             v_max_m, v_max_c, rho_max_m, rho_max_c,
-                                                             beta_m, beta_c, n_m, n_c)
-        tau_m, tau_c = physics.calculate_relaxation_time_gpu(rho_m_calc, rho_c_calc,
-                                                             tau_relax_m, tau_relax_c)
+        Ve_m, Ve_c = physics.calculate_equilibrium_speed_gpu(
+            rho_m_calc, rho_c_calc, R_local,
+            rho_jam_eq, V_creeping, # Pass base params for eq speed
+            v_max_m_cat1, v_max_m_cat2, v_max_m_cat3, # Pass category-specific Vmax
+            v_max_c_cat1, v_max_c_cat2, v_max_c_cat3
+        )
+        tau_m, tau_c = physics.calculate_relaxation_time_gpu(
+            rho_m_calc, rho_c_calc, # Pass densities (might be used in future)
+            tau_relax_m, tau_relax_c # Pass base relaxation times
+        )
 
         # --- 3. Calculate source term S(U) ---
         # Assume physics.calculate_source_term has a @cuda.jit(device=True) version
@@ -192,6 +199,21 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
        not hasattr(physics, 'calculate_relaxation_time_gpu'):
         raise NotImplementedError("GPU versions (_gpu suffix) of required physics functions are not available in the physics module.")
 
+    # --- Extract category-specific Vmax values ---
+    # Assuming categories 1, 2, 3 exist. Add error handling or defaults if needed.
+    try:
+        v_max_m_cat1 = params.Vmax_m[1]
+        v_max_m_cat2 = params.Vmax_m.get(2, params.Vmax_m[1]) # Default cat 2 to 1 if missing
+        v_max_m_cat3 = params.Vmax_m.get(3, params.Vmax_m[1]) # Default cat 3 to 1 if missing
+
+        v_max_c_cat1 = params.Vmax_c[1]
+        v_max_c_cat2 = params.Vmax_c.get(2, params.Vmax_c[1]) # Default cat 2 to 1 if missing
+        v_max_c_cat3 = params.Vmax_c.get(3, params.Vmax_c[1]) # Default cat 3 to 1 if missing
+    except KeyError as e:
+        raise ValueError(f"Missing required Vmax for category {e} in parameters (Vmax_m/Vmax_c dictionaries)") from e
+    except AttributeError as e:
+         raise AttributeError(f"Could not find Vmax_m or Vmax_c dictionaries in parameters object: {e}") from e
+
 
     # --- 1. Prepare data and transfer to GPU ---
     # Copy input state to GPU
@@ -208,10 +230,16 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
     _ode_step_kernel[blockspergrid, threadsperblock](
         U_in_gpu, U_out_gpu, dt_ode, R_gpu, grid.N_physical, grid.num_ghost_cells,
         # Pass all necessary parameters explicitly from the params object
+        # Pressure params
         params.alpha, params.rho_jam, params.K_m, params.gamma_m, params.K_c, params.gamma_c,
-        params.v_max_m, params.v_max_c, params.rho_max_m, params.rho_max_c,
-        params.beta_m, params.beta_c, params.n_m, params.n_c,
-        params.tau_relax_m, params.tau_relax_c, params.epsilon
+        # Equilibrium speed params (base + extracted category Vmax)
+        params.rho_jam, params.V_creeping, # Note: rho_jam passed twice, once for pressure, once for eq speed
+        v_max_m_cat1, v_max_m_cat2, v_max_m_cat3,
+        v_max_c_cat1, v_max_c_cat2, v_max_c_cat3,
+        # Relaxation times
+        params.tau_m, params.tau_c,
+        # Epsilon
+        params.epsilon
     )
     cuda.synchronize() # Ensure kernel finishes before copying back
 
