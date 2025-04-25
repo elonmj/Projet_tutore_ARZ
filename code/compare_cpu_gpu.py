@@ -69,9 +69,10 @@ def main():
          print("Error: Grid parameters (N_physical, num_ghost_cells) differ between runs.")
          sys.exit(1)
 
-    phys_slice = slice(cpu_grid.num_ghost_cells, cpu_grid.num_ghost_cells + cpu_grid.N_physical)
-    cpu_state_final = cpu_data['states'][-1][:, phys_slice]
-    gpu_state_final = gpu_data['states'][-1][:, phys_slice]
+    # The loaded states seem to contain only physical cells already.
+    # phys_slice = slice(cpu_grid.num_ghost_cells, cpu_grid.num_ghost_cells + cpu_grid.N_physical) # No longer needed
+    cpu_state_final = cpu_data['states'][-1] # Use directly
+    gpu_state_final = gpu_data['states'][-1] # Use directly
 
     # --- Numerical Comparison ---
     print("\n--- Numerical Comparison (Final State - Physical Cells) ---")
@@ -98,9 +99,10 @@ def main():
     print(f"DEBUG: cpu_grid.N_physical = {cpu_grid.N_physical}")
     print(f"DEBUG: cpu_grid.num_ghost_cells = {cpu_grid.num_ghost_cells}")
     print(f"DEBUG: cpu_data['states'][-1].shape = {cpu_data['states'][-1].shape}")
-    print(f"DEBUG: phys_slice = {phys_slice}")
+    # print(f"DEBUG: phys_slice = {phys_slice}") # Removed phys_slice
     print(f"DEBUG: cpu_state_final.shape = {cpu_state_final.shape}")
     x_coords = cpu_grid.cell_centers(include_ghost=False)
+    print(f"DEBUG: x_coords.shape = {x_coords.shape}") # Add shape check for x_coords
 
     # Density Plot
     axes[0].plot(x_coords, cpu_state_final[0, :], 'b-', label='CPU rho_m')
