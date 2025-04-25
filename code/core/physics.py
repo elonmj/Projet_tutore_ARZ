@@ -592,19 +592,7 @@ def calculate_source_term_gpu(y, # Local state vector [rho_m, w_m, rho_c, w_c]
 
     # Source term vector S = (0, Sm, 0, Sc)
     return 0.0, Sm_i, 0.0, Sc_i
-    Sm = np.where(rho_m <= epsilon, 0.0, Sm)
-    Sc = np.where(rho_c <= epsilon, 0.0, Sc)
-
-    # Construct source vector S
-    # Numba handles array creation and assignment efficiently
-    S = np.zeros_like(U)
-    S[1] = Sm
-    S[3] = Sc
-    # The scalar case check 'if isinstance(rho_m, np.ndarray)' is not needed
-    # as Numba compiles based on input types. If U is (4,), S will be (4,).
-    # If U is (4, N), S will be (4, N).
-
-    return S
+# Removed dead code block from CPU version after the correct return statement
 
 # --- CUDA Kernel for Source Term Calculation ---
 # This kernel calculates the source term for a single element (thread)
