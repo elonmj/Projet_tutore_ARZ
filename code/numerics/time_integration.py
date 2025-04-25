@@ -144,11 +144,12 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
         j_total = j_phys + num_ghost_cells # Index in the full U array (including ghosts)
 
         # --- 1. Get local state and road quality ---
-        # Create a temporary local array for the state of the current cell
-        # Using cuda.local.array for potentially faster access if reused
-        y = cuda.local.array(4, dtype=U_in.dtype)
-        for i in range(4):
-            y[i] = U_in[i, j_total]
+        # Read state variables directly into scalars (potential register allocation)
+        y0 = U_in[0, j_total]
+        y1 = U_in[1, j_total]
+        y2 = U_in[2, j_total]
+        y3 = U_in[3, j_total]
+        # Note: Access U_in[i, j_total] is likely non-coalesced. Consider transposing U_in/U_out later.
 
         # Road quality for this physical cell
         # Assumes R_local_arr is the array of road qualities for physical cells
@@ -156,8 +157,8 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
 
         # --- 2. Calculate intermediate values (Equilibrium speeds, Relaxation times) ---
         # These calculations need to be done per-cell within the kernel
-        rho_m_calc = max(y[0], 0.0)
-        rho_c_calc = max(y[2], 0.0)
+        rho_m_calc = max(y0, 0.0)
+        rho_c_calc = max(y2, 0.0)
 
         # Assume physics functions have @cuda.jit(device=True) versions
         Ve_m, Ve_c = physics.calculate_equilibrium_speed_gpu(
@@ -173,15 +174,21 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
 
         # --- 3. Calculate source term S(U) ---
         # Assume physics.calculate_source_term_gpu has a @cuda.jit(device=True) version
+        # Create a tuple or temporary array if the device function expects an array-like input
+        # If it accepts scalars, pass them directly. Assuming it needs array-like:
+        y_temp = (y0, y1, y2, y3) # Pass as a tuple
         source = physics.calculate_source_term_gpu(
-            y, alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
+            y_temp, alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
             Ve_m, Ve_c, tau_m, tau_c, epsilon
         )
 
         # --- 4. Apply Explicit Euler step ---
         # Update the output array directly at the correct total index
-        for i in range(4):
-            U_out[i, j_total] = y[i] + dt_ode * source[i]
+        # Note: Access U_out[i, j_total] is likely non-coalesced.
+        U_out[0, j_total] = y0 + dt_ode * source[0]
+        U_out[1, j_total] = y1 + dt_ode * source[1]
+        U_out[2, j_total] = y2 + dt_ode * source[2]
+        U_out[3, j_total] = y3 + dt_ode * source[3]
 
 # --- New GPU Wrapper Function for ODE Step ---
 def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
