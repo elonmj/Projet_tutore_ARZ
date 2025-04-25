@@ -1,5 +1,6 @@
 import numpy as np
 from numba import cuda # Import cuda
+import cupy as cp # Import CuPy
 from scipy.integrate import solve_ivp
 from ..grid.grid1d import Grid1D
 from ..core.parameters import ModelParameters
@@ -121,72 +122,15 @@ def solve_ode_step_cpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
 
     return U_out # Return the updated state array
 
-# --- New CUDA Kernel for ODE Step ---
-@cuda.jit
-def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cells,
-                     # Pass necessary parameters explicitly
-                     alpha, rho_jam, K_m, gamma_m, K_c, gamma_c, # Pressure
-                     rho_jam_eq, V_creeping, # Equilibrium Speed base params
-                     v_max_m_cat1, v_max_m_cat2, v_max_m_cat3, # Motorcycle Vmax per category
-                     v_max_c_cat1, v_max_c_cat2, v_max_c_cat3, # Car Vmax per category
-                     tau_relax_m, tau_relax_c, # Relaxation times
-                     epsilon):
-    """
-    CUDA kernel for explicit Euler step for the ODE source term.
-    Updates U_out based on U_in and the source term S(U_in).
-    Operates only on physical cells.
-    """
-    idx = cuda.grid(1) # Global thread index
-
-    # Check if index is within the range of physical cells
-    if idx < N_physical:
-        j_phys = idx
-        j_total = j_phys + num_ghost_cells # Index in the full U array (including ghosts)
-
-        # --- 1. Get local state and road quality ---
-        # Create a temporary local array for the state of the current cell
-        # Using cuda.local.array for potentially faster access if reused
-        y = cuda.local.array(4, dtype=U_in.dtype)
-        for i in range(4):
-            y[i] = U_in[i, j_total]
-
-        # Road quality for this physical cell
-        # Assumes R_local_arr is the array of road qualities for physical cells
-        R_local = R_local_arr[j_phys]
-
-        # --- 2. Calculate intermediate values (Equilibrium speeds, Relaxation times) ---
-        # These calculations need to be done per-cell within the kernel
-        rho_m_calc = max(y[0], 0.0)
-        rho_c_calc = max(y[2], 0.0)
-
-        # Assume physics functions have @cuda.jit(device=True) versions
-        Ve_m, Ve_c = physics.calculate_equilibrium_speed_gpu(
-            rho_m_calc, rho_c_calc, R_local,
-            rho_jam_eq, V_creeping, # Pass base params for eq speed
-            v_max_m_cat1, v_max_m_cat2, v_max_m_cat3, # Pass category-specific Vmax
-            v_max_c_cat1, v_max_c_cat2, v_max_c_cat3
-        )
-        tau_m, tau_c = physics.calculate_relaxation_time_gpu(
-            rho_m_calc, rho_c_calc, # Pass densities (might be used in future)
-            tau_relax_m, tau_relax_c # Pass base relaxation times
-        )
-
-        # --- 3. Calculate source term S(U) ---
-        # Assume physics.calculate_source_term_gpu has a @cuda.jit(device=True) version
-        source = physics.calculate_source_term_gpu(
-            y, alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
-            Ve_m, Ve_c, tau_m, tau_c, epsilon
-        )
-
-        # --- 4. Apply Explicit Euler step ---
-        # Update the output array directly at the correct total index
-        for i in range(4):
-            U_out[i, j_total] = y[i] + dt_ode * source[i]
+# --- [REMOVED] Unused Numba CUDA Kernel for ODE Step ---
+# The _ode_step_kernel is no longer used as the logic is now implemented
+# directly in solve_ode_step_gpu using CuPy operations.
 
 # --- New GPU Wrapper Function for ODE Step ---
 def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
     """
     Solves the ODE system dU/dt = S(U) using an explicit Euler step on the GPU.
+    Replaced Numba kernel with CuPy operations.
 
     Args:
         U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
@@ -199,10 +143,11 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
     """
     if grid.road_quality is None:
         raise ValueError("Road quality must be loaded for GPU ODE step.")
-    if not hasattr(physics, 'calculate_source_term_gpu') or \
-       not hasattr(physics, 'calculate_equilibrium_speed_gpu') or \
-       not hasattr(physics, 'calculate_relaxation_time_gpu'):
-        raise NotImplementedError("GPU versions (_gpu suffix) of required physics functions are not available in the physics module.")
+    # Checks for _gpu physics functions are no longer needed as we reimplement logic here
+    # if not hasattr(physics, 'calculate_source_term_gpu') or \
+    #    not hasattr(physics, 'calculate_equilibrium_speed_gpu') or \
+    #    not hasattr(physics, 'calculate_relaxation_time_gpu'):
+    #     raise NotImplementedError("GPU versions (_gpu suffix) of required physics functions are not available in the physics module.")
 
     # --- Extract category-specific Vmax values ---
     # Assuming categories 1, 2, 3 exist. Add error handling or defaults if needed.
@@ -220,40 +165,105 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
          raise AttributeError(f"Could not find Vmax_m or Vmax_c dictionaries in parameters object: {e}") from e
 
 
-    # --- 1. Prepare data and transfer to GPU ---
+    # --- 1. Prepare data and transfer to GPU using CuPy ---
     # Copy input state to GPU
-    U_in_gpu = cuda.to_device(U_in)
+    d_U_in = cp.asarray(U_in)
     # Create output array on GPU, initialized with input (important for ghost cells)
-    U_out_gpu = cuda.to_device(U_in) # Start with U_in values
-    # Copy road quality (only physical part needed by kernel)
-    R_gpu = cuda.to_device(grid.road_quality)
+    d_U_out = cp.copy(d_U_in) # Use cp.copy
+    # Copy road quality (only physical part needed)
+    # Ensure road_quality is treated as integer indices
+    d_R_local = cp.asarray(grid.road_quality, dtype=cp.int32)
 
-    # --- 2. Configure and launch kernel ---
-    threadsperblock = 32 # Typical value, can be tuned
-    blockspergrid = math.ceil(grid.N_physical / threadsperblock)
+    # --- 2. Perform calculations using CuPy ---
+    # Get slices/indices for convenience
+    N_physical = grid.N_physical
+    num_ghost = grid.num_ghost_cells
+    phys_slice = slice(num_ghost, num_ghost + N_physical)
 
-    _ode_step_kernel[blockspergrid, threadsperblock](
-        U_in_gpu, U_out_gpu, dt_ode, R_gpu, grid.N_physical, grid.num_ghost_cells,
-        # Pass all necessary parameters explicitly from the params object
-        # Pressure params
-        params.alpha, params.rho_jam, params.K_m, params.gamma_m, params.K_c, params.gamma_c,
-        # Equilibrium speed params (base + extracted category Vmax)
-        params.rho_jam, params.V_creeping, # Note: rho_jam passed twice, once for pressure, once for eq speed
-        v_max_m_cat1, v_max_m_cat2, v_max_m_cat3,
-        v_max_c_cat1, v_max_c_cat2, v_max_c_cat3,
-        # Relaxation times
-        params.tau_m, params.tau_c,
-        # Epsilon
-        params.epsilon
-    )
-    cuda.synchronize() # Ensure kernel finishes before copying back
+    # Extract state variables for physical cells
+    d_rho_m = d_U_in[0, phys_slice]
+    d_w_m   = d_U_in[1, phys_slice]
+    d_rho_c = d_U_in[2, phys_slice]
+    d_w_c   = d_U_in[3, phys_slice]
+
+    # Ensure densities are non-negative
+    d_rho_m_calc = cp.maximum(d_rho_m, 0.0)
+    d_rho_c_calc = cp.maximum(d_rho_c, 0.0)
+
+    # --- Calculate Equilibrium Speed (Replicating logic from physics.calculate_equilibrium_speed_gpu) ---
+    d_rho_total = d_rho_m_calc + d_rho_c_calc
+    d_g = cp.maximum(0.0, 1.0 - d_rho_total / params.rho_jam)
+
+    # Vmax lookup based on d_R_local (physical cells only)
+    # Create arrays for Vmax values corresponding to categories
+    # Ensure these arrays are on the GPU
+    v_max_m_cats = cp.array([0.0, v_max_m_cat1, v_max_m_cat2, v_max_m_cat3]) # Index 0 unused
+    v_max_c_cats = cp.array([0.0, v_max_c_cat1, v_max_c_cat2, v_max_c_cat3]) # Index 0 unused
+
+    # Use advanced indexing with the road quality array
+    d_Vmax_m_local = v_max_m_cats[d_R_local]
+    d_Vmax_c_local = v_max_c_cats[d_R_local]
+
+    d_Ve_m = params.V_creeping + (d_Vmax_m_local - params.V_creeping) * d_g
+    d_Ve_c = d_Vmax_c_local * d_g
+    d_Ve_m = cp.maximum(d_Ve_m, 0.0)
+    d_Ve_c = cp.maximum(d_Ve_c, 0.0)
+
+    # --- Calculate Relaxation Time (Replicating logic from physics.calculate_relaxation_time_gpu) ---
+    # Currently constant values
+    tau_m = params.tau_m
+    tau_c = params.tau_c
+
+    # --- Calculate Pressure (Replicating logic from physics._calculate_pressure_cuda) ---
+    d_rho_eff_m = d_rho_m_calc + params.alpha * d_rho_c_calc
+    d_norm_rho_eff_m = cp.minimum(d_rho_eff_m / params.rho_jam, 1.0 - params.epsilon)
+    d_norm_rho_total = cp.minimum(d_rho_total / params.rho_jam, 1.0 - params.epsilon)
+    d_norm_rho_eff_m = cp.maximum(d_norm_rho_eff_m, 0.0)
+    d_norm_rho_total = cp.maximum(d_norm_rho_total, 0.0)
+
+    d_p_m = params.K_m * (d_norm_rho_eff_m ** params.gamma_m)
+    d_p_c = params.K_c * (d_norm_rho_total ** params.gamma_c)
+
+    # Ensure pressure is zero if respective density is zero
+    d_p_m = cp.where(d_rho_m_calc <= params.epsilon, 0.0, d_p_m)
+    d_p_c = cp.where(d_rho_c_calc <= params.epsilon, 0.0, d_p_c)
+    d_p_m = cp.where(d_rho_eff_m <= params.epsilon, 0.0, d_p_m) # Also check effective density
+
+    # --- Calculate Physical Velocity (Replicating logic from physics._calculate_physical_velocity_cuda) ---
+    d_v_m = d_w_m - d_p_m
+    d_v_c = d_w_c - d_p_c
+
+    # --- Calculate Source Term (Replicating logic from physics.calculate_source_term_gpu) ---
+    d_Sm = cp.zeros_like(d_rho_m) # Initialize source terms
+    d_Sc = cp.zeros_like(d_rho_c)
+
+    # Avoid division by zero for tau and zero density
+    mask_m = (tau_m > params.epsilon) & (d_rho_m_calc > params.epsilon)
+    mask_c = (tau_c > params.epsilon) & (d_rho_c_calc > params.epsilon)
+
+    # Use cp.where for conditional assignment (more efficient on GPU than boolean indexing assignment)
+    d_Sm = cp.where(mask_m, (d_Ve_m - d_v_m) / tau_m, 0.0)
+    d_Sc = cp.where(mask_c, (d_Ve_c - d_v_c) / tau_c, 0.0)
+
+    # --- 4. Apply Explicit Euler step to physical cells in d_U_out ---
+    # Note: We only update the physical part of d_U_out
+    d_U_out[0, phys_slice] = d_rho_m # Density doesn't change in ODE step
+    d_U_out[1, phys_slice] = d_w_m + dt_ode * d_Sm
+    d_U_out[2, phys_slice] = d_rho_c # Density doesn't change in ODE step
+    d_U_out[3, phys_slice] = d_w_c + dt_ode * d_Sc
+
+    # Apply density floor to the updated physical cells
+    d_U_out[0, phys_slice] = cp.maximum(d_U_out[0, phys_slice], params.epsilon)
+    d_U_out[2, phys_slice] = cp.maximum(d_U_out[2, phys_slice], params.epsilon)
+
 
     # --- 3. Copy result back to CPU ---
-    U_out = U_out_gpu.copy_to_host()
+    # Note: Ghost cells in d_U_out were copied from d_U_in initially and not modified
+    U_out = cp.asnumpy(d_U_out)
 
-    # Note: Ghost cells were initialized from U_in on the GPU and not touched by the kernel
-    # (which only iterated up to N_physical). So U_out already contains the correct
-    # ghost cell values copied back from U_out_gpu. No extra CPU-side copying needed.
+    # Optional: Check for NaNs or Infs after GPU computation
+    if np.isnan(U_out).any() or np.isinf(U_out).any():
+        print("Warning: NaN or Inf detected in CuPy ODE step output.")
 
     return U_out
 
