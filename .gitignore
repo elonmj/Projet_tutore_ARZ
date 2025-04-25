@@ -42,3 +42,16 @@ Thumbs.db
 *.run.xml
 *.bcf
 *.lof
+.*thm
+
+
+# dossier results
+results/
+
+#dossier Litterature_review
+Litterature_review/
+
+
+.*prof
+
+docs/

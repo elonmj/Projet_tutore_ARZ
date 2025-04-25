@@ -547,6 +547,22 @@ def calculate_source_term(U: np.ndarray,
     Sc = (Ve_c - v_c) / (tau_c + epsilon)
 
     # Source term is zero if density is zero
+    Sm = np.where(rho_m_calc <= epsilon, 0.0, Sm)
+    Sc = np.where(rho_c_calc <= epsilon, 0.0, Sc)
+
+    # Construct the full source vector S = [0, Sm, 0, Sc]
+    # Need to handle scalar vs array inputs for U
+    if U.ndim == 1: # Scalar input (single cell)
+        # Initialize S and assign values (more Numba-friendly)
+        S = np.zeros(4, dtype=U.dtype)
+        S[1] = Sm # Sm and Sc should be scalars here if U.ndim == 1
+        S[3] = Sc
+    else: # Array input (multiple cells)
+        S = np.zeros_like(U)
+        S[1, :] = Sm
+        S[3, :] = Sc
+    return S
+
 # --- CUDA Device Function for Source Term Calculation ---
 @cuda.jit(device=True)
 def calculate_source_term_gpu(y, # Local state vector [rho_m, w_m, rho_c, w_c]

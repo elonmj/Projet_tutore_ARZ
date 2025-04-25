@@ -115,6 +115,11 @@ def solve_ode_step_cpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
         else:
             # Store the solution at the end of the time step
             U_out[:, j] = sol.y[:, -1]
+            # Ensure densities remain non-negative after ODE step
+            U_out[0, j] = np.maximum(U_out[0, j], params.epsilon) # rho_m
+            U_out[2, j] = np.maximum(U_out[2, j], params.epsilon) # rho_c
+
+    return U_out # Return the updated state array
 
 # --- New CUDA Kernel for ODE Step ---
 @cuda.jit
@@ -251,7 +256,7 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
     # ghost cell values copied back from U_out_gpu. No extra CPU-side copying needed.
 
     return U_out
-    return U_out
+
 
 # --- Helper for Hyperbolic Step ---
 
@@ -273,29 +278,21 @@ def solve_hyperbolic_step_cpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, par
     U_out = np.copy(U_in) # Start with input, ghost cells won't be updated by flux diff
     fluxes = np.zeros((4, grid.N_total)) # Store fluxes at interfaces j-1/2
 
-    # Calculate fluxes at all interfaces (from 0 to N_total)
-    # Interface j-1/2 is between cell j-1 and cell j
-    for j in range(grid.N_total): # Flux index corresponds to left cell index
-        U_L = U_in[:, j]
-        U_R = U_in[:, j + 1] if j + 1 < grid.N_total else U_in[:, j] # Handle rightmost boundary approx
-        # Note: A more robust way for the rightmost flux might be needed depending on BCs
-        # For outflow, extrapolating U_R might be better. For periodic, wrap around.
-        # Let's assume BCs handle ghost cells correctly, so we compute N_total fluxes
-        # Interface j=0 => flux F_{-1/2} uses U[-1] (ghost) and U[0] (ghost)
-        # Interface j=N_total => flux F_{N_total-1/2} uses U[N_total-1] (ghost) and U[N_total] (ghost) - needs care!
-
-        # Let's compute fluxes relevant for updating physical cells: j+1/2 from ghost_cells-1 to N_physical+ghost_cells
-        # Interface index `iface_idx` goes from 0 to N_total
-        # We need fluxes F_{g-1/2} to F_{N_phys+g-1/2} where g=num_ghost_cells
-        # These are N_phys+1 fluxes.
-        # Let's compute all N_total fluxes for simplicity, indexed by the left cell.
-
-        if j + 1 >= grid.N_total: continue # Avoid index out of bounds for U_R
-
+    # Calculate fluxes at interfaces j+1/2 (between cell j and j+1).
+    # We need N_total+1 interfaces if we consider interfaces outside the domain,
+    # but for updating N_physical cells from j=g to j=g+N-1, we need
+    # fluxes F_{g-1/2} to F_{g+N-1/2}.
+    # F_{j+1/2} is calculated using U_j and U_{j+1}.
+    # F_{j+1/2} is stored in fluxes[:, j].
+    # We need j from g-1 to g+N-1.
+    # The loop range should cover indices j such that both U_in[:, j] and U_in[:, j+1] are valid.
+    # Loop from j = g-1 to g+N-1. Max index accessed in U_in is (g+N-1)+1 = g+N (first right ghost cell).
+    g = grid.num_ghost_cells
+    N = grid.N_physical
+    for j in range(g - 1, g + N): # Calculate fluxes F_{j+1/2} for j=g-1..g+N-1
         U_L = U_in[:, j]
         U_R = U_in[:, j + 1]
         fluxes[:, j] = riemann_solvers.central_upwind_flux(U_L, U_R, params)
-
 
     # Update physical cells using flux differences
     # Update cell j using F_{j+1/2} - F_{j-1/2}
