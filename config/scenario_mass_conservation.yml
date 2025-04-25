@@ -28,7 +28,7 @@ initial_conditions: # Changed key to plural
     wave_number: 1
 
 simulation:
-  t_final_sec: 500.0
+  t_final_sec: 1000.0 # Increased simulation time
   output_dt_sec: 10.0 # Define even if full state output isn't primary goal
 
 numerical:
