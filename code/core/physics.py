@@ -109,74 +109,10 @@ def _calculate_pressure_cuda(rho_m_i, rho_c_i, alpha, rho_jam, epsilon, K_m, gam
 
     return p_m_i, p_c_i
 
-# --- CUDA Kernel Wrapper for Pressure Calculation ---
-# This kernel launches threads to call the device function for each element
-@cuda.jit
-def calculate_pressure_cuda_kernel(rho_m, rho_c, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c, p_m_out, p_c_out):
-    """
-    CUDA kernel to calculate pressure for all cells.
-    """
-    idx = cuda.grid(1) # Get the global thread index
-
-    if idx < rho_m.size: # Check bounds
-        p_m_i, p_c_i = _calculate_pressure_cuda(
-            rho_m[idx], rho_c[idx],
-            alpha, rho_jam, epsilon,
-            K_m, gamma_m, K_c, gamma_c
-        )
-        p_m_out[idx] = p_m_i
-        p_c_out[idx] = p_c_i
-
-# --- Wrapper function to call the CUDA kernel ---
-def calculate_pressure_gpu(rho_m: np.ndarray, rho_c: np.ndarray,
-                           alpha: float, rho_jam: float, epsilon: float,
-                           K_m: float, gamma_m: float,
-                           K_c: float, gamma_c: float) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Calculates the pressure terms for motorcycles (m) and cars (c) on the GPU.
-
-    Args:
-        rho_m: Density of motorcycles (veh/m).
-        rho_c: Density of cars (veh/m).
-        alpha: Interaction parameter.
-        rho_jam: Jam density (veh/m).
-        epsilon: Small number for numerical stability.
-        K_m: Pressure coefficient for motorcycles (m/s).
-        gamma_m: Pressure exponent for motorcycles.
-        K_c: Pressure coefficient for cars (m/s).
-        gamma_c: Pressure exponent for cars.
-
-
-    Returns:
-        A tuple (p_m, p_c) containing pressure terms (m/s) on the CPU.
-    """
-    # Ensure inputs are contiguous and on CPU
-    rho_m_cpu = np.ascontiguousarray(rho_m)
-    rho_c_cpu = np.ascontiguousarray(rho_c)
-
-    # Allocate device memory
-    d_rho_m = cuda.to_device(rho_m_cpu)
-    d_rho_c = cuda.to_device(rho_c_cpu)
-    d_p_m = cuda.device_array_like(d_rho_m)
-    d_p_c = cuda.device_array_like(d_rho_c)
-
-    # Configure the kernel launch
-    threadsperblock = 256
-    blockspergrid = (d_rho_m.size + (threadsperblock - 1)) // threadsperblock
-
-    # Launch the kernel
-    calculate_pressure_cuda_kernel[blockspergrid, threadsperblock](
-        d_rho_m, d_rho_c,
-        alpha, rho_jam, epsilon,
-        K_m, gamma_m, K_c, gamma_c,
-        d_p_m, d_p_c
-    )
-
-    # Copy results back to host (CPU)
-    p_m_cpu = d_p_m.copy_to_host()
-    p_c_cpu = d_p_c.copy_to_host()
-
-    return p_m_cpu, p_c_cpu
+# --- Removed calculate_pressure_cuda_kernel and calculate_pressure_gpu ---
+# These were wrappers performing CPU->GPU->CPU transfers and are superseded
+# by direct calls to the _calculate_pressure_cuda device function within
+# other kernels.
 
 
 def calculate_equilibrium_speed(rho_m: np.ndarray, rho_c: np.ndarray, R_local: np.ndarray, params: ModelParameters) -> tuple[np.ndarray, np.ndarray]:
@@ -336,66 +272,10 @@ def _calculate_physical_velocity_cuda(w_m_i, w_c_i, p_m_i, p_c_i):
     v_c_i = w_c_i - p_c_i
     return v_m_i, v_c_i
 
-# --- CUDA Kernel Wrapper for Physical Velocity Calculation ---
-# This kernel launches threads to call the device function for each element
-@cuda.jit
-def calculate_physical_velocity_cuda_kernel(w_m, w_c, p_m, p_c, v_m_out, v_c_out):
-    """
-    CUDA kernel to calculate physical velocity for all cells.
-    """
-    idx = cuda.grid(1) # Get the global thread index
-
-    if idx < w_m.size: # Check bounds
-        v_m_i, v_c_i = _calculate_physical_velocity_cuda(
-            w_m[idx], w_c[idx], p_m[idx], p_c[idx]
-        )
-        v_m_out[idx] = v_m_i
-        v_c_out[idx] = v_c_i
-
-# --- Wrapper function to call the CUDA kernel ---
-def calculate_physical_velocity_gpu(w_m: np.ndarray, w_c: np.ndarray, p_m: np.ndarray, p_c: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Calculates the physical velocities from Lagrangian variables and pressure on the GPU.
-
-    Args:
-        w_m: Lagrangian variable for motorcycles (m/s).
-        w_c: Lagrangian variable for cars (m/s).
-        p_m: Pressure term for motorcycles (m/s).
-        p_c: Pressure term for cars (m/s).
-
-    Returns:
-        A tuple (v_m, v_c) containing physical velocities (m/s) on the CPU.
-    """
-    # Ensure inputs are contiguous and on CPU
-    w_m_cpu = np.ascontiguousarray(w_m)
-    w_c_cpu = np.ascontiguousarray(w_c)
-    p_m_cpu = np.ascontiguousarray(p_m)
-    p_c_cpu = np.ascontiguousarray(p_c)
-
-
-    # Allocate device memory
-    d_w_m = cuda.to_device(w_m_cpu)
-    d_w_c = cuda.to_device(w_c_cpu)
-    d_p_m = cuda.to_device(p_m_cpu)
-    d_p_c = cuda.to_device(p_c_cpu)
-    d_v_m = cuda.device_array_like(d_w_m)
-    d_v_c = cuda.device_array_like(d_w_c)
-
-    # Configure the kernel launch
-    threadsperblock = 256
-    blockspergrid = (d_w_m.size + (threadsperblock - 1)) // threadsperblock
-
-    # Launch the kernel
-    calculate_physical_velocity_cuda_kernel[blockspergrid, threadsperblock](
-        d_w_m, d_w_c, d_p_m, d_p_c,
-        d_v_m, d_v_c
-    )
-
-    # Copy results back to host (CPU)
-    v_m_cpu = d_v_m.copy_to_host()
-    v_c_cpu = d_v_c.copy_to_host()
-
-    return v_m_cpu, v_c_cpu
+# --- Removed calculate_physical_velocity_cuda_kernel and calculate_physical_velocity_gpu ---
+# These were wrappers performing CPU->GPU->CPU transfers and are superseded
+# by direct calls to the _calculate_physical_velocity_cuda device function within
+# other kernels.
 
 
 def _calculate_pressure_derivative(rho_val, K, gamma, rho_jam, epsilon):

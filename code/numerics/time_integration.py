@@ -191,21 +191,24 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
         U_out[3, j_total] = y3 + dt_ode * source[3]
 
 # --- New GPU Wrapper Function for ODE Step ---
-def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+def solve_ode_step_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_ode: float, grid: Grid1D, params: ModelParameters, d_R: cuda.devicearray.DeviceNDArray) -> cuda.devicearray.DeviceNDArray:
     """
     Solves the ODE system dU/dt = S(U) using an explicit Euler step on the GPU.
+    Operates entirely on GPU arrays.
 
     Args:
-        U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
+        d_U_in (cuda.devicearray.DeviceNDArray): Input state device array (including ghost cells). Shape (4, N_total).
         dt_ode (float): Time step for the ODE integration.
-        grid (Grid1D): Grid object.
+        grid (Grid1D): Grid object (used for N_physical, num_ghost_cells).
         params (ModelParameters): Model parameters.
+        d_R (cuda.devicearray.DeviceNDArray): Road quality device array (physical cells only). Shape (N_physical,).
 
     Returns:
-        np.ndarray: Output state array after the ODE step. Shape (4, N_total).
+        cuda.devicearray.DeviceNDArray: Output state device array after the ODE step. Shape (4, N_total).
     """
-    if grid.road_quality is None:
-        raise ValueError("Road quality must be loaded for GPU ODE step.")
+    # Road quality check is implicitly handled by requiring d_R
+    if d_R is None or not cuda.is_cuda_array(d_R):
+         raise ValueError("Valid GPU road quality array d_R must be provided for GPU ODE step.")
     if not hasattr(physics, 'calculate_source_term_gpu') or \
        not hasattr(physics, 'calculate_equilibrium_speed_gpu') or \
        not hasattr(physics, 'calculate_relaxation_time_gpu'):
@@ -227,20 +230,26 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
          raise AttributeError(f"Could not find Vmax_m or Vmax_c dictionaries in parameters object: {e}") from e
 
 
-    # --- 1. Prepare data and transfer to GPU ---
-    # Copy input state to GPU
-    U_in_gpu = cuda.to_device(U_in)
-    # Create output array on GPU, initialized with input (important for ghost cells)
-    U_out_gpu = cuda.to_device(U_in) # Start with U_in values
-    # Copy road quality (only physical part needed by kernel)
-    R_gpu = cuda.to_device(grid.road_quality)
+    # --- 1. Allocate output array on GPU ---
+    # Note: We don't need to initialize with d_U_in because the kernel only updates
+    # physical cells. Ghost cells will be updated by the boundary condition kernel later.
+    # However, allocating like d_U_in ensures the same shape and dtype.
+    d_U_out = cuda.device_array_like(d_U_in)
+    # Explicitly copy ghost cells from input to output *before* kernel launch
+    # This ensures they are preserved if the kernel doesn't touch them (which it shouldn't)
+    # and are correct if the subsequent hyperbolic step needs them.
+    n_ghost = grid.num_ghost_cells
+    n_phys = grid.N_physical
+    d_U_out[:, :n_ghost] = d_U_in[:, :n_ghost]
+    d_U_out[:, n_ghost+n_phys:] = d_U_in[:, n_ghost+n_phys:]
+
 
     # --- 2. Configure and launch kernel ---
-    threadsperblock = 32 # Typical value, can be tuned
+    threadsperblock = 256 # Typical value, can be tuned
     blockspergrid = math.ceil(grid.N_physical / threadsperblock)
 
     _ode_step_kernel[blockspergrid, threadsperblock](
-        U_in_gpu, U_out_gpu, dt_ode, R_gpu, grid.N_physical, grid.num_ghost_cells,
+        d_U_in, d_U_out, dt_ode, d_R, grid.N_physical, grid.num_ghost_cells,
         # Pass all necessary parameters explicitly from the params object
         # Pressure params
         params.alpha, params.rho_jam, params.K_m, params.gamma_m, params.K_c, params.gamma_c,
@@ -253,16 +262,11 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
         # Epsilon
         params.epsilon
     )
-    cuda.synchronize() # Ensure kernel finishes before copying back
+    # cuda.synchronize() # No sync needed here, let subsequent steps handle it
 
-    # --- 3. Copy result back to CPU ---
-    U_out = U_out_gpu.copy_to_host()
-
-    # Note: Ghost cells were initialized from U_in on the GPU and not touched by the kernel
-    # (which only iterated up to N_physical). So U_out already contains the correct
-    # ghost cell values copied back from U_out_gpu. No extra CPU-side copying needed.
-
-    return U_out
+    # --- 3. Return GPU array ---
+    # No copy back to host
+    return d_U_out
 
 
 # --- Helper for Hyperbolic Step ---
@@ -372,34 +376,45 @@ def _update_state_hyperbolic_cuda_kernel(U_in, fluxes, dt_hyp, dx, epsilon,
 
 # --- GPU Hyperbolic Step Implementation ---
 
-def solve_hyperbolic_step_gpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+def solve_hyperbolic_step_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
     """
     Solves the hyperbolic part dU/dt + dF/dx = 0 using FVM with CU flux on the GPU.
-    Uses first-order Euler forward in time.
+    Uses first-order Euler forward in time. Operates entirely on GPU arrays.
 
     Args:
-        U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
+        d_U_in (cuda.devicearray.DeviceNDArray): Input state device array (including ghost cells). Shape (4, N_total).
         dt_hyp (float): Time step for the hyperbolic update.
         grid (Grid1D): Grid object.
         params (ModelParameters): Model parameters.
 
     Returns:
-        np.ndarray: Output state array after the hyperbolic step. Shape (4, N_total) on CPU.
+        cuda.devicearray.DeviceNDArray: Output state device array after the hyperbolic step. Shape (4, N_total).
     """
-    # Ensure input is contiguous and on CPU
-    U_in_cpu = np.ascontiguousarray(U_in)
-    N_total = U_in_cpu.shape[1]
+    # --- 1. Allocate output array on GPU ---
+    d_U_out = cuda.device_array_like(d_U_in)
+    # Explicitly copy ghost cells from input to output *before* kernel launch
+    # This ensures they are preserved if the kernel doesn't touch them (which it shouldn't)
+    # and are correct if the subsequent boundary condition step needs them.
+    n_ghost = grid.num_ghost_cells
+    n_phys = grid.N_physical
+    d_U_out[:, :n_ghost] = d_U_in[:, :n_ghost]
+    d_U_out[:, n_ghost+n_phys:] = d_U_in[:, n_ghost+n_phys:]
 
-    # Allocate device memory for input and output states
-    d_U_in = cuda.to_device(U_in_cpu)
-    d_U_out = cuda.device_array_like(d_U_in) # Allocate output on GPU
 
-    # Calculate fluxes on the GPU
-    # riemann_solvers.central_upwind_flux_gpu now returns fluxes directly on the GPU device
-    d_fluxes = riemann_solvers.central_upwind_flux_gpu(U_in_cpu, params)
+    # --- 2. Calculate fluxes on the GPU ---
+    # NOTE: riemann_solvers.central_upwind_flux_gpu needs modification
+    #       to accept d_U_in and return d_fluxes (GPU array).
+    try:
+        d_fluxes = riemann_solvers.central_upwind_flux_gpu(d_U_in, params)
+    except TypeError as e:
+         # Catch potential error if central_upwind_flux_gpu hasn't been updated yet
+         if "CUDA device array" in str(e):
+              raise TypeError("solve_hyperbolic_step_gpu requires riemann_solvers.central_upwind_flux_gpu to accept GPU arrays.") from e
+         else:
+              raise e # Re-raise other TypeErrors
 
-    # Configure the kernel launch for state update (over physical cells)
-    threadsperblock_update = 256
+    # --- 3. Configure and launch state update kernel ---
+    threadsperblock_update = 256 # Can be tuned
     blockspergrid_update = (grid.N_physical + (threadsperblock_update - 1)) // threadsperblock_update
 
     # Launch the state update kernel
@@ -408,68 +423,78 @@ def solve_hyperbolic_step_gpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, par
         grid.num_ghost_cells, grid.N_physical, d_U_out
     )
 
-    # Copy the full result (including potentially uninitialized ghost cells) back to CPU
-    U_out_cpu = d_U_out.copy_to_host()
+    # cuda.synchronize() # No sync needed here
 
-    # Copy ghost cell values from the original input U_in_cpu
-    # Left ghost cells
-    U_out_cpu[:, :grid.num_ghost_cells] = U_in_cpu[:, :grid.num_ghost_cells]
-    # Right ghost cells
-    U_out_cpu[:, grid.num_ghost_cells + grid.N_physical:] = U_in_cpu[:, grid.num_ghost_cells + grid.N_physical:]
+    # --- 4. Return GPU array ---
+    # No copy back to host, no manual ghost cell copy needed here
+    # (Ghost cells were copied into d_U_out before the kernel)
 
-    # Optional: Check for NaNs or Infs after GPU computation
-    if np.isnan(U_out_cpu).any() or np.isinf(U_out_cpu).any():
-        print("Warning: NaN or Inf detected in GPU hyperbolic step output.")
-        # Consider adding more detailed debugging info here if needed
+    # Optional: Add a debug flag to copy back and check NaNs if needed
+    # if params.debug_check_nan:
+    #     U_out_cpu = d_U_out.copy_to_host()
+    #     if np.isnan(U_out_cpu).any() or np.isinf(U_out_cpu).any():
+    #         print("Warning: NaN or Inf detected in GPU hyperbolic step output.")
 
-    return U_out_cpu
+    return d_U_out
 
 
 # --- Strang Splitting Step ---
 
-def strang_splitting_step(U_n: np.ndarray, dt: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+def strang_splitting_step(U_or_d_U_n, dt: float, grid: Grid1D, params: ModelParameters, d_R=None):
     """
     Performs one full time step using Strang splitting.
+    Handles both CPU and GPU arrays based on params.device.
 
     Args:
-        U_n (np.ndarray): State array at time n (including ghost cells). Shape (4, N_total).
+        U_or_d_U_n (np.ndarray or cuda.devicearray.DeviceNDArray): State array at time n.
         dt (float): The full time step.
         grid (Grid1D): Grid object.
-        params (ModelParameters): Model parameters.
+        params (ModelParameters): Model parameters (including device).
+        d_R (cuda.devicearray.DeviceNDArray, optional): GPU road quality array.
+                                                        Required if params.device == 'gpu'. Defaults to None.
 
     Returns:
-        np.ndarray: State array at time n+1 (including ghost cells). Shape (4, N_total).
+        np.ndarray or cuda.devicearray.DeviceNDArray: State array at time n+1 (same type as input).
     """
-    # Select the appropriate ODE solver based on the device parameter
     if params.device == 'gpu':
-        # Use the new GPU explicit Euler solver
-        ode_solver_func = solve_ode_step_gpu
+        # --- GPU Path ---
+        if not cuda.is_cuda_array(U_or_d_U_n):
+            raise TypeError("Device is 'gpu' but input U_or_d_U_n is not a GPU array.")
+        if d_R is None or not cuda.is_cuda_array(d_R):
+             raise ValueError("GPU road quality array d_R must be provided for GPU Strang splitting.")
+
+        d_U_n = U_or_d_U_n # Rename for clarity
+
+        # Step 1: Solve ODEs for dt/2
+        d_U_star = solve_ode_step_gpu(d_U_n, dt / 2.0, grid, params, d_R)
+
+        # Step 2: Solve Hyperbolic part for full dt
+        d_U_ss = solve_hyperbolic_step_gpu(d_U_star, dt, grid, params)
+
+        # Step 3: Solve ODEs for dt/2
+        d_U_np1 = solve_ode_step_gpu(d_U_ss, dt / 2.0, grid, params, d_R)
+
+        return d_U_np1
+
     elif params.device == 'cpu':
-        # Use the original CPU solver based on solve_ivp
-        ode_solver_func = solve_ode_step_cpu
+        # --- CPU Path ---
+        if cuda.is_cuda_array(U_or_d_U_n):
+            raise TypeError("Device is 'cpu' but input U_or_d_U_n is a GPU array.")
+
+        U_n = U_or_d_U_n # Rename for clarity
+
+        # Step 1: Solve ODEs for dt/2
+        U_star = solve_ode_step_cpu(U_n, dt / 2.0, grid, params)
+
+        # Step 2: Solve Hyperbolic part for full dt
+        U_ss = solve_hyperbolic_step_cpu(U_star, dt, grid, params)
+
+        # Step 3: Solve ODEs for dt/2
+        U_np1 = solve_ode_step_cpu(U_ss, dt / 2.0, grid, params)
+
+        return U_np1
     else:
         raise ValueError(f"Unsupported device: {params.device}. Choose 'cpu' or 'gpu'.")
-
-
-    # Step 1: Solve ODEs for dt/2
-    U_star = ode_solver_func(U_n, dt / 2.0, grid, params)
-
-    # Select the appropriate hyperbolic solver based on the device parameter
-    if params.device == 'cpu':
-        hyperbolic_solver_func = solve_hyperbolic_step_cpu
-    elif params.device == 'gpu':
-        hyperbolic_solver_func = solve_hyperbolic_step_gpu
-    else:
-        raise ValueError(f"Unsupported device: {params.device}. Choose 'cpu' or 'gpu'.")
-
-
-    # Step 2: Solve Hyperbolic part for full dt
-    U_ss = hyperbolic_solver_func(U_star, dt, grid, params)
-
-    # Step 3: Solve ODEs for dt/2
-    U_np1 = ode_solver_func(U_ss, dt / 2.0, grid, params)
-
-    return U_np1
 
 # Example Usage (for testing purposes)
 # if __name__ == '__main__':

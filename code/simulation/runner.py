@@ -4,6 +4,7 @@ import copy # For deep merging overrides
 import os
 import yaml # To load road quality if defined directly in scenario
 from tqdm import tqdm # For progress bar
+from numba import cuda # Import cuda for device arrays
 
 from ..analysis import metrics
 from ..io import data_manager
@@ -97,14 +98,43 @@ class SimulationRunner:
         if not self.quiet:
             print("Initial state created.")
 
+        # --- Transfer initial state and road quality to GPU if needed ---
+        self.d_U = None # Handle for GPU state array
+        self.d_R = None # Handle for GPU road quality array
+        if self.device == 'gpu':
+            if not self.quiet:
+                print("Transferring initial state and road quality to GPU...")
+            try:
+                self.d_U = cuda.to_device(self.U)
+                if self.grid.road_quality is not None:
+                    self.d_R = cuda.to_device(self.grid.road_quality)
+                else:
+                    # Should not happen if _load_road_quality succeeded, but handle defensively
+                    raise ValueError("Road quality not loaded, cannot transfer to GPU.")
+                if not self.quiet:
+                    print("GPU data transfer complete.")
+            except Exception as e:
+                print(f"Error transferring data to GPU: {e}")
+                # Fallback to CPU or raise error? For now, raise.
+                raise RuntimeError(f"Failed to initialize GPU data: {e}") from e
+        # ----------------------------------------------------------------
+
+        # --- Apply initial boundary conditions ---
+        # Apply BCs *after* potential GPU transfer, using the correct array
+        initial_U_array = self.d_U if self.device == 'gpu' else self.U
+        boundary_conditions.apply_boundary_conditions(initial_U_array, self.grid, self.params)
+        if not self.quiet:
+            print("Initial boundary conditions applied.")
+        # -----------------------------------------
+
         # Initialize time and results storage
         self.t = 0.0
         self.times = [self.t]
-        # Store only physical cells
+        # Store only physical cells (always store CPU copy)
         self.states = [np.copy(self.U[:, self.grid.physical_cell_indices])]
         self.step_count = 0
 
-        # --- Mass Conservation Check Initialization ---
+        # --- Mass Conservation Check Initialization (uses CPU data) ---
         self.mass_check_config = getattr(self.params, 'mass_conservation_check', None)
         if self.mass_check_config:
             if not self.quiet:
@@ -262,8 +292,7 @@ class SimulationRunner:
         else:
             raise ValueError(f"Unknown initial condition type: '{ic_type}'")
 
-        # Apply initial boundary conditions to fill ghost cells correctly
-        boundary_conditions.apply_boundary_conditions(U_init, self.grid, self.params)
+        # Return the raw initial state without BCs applied yet
         return U_init
 
     def run(self, t_final: float = None, output_dt: float = None, max_steps: int = None) -> tuple[list[float], list[np.ndarray]]:
@@ -297,12 +326,22 @@ class SimulationRunner:
 
         try: # Ensure pbar is closed even if errors occur
             while self.t < t_final and (max_steps is None or self.step_count < max_steps):
+
+                # --- Select state array based on device ---
+                current_U = self.d_U if self.device == 'gpu' else self.U
+                # -----------------------------------------
+
                 # 1. Apply Boundary Conditions
                 # Ensures ghost cells are up-to-date before CFL calc and time step
-                boundary_conditions.apply_boundary_conditions(self.U, self.grid, self.params)
+                # NOTE: This function will need modification to handle GPU arrays
+                boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params)
 
-                # 2. Calculate Stable Timestep (using only physical cells)
-                dt = cfl.calculate_cfl_dt(self.U[:, self.grid.physical_cell_indices], self.grid, self.params)
+                # 2. Calculate Stable Timestep
+                # NOTE: calculate_cfl_dt now handles GPU arrays directly
+                # Pass the full state array (CPU or GPU)
+                # The function internally handles slicing or indexing based on device
+                dt = cfl.calculate_cfl_dt(current_U, self.grid, self.params)
+
 
                 # 3. Adjust dt to not overshoot t_final or next output time
                 time_to_final = t_final - self.t
@@ -318,7 +357,15 @@ class SimulationRunner:
 
 
                 # 4. Perform Time Step using Strang Splitting
-                self.U = time_integration.strang_splitting_step(self.U, dt, self.grid, self.params)
+                # NOTE: strang_splitting_step will need modification to handle/return GPU arrays
+                if self.device == 'gpu':
+                    # Pass d_R (GPU road quality) if needed by time_integration (check its signature later)
+                    self.d_U = time_integration.strang_splitting_step(self.d_U, dt, self.grid, self.params, d_R=self.d_R)
+                    current_U = self.d_U # Update handle
+                else:
+                    self.U = time_integration.strang_splitting_step(self.U, dt, self.grid, self.params)
+                    current_U = self.U # Update handle
+
 
                 # 5. Update Time
                 self.t += dt
@@ -330,7 +377,12 @@ class SimulationRunner:
                 # --- Mass Conservation Check ---
                 if self.mass_check_config and (self.step_count % self.mass_check_config['frequency_steps'] == 0):
                     try:
-                        U_phys_current = self.U[:, self.grid.physical_cell_indices]
+                        # If GPU, copy back physical cells temporarily for mass calc
+                        if self.device == 'gpu':
+                            U_phys_current = current_U[:, self.grid.physical_cell_indices].copy_to_host()
+                        else:
+                            U_phys_current = current_U[:, self.grid.physical_cell_indices]
+
                         current_mass_m = metrics.calculate_total_mass(U_phys_current, self.grid, class_index=0)
                         current_mass_c = metrics.calculate_total_mass(U_phys_current, self.grid, class_index=2)
                         self.mass_times.append(self.t)
@@ -340,17 +392,30 @@ class SimulationRunner:
                         pbar.write(f"Warning: Error calculating mass at t={self.t:.4f}: {e}")
 
                 # 6. Check for Numerical Issues (Positivity handled in hyperbolic step)
-                if np.isnan(self.U).any():
+                # If GPU, copy back temporarily to check for NaNs on CPU
+                if self.device == 'gpu':
+                    U_cpu_check = current_U.copy_to_host()
+                    nan_check_array = U_cpu_check
+                else:
+                    nan_check_array = current_U
+
+                if np.isnan(nan_check_array).any():
                     pbar.write(f"Error: NaN detected in state vector at t = {self.t:.4f}, step {self.step_count}.")
                     # Optionally save the state just before NaN for debugging
-                    # io.data_manager.save_simulation_data("nan_state.npz", self.times, self.states, self.grid, self.params)
+                    # Consider saving the GPU state if possible, or the CPU copy
+                    # io.data_manager.save_simulation_data("nan_state.npz", self.times, self.states, self.grid, self.params) # Saves CPU states list
                     raise ValueError("Simulation failed due to NaN values.")
 
                 # 7. Store Results if Output Time Reached
                 # Use a small tolerance for floating point comparison
                 if self.t >= last_output_time + output_dt - 1e-9 or abs(self.t - t_final) < 1e-9 :
                     self.times.append(self.t)
-                    self.states.append(np.copy(self.U[:, self.grid.physical_cell_indices]))
+                    # If GPU, copy back only physical cells for storage
+                    if self.device == 'gpu':
+                        state_cpu = current_U[:, self.grid.physical_cell_indices].copy_to_host()
+                        self.states.append(state_cpu)
+                    else:
+                        self.states.append(np.copy(current_U[:, self.grid.physical_cell_indices]))
                     last_output_time = self.t
                     # Use pbar.write to print messages without breaking the bar
                     pbar.write(f"  Stored output at t = {self.t:.4f} s (Step {self.step_count})")

@@ -1,17 +1,86 @@
 import numpy as np
+from numba import cuda, float64, int32 # Import cuda and types
+import math # For ceil
 from ..grid.grid1d import Grid1D
 from ..core.parameters import ModelParameters
 
-def apply_boundary_conditions(U_with_ghost: np.ndarray, grid: Grid1D, params: ModelParameters):
-    """
-    Applies boundary conditions to the state vector array including ghost cells.
+# --- CUDA Kernel ---
 
-    Modifies U_with_ghost in-place.
+@cuda.jit
+def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
+                                      left_type_code, right_type_code,
+                                      inflow_L_0, inflow_L_1, inflow_L_2, inflow_L_3,
+                                      inflow_R_0, inflow_R_1, inflow_R_2, inflow_R_3):
+    """
+    CUDA kernel to apply boundary conditions directly on the GPU device array d_U.
 
     Args:
-        U_with_ghost (np.ndarray): State vector array including ghost cells. Shape (4, N_total).
+        d_U: Device array (4, N_total) modified in-place.
+        n_ghost: Number of ghost cells.
+        n_phys: Number of physical cells.
+        left_type_code: 0=inflow, 1=outflow, 2=periodic.
+        right_type_code: 0=inflow, 1=outflow, 2=periodic.
+        inflow_L_0..3: Left inflow state values (if left_type_code==0).
+        inflow_R_0..3: Right inflow state values (if right_type_code==0).
+    """
+    # Thread index corresponds to the ghost cell layer (0 to n_ghost-1)
+    i = cuda.grid(1)
+
+    if i < n_ghost:
+        # --- Left Boundary ---
+        left_ghost_idx = i
+        if left_type_code == 0: # Inflow
+            d_U[0, left_ghost_idx] = inflow_L_0
+            d_U[1, left_ghost_idx] = inflow_L_1
+            d_U[2, left_ghost_idx] = inflow_L_2
+            d_U[3, left_ghost_idx] = inflow_L_3
+        elif left_type_code == 1: # Outflow (zero-order extrapolation)
+            first_phys_idx = n_ghost
+            d_U[0, left_ghost_idx] = d_U[0, first_phys_idx]
+            d_U[1, left_ghost_idx] = d_U[1, first_phys_idx]
+            d_U[2, left_ghost_idx] = d_U[2, first_phys_idx]
+            d_U[3, left_ghost_idx] = d_U[3, first_phys_idx]
+        elif left_type_code == 2: # Periodic
+            src_idx = n_phys + i # Copy from right physical cells
+            d_U[0, left_ghost_idx] = d_U[0, src_idx]
+            d_U[1, left_ghost_idx] = d_U[1, src_idx]
+            d_U[2, left_ghost_idx] = d_U[2, src_idx]
+            d_U[3, left_ghost_idx] = d_U[3, src_idx]
+
+        # --- Right Boundary ---
+        right_ghost_idx = n_phys + n_ghost + i
+        if right_type_code == 0: # Inflow
+            d_U[0, right_ghost_idx] = inflow_R_0
+            d_U[1, right_ghost_idx] = inflow_R_1
+            d_U[2, right_ghost_idx] = inflow_R_2
+            d_U[3, right_ghost_idx] = inflow_R_3
+        elif right_type_code == 1: # Outflow (zero-order extrapolation)
+            last_phys_idx = n_phys + n_ghost - 1
+            d_U[0, right_ghost_idx] = d_U[0, last_phys_idx]
+            d_U[1, right_ghost_idx] = d_U[1, last_phys_idx]
+            d_U[2, right_ghost_idx] = d_U[2, last_phys_idx]
+            d_U[3, right_ghost_idx] = d_U[3, last_phys_idx]
+        elif right_type_code == 2: # Periodic
+            src_idx = n_ghost + i # Copy from left physical cells
+            d_U[0, right_ghost_idx] = d_U[0, src_idx]
+            d_U[1, right_ghost_idx] = d_U[1, src_idx]
+            d_U[2, right_ghost_idx] = d_U[2, src_idx]
+            d_U[3, right_ghost_idx] = d_U[3, src_idx]
+
+# --- Main Function ---
+
+def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
+    """
+    Applies boundary conditions to the state vector array including ghost cells.
+    Works for both CPU (NumPy) and GPU (Numba DeviceNDArray) arrays.
+
+    Modifies U_or_d_U in-place.
+
+    Args:
+        U_or_d_U (np.ndarray or numba.cuda.DeviceNDArray): State vector array (CPU or GPU). Shape (4, N_total).
         grid (Grid1D): The computational grid object.
-        params (ModelParameters): Object containing parameters, including boundary condition definitions.
+        params (ModelParameters): Object containing parameters, including boundary condition definitions
+                                  and the target device ('cpu' or 'gpu').
                                   Expects params.boundary_conditions to be a dict like:
                                   {'left': {'type': 'inflow', 'state': [rho_m, w_m, rho_c, w_c]},
                                    'right': {'type': 'outflow'}}
@@ -22,49 +91,86 @@ def apply_boundary_conditions(U_with_ghost: np.ndarray, grid: Grid1D, params: Mo
     """
     n_ghost = grid.num_ghost_cells
     n_phys = grid.N_physical
+    N_total = grid.N_total
     bc_config = params.boundary_conditions
 
-    # --- Left Boundary ---
-    left_bc = bc_config.get('left', {'type': 'outflow'}) # Default to outflow if not specified
-    left_type = left_bc.get('type', 'outflow').lower()
+    # --- Determine Device and Prepare ---
+    is_gpu = hasattr(params, 'device') and params.device == 'gpu'
+    if is_gpu and not cuda.is_cuda_array(U_or_d_U):
+        raise TypeError("Device is 'gpu' but input array is not a Numba CUDA device array.")
+    if not is_gpu and cuda.is_cuda_array(U_or_d_U):
+         raise TypeError("Device is 'cpu' but input array is a Numba CUDA device array.")
 
-    if left_type == 'inflow':
-        inflow_state = left_bc.get('state')
-        if inflow_state is None or len(inflow_state) != 4:
-            raise ValueError("Inflow boundary condition requires a 'state' list/array of length 4.")
-        # Set all left ghost cells to the inflow state
-        U_with_ghost[:, 0:n_ghost] = np.array(inflow_state).reshape(-1, 1)
-    elif left_type == 'outflow':
-        # Zero-order extrapolation: copy state from the first physical cell
-        first_physical_cell_state = U_with_ghost[:, n_ghost:n_ghost+1] # Keep dimensions
-        U_with_ghost[:, 0:n_ghost] = first_physical_cell_state
-    elif left_type == 'periodic':
-        # Copy state from the rightmost physical cells
-        U_with_ghost[:, 0:n_ghost] = U_with_ghost[:, n_phys:n_phys + n_ghost]
+    # --- Get BC Types and Inflow States ---
+    left_bc = bc_config.get('left', {'type': 'outflow'})
+    right_bc = bc_config.get('right', {'type': 'outflow'})
+    left_type_str = left_bc.get('type', 'outflow').lower()
+    right_type_str = right_bc.get('type', 'outflow').lower()
+
+    type_map = {'inflow': 0, 'outflow': 1, 'periodic': 2}
+    left_type_code = type_map.get(left_type_str)
+    right_type_code = type_map.get(right_type_str)
+
+    if left_type_code is None: raise ValueError(f"Unknown left boundary condition type: {left_type_str}")
+    if right_type_code is None: raise ValueError(f"Unknown right boundary condition type: {right_type_str}")
+
+    # Prepare inflow states (use dummy values if not inflow)
+    inflow_L = [0.0] * 4
+    inflow_R = [0.0] * 4
+    if left_type_code == 0:
+        inflow_L_state = left_bc.get('state')
+        if inflow_L_state is None or len(inflow_L_state) != 4:
+            raise ValueError("Left inflow BC requires a 'state' list/array of length 4.")
+        inflow_L = list(inflow_L_state) # Ensure it's a list of floats
+    if right_type_code == 0:
+        inflow_R_state = right_bc.get('state')
+        if inflow_R_state is None or len(inflow_R_state) != 4:
+            raise ValueError("Right inflow BC requires a 'state' list/array of length 4.")
+        inflow_R = list(inflow_R_state) # Ensure it's a list of floats
+
+
+    # --- Apply BCs ---
+    if is_gpu:
+        # --- GPU Implementation ---
+        d_U = U_or_d_U # Rename for clarity
+
+        # Configure kernel launch
+        threadsperblock = 64 # Can be tuned, but likely small enough
+        blockspergrid = math.ceil(n_ghost / threadsperblock)
+
+        # Launch kernel
+        _apply_boundary_conditions_kernel[blockspergrid, threadsperblock](
+            d_U, n_ghost, n_phys,
+            left_type_code, right_type_code,
+            # Pass inflow states as individual float arguments
+            float64(inflow_L[0]), float64(inflow_L[1]), float64(inflow_L[2]), float64(inflow_L[3]),
+            float64(inflow_R[0]), float64(inflow_R[1]), float64(inflow_R[2]), float64(inflow_R[3])
+        )
+        # No explicit sync needed here, subsequent kernels will sync
+
     else:
-        raise ValueError(f"Unknown left boundary condition type: {left_type}")
+        # --- CPU Implementation (Original Logic) ---
+        U = U_or_d_U # Rename for clarity
 
-    # --- Right Boundary ---
-    right_bc = bc_config.get('right', {'type': 'outflow'}) # Default to outflow
-    right_type = right_bc.get('type', 'outflow').lower()
+        # Left Boundary
+        if left_type_code == 0: # Inflow
+            U[:, 0:n_ghost] = np.array(inflow_L).reshape(-1, 1)
+        elif left_type_code == 1: # Outflow
+            first_physical_cell_state = U[:, n_ghost:n_ghost+1]
+            U[:, 0:n_ghost] = first_physical_cell_state
+        elif left_type_code == 2: # Periodic
+            U[:, 0:n_ghost] = U[:, n_phys:n_phys + n_ghost]
 
-    if right_type == 'inflow': # Less common for right boundary, but possible
-        inflow_state = right_bc.get('state')
-        if inflow_state is None or len(inflow_state) != 4:
-            raise ValueError("Inflow boundary condition requires a 'state' list/array of length 4.")
-        # Set all right ghost cells to the inflow state
-        U_with_ghost[:, n_phys + n_ghost:] = np.array(inflow_state).reshape(-1, 1)
-    elif right_type == 'outflow':
-        # Zero-order extrapolation: copy state from the last physical cell
-        last_physical_cell_state = U_with_ghost[:, n_phys + n_ghost - 1 : n_phys + n_ghost] # Keep dimensions
-        U_with_ghost[:, n_phys + n_ghost:] = last_physical_cell_state
-    elif right_type == 'periodic':
-        # Copy state from the leftmost physical cells
-        U_with_ghost[:, n_phys + n_ghost:] = U_with_ghost[:, n_ghost:n_ghost + n_ghost]
-    else:
-        raise ValueError(f"Unknown right boundary condition type: {right_type}")
+        # Right Boundary
+        if right_type_code == 0: # Inflow
+            U[:, n_phys + n_ghost:] = np.array(inflow_R).reshape(-1, 1)
+        elif right_type_code == 1: # Outflow
+            last_physical_cell_state = U[:, n_phys + n_ghost - 1 : n_phys + n_ghost]
+            U[:, n_phys + n_ghost:] = last_physical_cell_state
+        elif right_type_code == 2: # Periodic
+            U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
 
-    # Note: No return value, U_with_ghost is modified in-place.
+    # Note: No return value, U_or_d_U is modified in-place.
 
 # Example Usage (for testing purposes)
 # if __name__ == '__main__':

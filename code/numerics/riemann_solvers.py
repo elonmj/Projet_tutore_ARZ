@@ -211,37 +211,38 @@ def central_upwind_flux_cuda_kernel(U,
 
 # --- Wrapper function to call the CUDA kernel ---
 
-def central_upwind_flux_gpu(U: np.ndarray, params: ModelParameters) -> cuda.devicearray:
+def central_upwind_flux_gpu(d_U_in: cuda.devicearray.DeviceNDArray, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
     """
     Calculates the numerical flux at all interfaces using the Central-Upwind scheme on the GPU.
+    Operates entirely on GPU arrays.
 
     Args:
-        U (np.ndarray): State array (including ghost cells) on the CPU. Shape (4, N_total).
+        d_U_in (cuda.devicearray.DeviceNDArray): Input state device array (including ghost cells). Shape (4, N_total).
         params (ModelParameters): Model parameters object.
 
     Returns:
-        cuda.devicearray: The numerical flux vectors F_CU at all interfaces. Shape (4, N_total) on the GPU.
-                          The flux at index j corresponds to the interface between cell j and j+1.
-                          The last column might be zero or uninitialized depending on kernel logic.
+        cuda.devicearray.DeviceNDArray: The numerical flux vectors F_CU at all interfaces. Shape (4, N_total) on the GPU.
+                                         The flux at index j corresponds to the interface between cell j and j+1.
+                                         The last column (interface N_total-1) is not calculated by the kernel.
     """
-    # Ensure inputs are contiguous and on CPU
-    U_cpu = np.ascontiguousarray(U)
-    N_total = U_cpu.shape[1]
+    if not cuda.is_cuda_array(d_U_in):
+        raise TypeError("Input d_U_in must be a Numba CUDA device array.")
 
-    # Allocate device memory
-    d_U = cuda.to_device(U_cpu)
-    # Allocate output array for fluxes. Size N_total to match CPU version's expectation,
-    # even though the kernel currently calculates N_total-1 fluxes.
-    d_F_CU = cuda.device_array((4, N_total), dtype=U_cpu.dtype)
+    N_total = d_U_in.shape[1]
+
+    # Allocate output array for fluxes on the GPU.
+    # Size N_total to match CPU version's expectation, even though the
+    # kernel currently calculates N_total-1 fluxes. The last column remains uninitialized.
+    d_F_CU = cuda.device_array((4, N_total), dtype=d_U_in.dtype)
 
     # Configure the kernel launch
-    # Launch threads for N_total-1 interfaces
+    # Launch threads for N_total-1 interfaces (from j=0 to j=N_total-2)
     threadsperblock = 256
     blockspergrid = ( (N_total - 1) + (threadsperblock - 1)) // threadsperblock
 
     # Launch the kernel
     central_upwind_flux_cuda_kernel[blockspergrid, threadsperblock](
-        d_U,
+        d_U_in, # Pass the input GPU array directly
         params.alpha, params.rho_jam, params.epsilon,
         params.K_m, params.gamma_m, params.K_c, params.gamma_c,
         d_F_CU
