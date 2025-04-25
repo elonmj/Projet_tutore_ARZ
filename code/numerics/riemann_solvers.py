@@ -1,5 +1,6 @@
 import numpy as np
-from numba import cuda, float64 # Import cuda and float64 type
+import numba # Import numba itself
+from numba import cuda, float64 # Keep float64 import for convenience elsewhere? Or remove if not used.
 import math # Import math for CUDA device functions
 from ..core.parameters import ModelParameters
 from ..core import physics # Import the physics module itself
@@ -198,7 +199,7 @@ def central_upwind_flux_cuda_kernel(d_U_in,
     Each thread calculates the flux for one interface idx (between cell idx and idx+1).
     """
     # Shared memory for U state: 4 variables, TPB threads + 1 extra cell for right neighbor
-    s_U = cuda.shared.array(shape=(4, TPB_FLUX + 1), dtype=float64) # Use numba.float64
+    s_U = cuda.shared.array(shape=(4, TPB_FLUX + 1), dtype=numba.float64) # Use numba.float64 explicitly
 
     # Global thread index (corresponds to the *left* cell index for the interface)
     idx = cuda.grid(1)
