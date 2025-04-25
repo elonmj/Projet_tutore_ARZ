@@ -549,9 +549,9 @@ def calculate_source_term(U: np.ndarray,
     # Source term is zero if density is zero
 # --- CUDA Device Function for Source Term Calculation ---
 @cuda.jit(device=True)
-def _device_calculate_source_term(y, # Local state vector [rho_m, w_m, rho_c, w_c]
-                                  # Pressure params
-                                  alpha: float, rho_jam: float, K_m: float, gamma_m: float, K_c: float, gamma_c: float,
+def calculate_source_term_gpu(y, # Local state vector [rho_m, w_m, rho_c, w_c]
+                              # Pressure params
+                              alpha: float, rho_jam: float, K_m: float, gamma_m: float, K_c: float, gamma_c: float,
                               # Equilibrium speeds (pre-calculated for this cell)
                               Ve_m_i: float, Ve_c_i: float,
                               # Relaxation times (pre-calculated for this cell)

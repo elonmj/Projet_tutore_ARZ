@@ -167,8 +167,8 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
         )
 
         # --- 3. Calculate source term S(U) ---
-        # Assume physics._device_calculate_source_term has a @cuda.jit(device=True) version
-        source = physics._device_calculate_source_term(
+        # Assume physics.calculate_source_term_gpu has a @cuda.jit(device=True) version
+        source = physics.calculate_source_term_gpu(
             y, alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
             Ve_m, Ve_c, tau_m, tau_c, epsilon
         )
