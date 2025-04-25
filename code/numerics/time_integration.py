@@ -4,6 +4,7 @@ from scipy.integrate import solve_ivp
 from ..grid.grid1d import Grid1D
 from ..core.parameters import ModelParameters
 from ..core import physics
+import math # Import math for ceil
 from . import riemann_solvers # Import the riemann solver module
 
 # --- Helper for ODE Step ---
@@ -115,6 +116,113 @@ def solve_ode_step_cpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
             # Store the solution at the end of the time step
             U_out[:, j] = sol.y[:, -1]
 
+# --- New CUDA Kernel for ODE Step ---
+@cuda.jit
+def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cells,
+                     # Pass necessary parameters explicitly
+                     alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
+                     v_max_m, v_max_c, rho_max_m, rho_max_c, beta_m, beta_c, n_m, n_c,
+                     tau_relax_m, tau_relax_c, epsilon):
+    """
+    CUDA kernel for explicit Euler step for the ODE source term.
+    Updates U_out based on U_in and the source term S(U_in).
+    Operates only on physical cells.
+    """
+    idx = cuda.grid(1) # Global thread index
+
+    # Check if index is within the range of physical cells
+    if idx < N_physical:
+        j_phys = idx
+        j_total = j_phys + num_ghost_cells # Index in the full U array (including ghosts)
+
+        # --- 1. Get local state and road quality ---
+        # Create a temporary local array for the state of the current cell
+        # Using cuda.local.array for potentially faster access if reused
+        y = cuda.local.array(4, dtype=U_in.dtype)
+        for i in range(4):
+            y[i] = U_in[i, j_total]
+
+        # Road quality for this physical cell
+        # Assumes R_local_arr is the array of road qualities for physical cells
+        R_local = R_local_arr[j_phys]
+
+        # --- 2. Calculate intermediate values (Equilibrium speeds, Relaxation times) ---
+        # These calculations need to be done per-cell within the kernel
+        rho_m_calc = max(y[0], 0.0)
+        rho_c_calc = max(y[2], 0.0)
+
+        # Assume physics functions have @cuda.jit(device=True) versions
+        # Placeholder names used here - replace with actual function names if different
+        Ve_m, Ve_c = physics.calculate_equilibrium_speed_gpu(rho_m_calc, rho_c_calc, R_local,
+                                                             v_max_m, v_max_c, rho_max_m, rho_max_c,
+                                                             beta_m, beta_c, n_m, n_c)
+        tau_m, tau_c = physics.calculate_relaxation_time_gpu(rho_m_calc, rho_c_calc,
+                                                             tau_relax_m, tau_relax_c)
+
+        # --- 3. Calculate source term S(U) ---
+        # Assume physics.calculate_source_term has a @cuda.jit(device=True) version
+        source = physics.calculate_source_term_gpu(
+            y, alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
+            Ve_m, Ve_c, tau_m, tau_c, epsilon
+        )
+
+        # --- 4. Apply Explicit Euler step ---
+        # Update the output array directly at the correct total index
+        for i in range(4):
+            U_out[i, j_total] = y[i] + dt_ode * source[i]
+
+# --- New GPU Wrapper Function for ODE Step ---
+def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+    """
+    Solves the ODE system dU/dt = S(U) using an explicit Euler step on the GPU.
+
+    Args:
+        U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
+        dt_ode (float): Time step for the ODE integration.
+        grid (Grid1D): Grid object.
+        params (ModelParameters): Model parameters.
+
+    Returns:
+        np.ndarray: Output state array after the ODE step. Shape (4, N_total).
+    """
+    if grid.road_quality is None:
+        raise ValueError("Road quality must be loaded for GPU ODE step.")
+    if not hasattr(physics, 'calculate_source_term_gpu') or \
+       not hasattr(physics, 'calculate_equilibrium_speed_gpu') or \
+       not hasattr(physics, 'calculate_relaxation_time_gpu'):
+        raise NotImplementedError("GPU versions (_gpu suffix) of required physics functions are not available in the physics module.")
+
+
+    # --- 1. Prepare data and transfer to GPU ---
+    # Copy input state to GPU
+    U_in_gpu = cuda.to_device(U_in)
+    # Create output array on GPU, initialized with input (important for ghost cells)
+    U_out_gpu = cuda.to_device(U_in) # Start with U_in values
+    # Copy road quality (only physical part needed by kernel)
+    R_gpu = cuda.to_device(grid.road_quality)
+
+    # --- 2. Configure and launch kernel ---
+    threadsperblock = 32 # Typical value, can be tuned
+    blockspergrid = math.ceil(grid.N_physical / threadsperblock)
+
+    _ode_step_kernel[blockspergrid, threadsperblock](
+        U_in_gpu, U_out_gpu, dt_ode, R_gpu, grid.N_physical, grid.num_ghost_cells,
+        # Pass all necessary parameters explicitly from the params object
+        params.alpha, params.rho_jam, params.K_m, params.gamma_m, params.K_c, params.gamma_c,
+        params.v_max_m, params.v_max_c, params.rho_max_m, params.rho_max_c,
+        params.beta_m, params.beta_c, params.n_m, params.n_c,
+        params.tau_relax_m, params.tau_relax_c, params.epsilon
+    )
+    cuda.synchronize() # Ensure kernel finishes before copying back
+
+    # --- 3. Copy result back to CPU ---
+    U_out = U_out_gpu.copy_to_host()
+
+    # Note: Ghost cells were initialized from U_in on the GPU and not touched by the kernel
+    # (which only iterated up to N_physical). So U_out already contains the correct
+    # ghost cell values copied back from U_out_gpu. No extra CPU-side copying needed.
+
+    return U_out
     return U_out
 
 # --- Helper for Hyperbolic Step ---
