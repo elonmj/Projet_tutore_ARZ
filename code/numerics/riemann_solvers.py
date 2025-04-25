@@ -95,19 +95,20 @@ def central_upwind_flux(U_L: np.ndarray, U_R: np.ndarray, params: ModelParameter
 @cuda.jit(device=True)
 def _central_upwind_flux_cuda(U_L_i, U_R_i,
                               alpha, rho_jam, epsilon,
-                              K_m, gamma_m, K_c, gamma_c,
-                              F_CU_out_i):
+                              K_m, gamma_m, K_c, gamma_c):
     """
     CUDA device function to calculate the numerical flux at a single interface
-    using the first-order Central-Upwind scheme.
+    using the first-order Central-Upwind scheme. Returns the flux components as a tuple.
 
     Args:
-        U_L_i (cuda.devicearray): State vector [rho_m, w_m, rho_c, w_c] left of interface.
-        U_R_i (cuda.devicearray): State vector [rho_m, w_m, rho_c, w_c] right of interface.
+        U_L_i (tuple/array-like): State vector [rho_m, w_m, rho_c, w_c] left of interface.
+        U_R_i (tuple/array-like): State vector [rho_m, w_m, rho_c, w_c] right of interface.
         alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c (float): Model parameters.
-        F_CU_out_i (cuda.devicearray): Output array to store the calculated flux [4,].
+
+    Returns:
+        tuple[float, float, float, float]: The four components of the numerical flux vector F_CU.
     """
-    # Extract states
+    # Extract states (assuming U_L_i, U_R_i are tuples or array-like)
     rho_m_L, w_m_L, rho_c_L, w_c_L = U_L_i[0], U_L_i[1], U_L_i[2], U_L_i[3]
     rho_m_R, w_m_R, rho_c_R, w_c_R = U_R_i[0], U_R_i[1], U_R_i[2], U_R_i[3]
 
@@ -162,20 +163,24 @@ def _central_upwind_flux_cuda(U_L_i, U_R_i,
 
     # Calculate the Central-Upwind numerical flux
     denominator = a_plus - a_minus
+    # Declare local variables for flux components
+    f0, f1, f2, f3 = 0.0, 0.0, 0.0, 0.0
     if abs(denominator) < epsilon:
         # Handle case where a+ approx equals a-
-        F_CU_out_i[0] = 0.5 * (F_L_0 + F_R_0)
-        F_CU_out_i[1] = 0.5 * (F_L_1 + F_R_1)
-        F_CU_out_i[2] = 0.5 * (F_L_2 + F_R_2)
-        F_CU_out_i[3] = 0.5 * (F_L_3 + F_R_3)
+        f0 = 0.5 * (F_L_0 + F_R_0)
+        f1 = 0.5 * (F_L_1 + F_R_1)
+        f2 = 0.5 * (F_L_2 + F_R_2)
+        f3 = 0.5 * (F_L_3 + F_R_3)
     else:
         inv_denominator = 1.0 / denominator
         factor = a_plus * a_minus * inv_denominator
 
-        F_CU_out_i[0] = (a_plus * F_L_0 - a_minus * F_R_0) * inv_denominator + factor * (U_R_i[0] - U_L_i[0])
-        F_CU_out_i[1] = (a_plus * F_L_1 - a_minus * F_R_1) * inv_denominator + factor * (U_R_i[1] - U_L_i[1])
-        F_CU_out_i[2] = (a_plus * F_L_2 - a_minus * F_R_2) * inv_denominator + factor * (U_R_i[2] - U_L_i[2])
-        F_CU_out_i[3] = (a_plus * F_L_3 - a_minus * F_R_3) * inv_denominator + factor * (U_R_i[3] - U_L_i[3])
+        f0 = (a_plus * F_L_0 - a_minus * F_R_0) * inv_denominator + factor * (U_R_i[0] - U_L_i[0])
+        f1 = (a_plus * F_L_1 - a_minus * F_R_1) * inv_denominator + factor * (U_R_i[1] - U_L_i[1])
+        f2 = (a_plus * F_L_2 - a_minus * F_R_2) * inv_denominator + factor * (U_R_i[2] - U_L_i[2])
+        f3 = (a_plus * F_L_3 - a_minus * F_R_3) * inv_denominator + factor * (U_R_i[3] - U_L_i[3])
+
+    return f0, f1, f2, f3
 
 
 # --- CUDA Kernel Wrapper for Central-Upwind Flux ---
@@ -242,22 +247,16 @@ def central_upwind_flux_cuda_kernel(d_U_in,
         U_L_s = (s_U[0, tx], s_U[1, tx], s_U[2, tx], s_U[3, tx])
         U_R_s = (s_U[0, tx + 1], s_U[1, tx + 1], s_U[2, tx + 1], s_U[3, tx + 1])
 
-        # Allocate temporary local array for the output flux of this thread
-        F_CU_out_i = cuda.local.array(4, dtype=float64)
+        # Call the device function, which now returns a tuple
+        f0, f1, f2, f3 = _central_upwind_flux_cuda(U_L_s, U_R_s, # Pass tuples
+                                                   alpha, rho_jam, epsilon,
+                                                   K_m, gamma_m, K_c, gamma_c)
 
-        # Call the device function (assuming it takes tuples/scalars now)
-        # We need to adapt _central_upwind_flux_cuda or create a new version
-        # Let's assume _central_upwind_flux_cuda is adapted to take tuples/scalars
-        _central_upwind_flux_cuda(U_L_s, U_R_s, # Pass tuples
-                                  alpha, rho_jam, epsilon,
-                                  K_m, gamma_m, K_c, gamma_c,
-                                  F_CU_out_i) # Pass local array for output
-
-        # Write the result to global memory
-        d_F_CU_out[0, idx] = F_CU_out_i[0]
-        d_F_CU_out[1, idx] = F_CU_out_i[1]
-        d_F_CU_out[2, idx] = F_CU_out_i[2]
-        d_F_CU_out[3, idx] = F_CU_out_i[3]
+        # Write the result components directly to global memory
+        d_F_CU_out[0, idx] = f0
+        d_F_CU_out[1, idx] = f1
+        d_F_CU_out[2, idx] = f2
+        d_F_CU_out[3, idx] = f3
 
     # Note: Flux at interface N_total-1 is not calculated.
 
