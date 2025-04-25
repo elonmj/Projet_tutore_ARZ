@@ -144,12 +144,12 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
         j_total = j_phys + num_ghost_cells # Index in the full U array (including ghosts)
 
         # --- 1. Get local state and road quality ---
-        # Read state variables directly into scalars assuming U_in has layout (N_total, 4) on GPU
-        y0 = U_in[j_total, 0]
-        y1 = U_in[j_total, 1]
-        y2 = U_in[j_total, 2]
-        y3 = U_in[j_total, 3]
-        # Access U_in[j_total, i] should now be coalesced.
+        # Read state variables directly into scalars (potential register allocation)
+        y0 = U_in[0, j_total]
+        y1 = U_in[1, j_total]
+        y2 = U_in[2, j_total]
+        y3 = U_in[3, j_total]
+        # Note: Access U_in[i, j_total] is likely non-coalesced. Consider transposing U_in/U_out later.
 
         # Road quality for this physical cell
         # Assumes R_local_arr is the array of road qualities for physical cells
@@ -184,11 +184,11 @@ def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cel
 
         # --- 4. Apply Explicit Euler step ---
         # Update the output array directly at the correct total index
-        # Access U_out[j_total, i] should now be coalesced.
-        U_out[j_total, 0] = y0 + dt_ode * source[0]
-        U_out[j_total, 1] = y1 + dt_ode * source[1]
-        U_out[j_total, 2] = y2 + dt_ode * source[2]
-        U_out[j_total, 3] = y3 + dt_ode * source[3]
+        # Note: Access U_out[i, j_total] is likely non-coalesced.
+        U_out[0, j_total] = y0 + dt_ode * source[0]
+        U_out[1, j_total] = y1 + dt_ode * source[1]
+        U_out[2, j_total] = y2 + dt_ode * source[2]
+        U_out[3, j_total] = y3 + dt_ode * source[3]
 
 # --- New GPU Wrapper Function for ODE Step ---
 def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
@@ -228,15 +228,12 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
 
 
     # --- 1. Prepare data and transfer to GPU ---
-    # Transpose U_in to (N_total, 4) for coalesced access in kernel
-    U_in_transposed = np.ascontiguousarray(U_in.T)
-    # Copy transposed input state to GPU
-    U_in_gpu = cuda.to_device(U_in_transposed)
-    # Create output array on GPU, initialized with transposed input (important for ghost cells)
-    # Numba copies layout, so U_out_gpu will also be (N_total, 4) and contiguous
-    U_out_gpu = cuda.to_device(U_in_transposed) # Start with U_in values
+    # Copy input state to GPU
+    U_in_gpu = cuda.to_device(U_in)
+    # Create output array on GPU, initialized with input (important for ghost cells)
+    U_out_gpu = cuda.to_device(U_in) # Start with U_in values
     # Copy road quality (only physical part needed by kernel)
-    R_gpu = cuda.to_device(grid.road_quality) # Shape (N_physical,) - layout doesn't matter much
+    R_gpu = cuda.to_device(grid.road_quality)
 
     # --- 2. Configure and launch kernel ---
     threadsperblock = 32 # Typical value, can be tuned
@@ -259,13 +256,11 @@ def solve_ode_step_gpu(U_in: np.ndarray, dt_ode: float, grid: Grid1D, params: Mo
     cuda.synchronize() # Ensure kernel finishes before copying back
 
     # --- 3. Copy result back to CPU ---
-    U_out_transposed = U_out_gpu.copy_to_host()
+    U_out = U_out_gpu.copy_to_host()
 
-    # Transpose the result back to the original (4, N_total) layout
-    U_out = np.ascontiguousarray(U_out_transposed.T)
-
-    # Note: Ghost cells were initialized from U_in_transposed on the GPU and not touched by the kernel
-    # (which only iterated up to N_physical). The final transpose puts them back in the right place.
+    # Note: Ghost cells were initialized from U_in on the GPU and not touched by the kernel
+    # (which only iterated up to N_physical). So U_out already contains the correct
+    # ghost cell values copied back from U_out_gpu. No extra CPU-side copying needed.
 
     return U_out
 
@@ -349,30 +344,30 @@ def _update_state_hyperbolic_cuda_kernel(U_in, fluxes, dt_hyp, dx, epsilon,
         # Calculate the corresponding index in the full U array (including ghost cells)
         j = num_ghost_cells + phys_idx
 
-        # Flux indices F_{j+1/2} correspond to fluxes[j, :] (layout N_total, 4)
-        # Flux indices F_{j-1/2} correspond to fluxes[j-1, :]
-        flux_right_0 = fluxes[j, 0] # Access fluxes[cell, variable]
-        flux_right_1 = fluxes[j, 1]
-        flux_right_2 = fluxes[j, 2]
-        flux_right_3 = fluxes[j, 3]
+        # Flux indices F_{j+1/2} correspond to fluxes[:, j]
+        # Flux indices F_{j-1/2} correspond to fluxes[:, j-1]
+        flux_right_0 = fluxes[0, j]
+        flux_right_1 = fluxes[1, j]
+        flux_right_2 = fluxes[2, j]
+        flux_right_3 = fluxes[3, j]
 
-        flux_left_0 = fluxes[j - 1, 0] # Access fluxes[cell, variable]
-        flux_left_1 = fluxes[j - 1, 1]
-        flux_left_2 = fluxes[j - 1, 2]
-        flux_left_3 = fluxes[j - 1, 3]
+        flux_left_0 = fluxes[0, j - 1]
+        flux_left_1 = fluxes[1, j - 1]
+        flux_left_2 = fluxes[2, j - 1]
+        flux_left_3 = fluxes[3, j - 1]
 
-        # Update state variables assuming U_in has layout (N_total, 4)
+        # Update state variables
         dt_dx = dt_hyp / dx
-        U_out_0 = U_in[j, 0] - dt_dx * (flux_right_0 - flux_left_0) # Access U_in[cell, variable]
-        U_out_1 = U_in[j, 1] - dt_dx * (flux_right_1 - flux_left_1)
-        U_out_2 = U_in[j, 2] - dt_dx * (flux_right_2 - flux_left_2)
-        U_out_3 = U_in[j, 3] - dt_dx * (flux_right_3 - flux_left_3)
+        U_out_0 = U_in[0, j] - dt_dx * (flux_right_0 - flux_left_0)
+        U_out_1 = U_in[1, j] - dt_dx * (flux_right_1 - flux_left_1)
+        U_out_2 = U_in[2, j] - dt_dx * (flux_right_2 - flux_left_2)
+        U_out_3 = U_in[3, j] - dt_dx * (flux_right_3 - flux_left_3)
 
-        # Apply density floor (ensure non-negative densities) assuming U_out has layout (N_total, 4)
-        U_out[j, 0] = max(U_out_0, epsilon) # Write U_out[cell, variable]
-        U_out[j, 1] = U_out_1             # w_m
-        U_out[j, 2] = max(U_out_2, epsilon) # rho_c
-        U_out[j, 3] = U_out_3             # w_c
+        # Apply density floor (ensure non-negative densities)
+        U_out[0, j] = max(U_out_0, epsilon) # rho_m
+        U_out[1, j] = U_out_1             # w_m
+        U_out[2, j] = max(U_out_2, epsilon) # rho_c
+        U_out[3, j] = U_out_3             # w_c
 
 
 # --- GPU Hyperbolic Step Implementation ---
@@ -391,48 +386,36 @@ def solve_hyperbolic_step_gpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, par
     Returns:
         np.ndarray: Output state array after the hyperbolic step. Shape (4, N_total) on CPU.
     """
-    # Ensure input is contiguous and on CPU (still in original 4, N_total layout)
+    # Ensure input is contiguous and on CPU
     U_in_cpu = np.ascontiguousarray(U_in)
     N_total = U_in_cpu.shape[1]
 
-    # Transpose U_in to (N_total, 4) for coalesced access in kernel
-    U_in_transposed = np.ascontiguousarray(U_in_cpu.T)
-
-    # Allocate device memory for input and output states (transposed layout)
-    d_U_in = cuda.to_device(U_in_transposed)
-    # Allocate output on GPU with the same (N_total, 4) layout
-    # Initialize with input values to preserve ghost cells initially
-    d_U_out = cuda.to_device(U_in_transposed)
+    # Allocate device memory for input and output states
+    d_U_in = cuda.to_device(U_in_cpu)
+    d_U_out = cuda.device_array_like(d_U_in) # Allocate output on GPU
 
     # Calculate fluxes on the GPU
-    # IMPORTANT: Assuming central_upwind_flux_gpu still takes (4, N_total) CPU input
-    # and returns (4, N_total) GPU output (d_fluxes).
-    # This means flux access in the kernel is still [variable, cell] and non-coalesced.
-    # We will address this later if needed by modifying the Riemann solver.
-    d_fluxes = riemann_solvers.central_upwind_flux_gpu(U_in_cpu, params) # Pass original layout
+    # riemann_solvers.central_upwind_flux_gpu now returns fluxes directly on the GPU device
+    d_fluxes = riemann_solvers.central_upwind_flux_gpu(U_in_cpu, params)
 
     # Configure the kernel launch for state update (over physical cells)
     threadsperblock_update = 256
     blockspergrid_update = (grid.N_physical + (threadsperblock_update - 1)) // threadsperblock_update
 
     # Launch the state update kernel
-    # Kernel now expects d_U_in and d_U_out to be (N_total, 4)
-    # Kernel still expects d_fluxes to be (4, N_total)
     _update_state_hyperbolic_cuda_kernel[blockspergrid_update, threadsperblock_update](
         d_U_in, d_fluxes, dt_hyp, grid.dx, params.epsilon,
         grid.num_ghost_cells, grid.N_physical, d_U_out
     )
-    cuda.synchronize() # Ensure kernel finishes before copying back
 
-    # Copy the transposed result (N_total, 4) back to CPU
-    U_out_transposed = d_U_out.copy_to_host()
+    # Copy the full result (including potentially uninitialized ghost cells) back to CPU
+    U_out_cpu = d_U_out.copy_to_host()
 
-    # Transpose the result back to the original (4, N_total) layout
-    U_out_cpu = np.ascontiguousarray(U_out_transposed.T)
-
-    # Note: Ghost cells were handled by initializing d_U_out with d_U_in (transposed)
-    # and the kernel only updating physical cells. The final transpose puts them back correctly.
-    # Manual ghost cell copying is no longer needed.
+    # Copy ghost cell values from the original input U_in_cpu
+    # Left ghost cells
+    U_out_cpu[:, :grid.num_ghost_cells] = U_in_cpu[:, :grid.num_ghost_cells]
+    # Right ghost cells
+    U_out_cpu[:, grid.num_ghost_cells + grid.N_physical:] = U_in_cpu[:, grid.num_ghost_cells + grid.N_physical:]
 
     # Optional: Check for NaNs or Infs after GPU computation
     if np.isnan(U_out_cpu).any() or np.isinf(U_out_cpu).any():
