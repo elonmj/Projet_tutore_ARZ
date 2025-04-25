@@ -93,24 +93,22 @@ def central_upwind_flux(U_L: np.ndarray, U_R: np.ndarray, params: ModelParameter
 # --- CUDA Device Function for Central-Upwind Flux ---
 
 @cuda.jit(device=True)
-def _central_upwind_flux_cuda(U_L_i, U_R_i,
+def _central_upwind_flux_cuda(rho_m_L, w_m_L, rho_c_L, w_c_L, # U_L components
+                              rho_m_R, w_m_R, rho_c_R, w_c_R, # U_R components
                               alpha, rho_jam, epsilon,
-                              K_m, gamma_m, K_c, gamma_c,
-                              F_CU_out_i):
+                              K_m, gamma_m, K_c, gamma_c):
     """
     CUDA device function to calculate the numerical flux at a single interface
-    using the first-order Central-Upwind scheme.
+    using the first-order Central-Upwind scheme. Accepts scalar inputs.
 
     Args:
-        U_L_i (cuda.devicearray): State vector [rho_m, w_m, rho_c, w_c] left of interface.
-        U_R_i (cuda.devicearray): State vector [rho_m, w_m, rho_c, w_c] right of interface.
+        rho_m_L, w_m_L, rho_c_L, w_c_L (float): State vector components left of interface.
+        rho_m_R, w_m_R, rho_c_R, w_c_R (float): State vector components right of interface.
         alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c (float): Model parameters.
-        F_CU_out_i (cuda.devicearray): Output array to store the calculated flux [4,].
-    """
-    # Extract states
-    rho_m_L, w_m_L, rho_c_L, w_c_L = U_L_i[0], U_L_i[1], U_L_i[2], U_L_i[3]
-    rho_m_R, w_m_R, rho_c_R, w_c_R = U_R_i[0], U_R_i[1], U_R_i[2], U_R_i[3]
 
+    Returns:
+        tuple: The 4 components of the numerical flux vector F_CU at the interface.
+    """
     # Ensure densities are non-negative for calculations
     rho_m_L_calc = max(rho_m_L, 0.0)
     rho_c_L_calc = max(rho_c_L, 0.0)
@@ -139,7 +137,6 @@ def _central_upwind_flux_cuda(U_L_i, U_R_i,
     )
 
     # Calculate local one-sided wave speeds (a+ and a-)
-    # Note: Numba CUDA device functions don't have default arguments for max/min
     max_lambda_L = max(lambda1_L, max(lambda2_L, max(lambda3_L, lambda4_L)))
     max_lambda_R = max(lambda1_R, max(lambda2_R, max(lambda3_R, lambda4_R)))
     min_lambda_L = min(lambda1_L, min(lambda2_L, min(lambda3_L, lambda4_L)))
@@ -149,7 +146,6 @@ def _central_upwind_flux_cuda(U_L_i, U_R_i,
     a_minus = min(min_lambda_L, min_lambda_R, 0.0)
 
     # Define the approximate physical flux F(U) = (rho_m*v_m, w_m, rho_c*v_c, w_c)^T
-    # Cannot create numpy arrays inside device function, use local variables or tuples if needed
     F_L_0 = rho_m_L_calc * v_m_L
     F_L_1 = w_m_L
     F_L_2 = rho_c_L_calc * v_c_L
@@ -160,53 +156,83 @@ def _central_upwind_flux_cuda(U_L_i, U_R_i,
     F_R_2 = rho_c_R_calc * v_c_R
     F_R_3 = w_c_R
 
-    # Calculate the Central-Upwind numerical flux
+    # Calculate the Central-Upwind numerical flux components
     denominator = a_plus - a_minus
     if abs(denominator) < epsilon:
         # Handle case where a+ approx equals a-
-        F_CU_out_i[0] = 0.5 * (F_L_0 + F_R_0)
-        F_CU_out_i[1] = 0.5 * (F_L_1 + F_R_1)
-        F_CU_out_i[2] = 0.5 * (F_L_2 + F_R_2)
-        F_CU_out_i[3] = 0.5 * (F_L_3 + F_R_3)
+        f_cu_0 = 0.5 * (F_L_0 + F_R_0)
+        f_cu_1 = 0.5 * (F_L_1 + F_R_1)
+        f_cu_2 = 0.5 * (F_L_2 + F_R_2)
+        f_cu_3 = 0.5 * (F_L_3 + F_R_3)
     else:
         inv_denominator = 1.0 / denominator
         factor = a_plus * a_minus * inv_denominator
 
-        F_CU_out_i[0] = (a_plus * F_L_0 - a_minus * F_R_0) * inv_denominator + factor * (U_R_i[0] - U_L_i[0])
-        F_CU_out_i[1] = (a_plus * F_L_1 - a_minus * F_R_1) * inv_denominator + factor * (U_R_i[1] - U_L_i[1])
-        F_CU_out_i[2] = (a_plus * F_L_2 - a_minus * F_R_2) * inv_denominator + factor * (U_R_i[2] - U_L_i[2])
-        F_CU_out_i[3] = (a_plus * F_L_3 - a_minus * F_R_3) * inv_denominator + factor * (U_R_i[3] - U_L_i[3])
+        # Calculate differences needed for the formula (U_R - U_L)
+        diff_0 = rho_m_R - rho_m_L
+        diff_1 = w_m_R - w_m_L
+        diff_2 = rho_c_R - rho_c_L
+        diff_3 = w_c_R - w_c_L
+
+        f_cu_0 = (a_plus * F_L_0 - a_minus * F_R_0) * inv_denominator + factor * diff_0
+        f_cu_1 = (a_plus * F_L_1 - a_minus * F_R_1) * inv_denominator + factor * diff_1
+        f_cu_2 = (a_plus * F_L_2 - a_minus * F_R_2) * inv_denominator + factor * diff_2
+        f_cu_3 = (a_plus * F_L_3 - a_minus * F_R_3) * inv_denominator + factor * diff_3
+
+    return f_cu_0, f_cu_1, f_cu_2, f_cu_3
 
 
 # --- CUDA Kernel Wrapper for Central-Upwind Flux ---
 
 @cuda.jit
-def central_upwind_flux_cuda_kernel(U,
+def central_upwind_flux_cuda_kernel(U, # Expected layout (N_total, 4)
                                     alpha, rho_jam, epsilon,
                                     K_m, gamma_m, K_c, gamma_c,
-                                    F_CU_out):
+                                    F_CU_out): # Expected layout (N_total, 4)
     """
     CUDA kernel to calculate the Central-Upwind flux for all interfaces.
     Each thread calculates the flux for one interface idx (between cell idx and idx+1).
+    Assumes U and F_CU_out have layout (N_total, 4).
     """
-    idx = cuda.grid(1) # Global thread index, corresponds to interface index
+    idx = cuda.grid(1) # Global thread index, corresponds to interface index j
 
-    # U has shape (4, N_total)
-    # F_CU_out has shape (4, N_total)
-    # We calculate N_total fluxes, corresponding to interfaces 0 to N_total-1
-    if idx < U.shape[1] - 1: # Check bounds: Need U_L=U[:,idx] and U_R=U[:,idx+1]
-        U_L_i = U[:, idx]
-        U_R_i = U[:, idx + 1]
-        F_CU_out_i = F_CU_out[:, idx] # Output flux for interface idx
+    # U has shape (N_total, 4)
+    # F_CU_out has shape (N_total, 4)
+    # We calculate N_total fluxes, corresponding to interfaces j=0 to N_total-1
+    # The flux at interface j is calculated using U[j] and U[j+1]
+    # The kernel needs to run for N_total-1 interfaces (0 to N_total-2)
+    if idx < U.shape[0] - 1: # Check bounds: Need U_L=U[idx,:] and U_R=U[idx+1,:]
+        # Read U_L components (coalesced access)
+        rho_m_L = U[idx, 0]
+        w_m_L   = U[idx, 1]
+        rho_c_L = U[idx, 2]
+        w_c_L   = U[idx, 3]
 
-        _central_upwind_flux_cuda(U_L_i, U_R_i,
-                                  alpha, rho_jam, epsilon,
-                                  K_m, gamma_m, K_c, gamma_c,
-                                  F_CU_out_i)
+        # Read U_R components (coalesced access)
+        rho_m_R = U[idx + 1, 0]
+        w_m_R   = U[idx + 1, 1]
+        rho_c_R = U[idx + 1, 2]
+        w_c_R   = U[idx + 1, 3]
+
+        # Calculate flux components using the scalar device function
+        f_cu_0, f_cu_1, f_cu_2, f_cu_3 = _central_upwind_flux_cuda(
+            rho_m_L, w_m_L, rho_c_L, w_c_L,
+            rho_m_R, w_m_R, rho_c_R, w_c_R,
+            alpha, rho_jam, epsilon,
+            K_m, gamma_m, K_c, gamma_c
+        )
+
+        # Write flux components to output array (coalesced access)
+        F_CU_out[idx, 0] = f_cu_0
+        F_CU_out[idx, 1] = f_cu_1
+        F_CU_out[idx, 2] = f_cu_2
+        F_CU_out[idx, 3] = f_cu_3
+
     # Note: The flux at the last interface (N_total-1) is not calculated here,
-    # as it would require U[:, N_total]. This might need adjustment depending
-    # on how boundary conditions are handled in the GPU hyperbolic step.
-    # For now, it calculates N_total-1 fluxes.
+    # as it would require U[N_total, :]. This matches the previous logic.
+    # The consuming function (solve_hyperbolic_step_gpu) needs N_total-1 fluxes
+    # (from interface g-1/2 to g+N-1/2) to update N physical cells.
+    # The flux F_{j+1/2} is stored at F_CU_out[j, :].
 
 
 # --- Wrapper function to call the CUDA kernel ---
@@ -214,32 +240,37 @@ def central_upwind_flux_cuda_kernel(U,
 def central_upwind_flux_gpu(U: np.ndarray, params: ModelParameters) -> cuda.devicearray:
     """
     Calculates the numerical flux at all interfaces using the Central-Upwind scheme on the GPU.
+    Internally uses transposed layout (N_total, 4) for coalesced memory access.
 
     Args:
         U (np.ndarray): State array (including ghost cells) on the CPU. Shape (4, N_total).
         params (ModelParameters): Model parameters object.
 
     Returns:
-        cuda.devicearray: The numerical flux vectors F_CU at all interfaces. Shape (4, N_total) on the GPU.
+        cuda.devicearray: The numerical flux vectors F_CU at all interfaces. Shape (N_total, 4) on the GPU.
                           The flux at index j corresponds to the interface between cell j and j+1.
-                          The last column might be zero or uninitialized depending on kernel logic.
+                          The last row might be zero or uninitialized depending on kernel logic.
     """
-    # Ensure inputs are contiguous and on CPU
+    # Ensure input is contiguous and on CPU (original layout)
     U_cpu = np.ascontiguousarray(U)
     N_total = U_cpu.shape[1]
 
-    # Allocate device memory
-    d_U = cuda.to_device(U_cpu)
-    # Allocate output array for fluxes. Size N_total to match CPU version's expectation,
-    # even though the kernel currently calculates N_total-1 fluxes.
-    d_F_CU = cuda.device_array((4, N_total), dtype=U_cpu.dtype)
+    # Transpose U to (N_total, 4) for coalesced access in kernel
+    U_transposed = np.ascontiguousarray(U_cpu.T)
+
+    # Allocate device memory for transposed input
+    d_U = cuda.to_device(U_transposed)
+    # Allocate output array for fluxes with transposed layout (N_total, 4)
+    # Size N_total to match the number of interfaces potentially calculated (0 to N_total-1)
+    d_F_CU = cuda.device_array((N_total, 4), dtype=U_transposed.dtype)
 
     # Configure the kernel launch
-    # Launch threads for N_total-1 interfaces
-    threadsperblock = 256
-    blockspergrid = ( (N_total - 1) + (threadsperblock - 1)) // threadsperblock
+    # Launch threads for N_total-1 interfaces (0 to N_total-2)
+    num_interfaces_to_calc = N_total - 1
+    threadsperblock = 256 # Typical value, can be tuned
+    blockspergrid = (num_interfaces_to_calc + (threadsperblock - 1)) // threadsperblock
 
-    # Launch the kernel
+    # Launch the kernel (expects transposed layout)
     central_upwind_flux_cuda_kernel[blockspergrid, threadsperblock](
         d_U,
         params.alpha, params.rho_jam, params.epsilon,
@@ -247,10 +278,9 @@ def central_upwind_flux_gpu(U: np.ndarray, params: ModelParameters) -> cuda.devi
         d_F_CU
     )
 
-    # Return the fluxes directly on the GPU device
-    # The last column (interface N_total-1) is not calculated by the kernel.
-    # The consuming function (solve_hyperbolic_step_gpu) needs to be aware of this
-    # or handle the boundary flux appropriately if needed.
+    # Return the fluxes directly on the GPU device with (N_total, 4) layout
+    # The last row (interface N_total-1) is not calculated by the kernel.
+    # The consuming function (solve_hyperbolic_step_gpu) needs to be aware of this layout.
     return d_F_CU
 
 

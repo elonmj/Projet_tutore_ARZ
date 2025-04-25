@@ -349,17 +349,17 @@ def _update_state_hyperbolic_cuda_kernel(U_in, fluxes, dt_hyp, dx, epsilon,
         # Calculate the corresponding index in the full U array (including ghost cells)
         j = num_ghost_cells + phys_idx
 
-        # Flux indices F_{j+1/2} correspond to fluxes[:, j]
-        # Flux indices F_{j-1/2} correspond to fluxes[:, j-1]
-        flux_right_0 = fluxes[0, j]
-        flux_right_1 = fluxes[1, j]
-        flux_right_2 = fluxes[2, j]
-        flux_right_3 = fluxes[3, j]
+        # Flux indices F_{j+1/2} correspond to fluxes[j, :] (layout N_total, 4)
+        # Flux indices F_{j-1/2} correspond to fluxes[j-1, :]
+        flux_right_0 = fluxes[j, 0] # Access fluxes[cell, variable]
+        flux_right_1 = fluxes[j, 1]
+        flux_right_2 = fluxes[j, 2]
+        flux_right_3 = fluxes[j, 3]
 
-        flux_left_0 = fluxes[0, j - 1]
-        flux_left_1 = fluxes[1, j - 1]
-        flux_left_2 = fluxes[2, j - 1]
-        flux_left_3 = fluxes[3, j - 1]
+        flux_left_0 = fluxes[j - 1, 0] # Access fluxes[cell, variable]
+        flux_left_1 = fluxes[j - 1, 1]
+        flux_left_2 = fluxes[j - 1, 2]
+        flux_left_3 = fluxes[j - 1, 3]
 
         # Update state variables assuming U_in has layout (N_total, 4)
         dt_dx = dt_hyp / dx
