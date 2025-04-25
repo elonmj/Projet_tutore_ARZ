@@ -187,8 +187,9 @@ def _central_upwind_flux_cuda(U_L_i, U_R_i,
 # --- CUDA Kernel Wrapper for Central-Upwind Flux ---
 
 # Define constants for shared memory allocation
-NUM_VARS = 4   # Number of state variables
-TPB_FLUX = 256 # Threads per block for flux kernel
+NUM_VARS = 4   # Number of state variables (must be known at compile time)
+TPB_FLUX = 256 # Threads per block for flux kernel (must be known at compile time)
+SHARED_MEM_COLS = TPB_FLUX + 1 # Calculate derived constant
 
 @cuda.jit
 def central_upwind_flux_cuda_kernel(d_U_in,
@@ -200,7 +201,7 @@ def central_upwind_flux_cuda_kernel(d_U_in,
     Each thread calculates the flux for one interface idx (between cell idx and idx+1).
     """
     # Shared memory for U state: NUM_VARS variables, TPB threads + 1 extra cell for right neighbor
-    s_U = cuda.shared.array(shape=(NUM_VARS, TPB_FLUX + 1), dtype=numba.float64) # Use constants for shape
+    s_U = cuda.shared.array(shape=(NUM_VARS, SHARED_MEM_COLS), dtype=numba.float64) # Use constants for shape
 
     # Global thread index (corresponds to the *left* cell index for the interface)
     idx = cuda.grid(1)
