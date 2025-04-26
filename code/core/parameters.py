@@ -86,9 +86,17 @@ class ModelParameters:
         pressure_params = config['pressure']
         self.gamma_m = float(pressure_params['gamma_m'])
         self.gamma_c = float(pressure_params['gamma_c'])
+# --- DEBUG: Print K values before assignment ---
+        print(f"DEBUG PARAMS: Reading K_m_kmh = {pressure_params.get('K_m_kmh')}")
+        print(f"DEBUG PARAMS: Reading K_c_kmh = {pressure_params.get('K_c_kmh')}")
+        # --- END DEBUG ---
         self.K_m = float(pressure_params['K_m_kmh']) * KMH_TO_MS
         self.K_c = float(pressure_params['K_c_kmh']) * KMH_TO_MS
 
+# --- DEBUG: Print K values after assignment (SI units) ---
+        print(f"DEBUG PARAMS: Assigned self.K_m = {self.K_m}")
+        print(f"DEBUG PARAMS: Assigned self.K_c = {self.K_c}")
+        # --- END DEBUG ---
         relaxation_params = config['relaxation']
         self.tau_m = float(relaxation_params['tau_m_sec'])
         self.tau_c = float(relaxation_params['tau_c_sec'])
