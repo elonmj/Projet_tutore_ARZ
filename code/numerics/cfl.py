@@ -207,11 +207,34 @@ def calculate_cfl_dt(U_or_d_U_physical, grid: Grid1D, params: ModelParameters) -
             if current_max > max_abs_lambda:
                 max_abs_lambda = current_max
 
-        # --- DEBUGGING: Check for extreme values and raise error ---
+        # --- DEBUGGING: Check for extreme values, find location, and raise error ---
         if max_abs_lambda > 1000.0: # Threshold for unusually large wave speed (adjust if needed)
-            # Raise an error to stop the simulation immediately
-            # We could potentially find the index here if needed for CPU debugging
-            raise ValueError(f"CFL Check (CPU): Extremely large max_abs_lambda detected ({max_abs_lambda:.4e} m/s), stopping simulation.")
+            # Find the index where the maximum occurred
+            max_val_index = -1
+            problematic_eigenvalues = []
+            for i, eigenvalues in enumerate(all_eigenvalues_list):
+                if eigenvalues is not None:
+                    abs_eigenvalues = np.abs(eigenvalues)
+                    current_max_in_cell = np.max(abs_eigenvalues) if abs_eigenvalues.size > 0 else 0.0
+                    if np.isclose(current_max_in_cell, max_abs_lambda):
+                         max_val_index = i # Physical index (adjusting for ghost cells later if needed)
+                         problematic_eigenvalues = eigenvalues
+                         break # Found the first occurrence
+
+            # Retrieve the state variables at the problematic index for the error message
+            problematic_rho_m = rho_m_calc[max_val_index]
+            problematic_v_m = v_m[max_val_index]
+            problematic_rho_c = rho_c_calc[max_val_index]
+            problematic_v_c = v_c[max_val_index]
+
+            error_msg = (
+                f"CFL Check (CPU): Extremely large max_abs_lambda detected ({max_abs_lambda:.4e} m/s) "
+                f"at physical cell index {max_val_index}.\n"
+                f"  State at this cell: rho_m={problematic_rho_m:.4e}, v_m={problematic_v_m:.4e}, "
+                f"rho_c={problematic_rho_c:.4e}, v_c={problematic_v_c:.4e}\n"
+                f"  Eigenvalues at this cell: {problematic_eigenvalues}. Stopping simulation."
+            )
+            raise ValueError(error_msg)
         # --- END DEBUGGING ---
 
     # Calculate dt based on CFL condition

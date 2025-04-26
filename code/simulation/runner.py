@@ -338,10 +338,14 @@ class SimulationRunner:
 
                 # 2. Calculate Stable Timestep
                 # NOTE: calculate_cfl_dt now handles GPU arrays directly
-                # Pass the full state array (CPU or GPU)
-                # The function internally handles slicing or indexing based on device
-                dt = cfl.calculate_cfl_dt(current_U, self.grid, self.params)
-
+                # Pass the appropriate array slice based on device
+                if self.device == 'gpu':
+                    # GPU function expects the full array (including ghosts)
+                    dt = cfl.calculate_cfl_dt(current_U, self.grid, self.params)
+                else: # CPU
+                    # CPU function expects only physical cells
+                    U_physical = current_U[:, self.grid.physical_cell_indices]
+                    dt = cfl.calculate_cfl_dt(U_physical, self.grid, self.params)
 
                 # 3. Adjust dt to not overshoot t_final or next output time
                 time_to_final = t_final - self.t
