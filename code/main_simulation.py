@@ -185,6 +185,12 @@ def main():
                 device=args.device # Pass the device argument
             )
 
+            # --- Print Loaded Parameters (DEBUGGING) ---
+            print("\n--- Loaded Model Parameters (SI Units) ---")
+            print(runner.params) # Access params from the runner instance
+            print("----------------------------------------\n")
+            # --- END DEBUGGING ---
+
             # --- Run Simulation ---
             # t_final and output_dt are taken from the loaded parameters by the runner
             start_run_time = time.time() # Record time before run
