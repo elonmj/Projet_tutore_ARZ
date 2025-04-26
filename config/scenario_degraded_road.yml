@@ -34,4 +34,4 @@ boundary_conditions:
 
 simulation:
   t_final_sec: 120.0 # Simulate long enough for steady state (adjust as needed)
-  output_dt_sec: 5.0 # Frequency for saving full state snapshots
+  output_dt_sec: 1.0 # Frequency for saving full state snapshots

@@ -166,6 +166,12 @@ def calculate_cfl_dt(U_or_d_U_physical, grid: Grid1D, params: ModelParameters) -
         # Copy result back to CPU
         max_abs_lambda = d_max_lambda_out.copy_to_host()[0]
 
+        # --- DEBUGGING: Check for extreme values and raise error ---
+        if max_abs_lambda > 1000.0: # Threshold for unusually large wave speed (adjust if needed)
+            # Raise an error to stop the simulation immediately
+            raise ValueError(f"CFL Check (GPU): Extremely large max_abs_lambda detected ({max_abs_lambda:.4e} m/s), stopping simulation.")
+        # --- END DEBUGGING ---
+
     else:
         # --- CPU Implementation (Original Logic) ---
         U_physical = U_or_d_U_physical # Expecting only physical cells here
@@ -200,6 +206,13 @@ def calculate_cfl_dt(U_or_d_U_physical, grid: Grid1D, params: ModelParameters) -
             current_max = np.max(np.abs(np.asarray(lambda_k_array)))
             if current_max > max_abs_lambda:
                 max_abs_lambda = current_max
+
+        # --- DEBUGGING: Check for extreme values and raise error ---
+        if max_abs_lambda > 1000.0: # Threshold for unusually large wave speed (adjust if needed)
+            # Raise an error to stop the simulation immediately
+            # We could potentially find the index here if needed for CPU debugging
+            raise ValueError(f"CFL Check (CPU): Extremely large max_abs_lambda detected ({max_abs_lambda:.4e} m/s), stopping simulation.")
+        # --- END DEBUGGING ---
 
     # Calculate dt based on CFL condition
     if max_abs_lambda < params.epsilon:
