@@ -27,8 +27,9 @@ initial_conditions:
 boundary_conditions:
   left:
     type: inflow
-    # Use the same state as the initial condition (physical units)
-    state: [15.0, 5.0, 85.0, 75.0] # [rho_m, rho_c, v_m, v_c]
+    # Use the state corresponding to equilibrium at R=1 (conservative units)
+    # Densities in veh/km, w in km/h (will be converted internally)
+    state: [15.0, 78.78, 5.0, 69.10] # [rho_m, w_m_eq, rho_c, w_c_eq] calculated for R=1 equilibrium
   right:
     type: outflow # Allow vehicles to leave freely
 
