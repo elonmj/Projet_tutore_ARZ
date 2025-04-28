@@ -21,7 +21,7 @@ flux_composition:
   interurban: {m: 0.50, c: 0.25} # Corrected typo from plan (0.25 -> 0.50 for interurban c)
 
 # Numerical Parameters
-cfl_number: 0.8
+cfl_number: 0.5 # Reduced from 0.8 to attempt stabilization
 ghost_cells: 2
 # ODE Solver options for Strang Splitting
 ode_solver: 'RK45' # Default, e.g., 'LSODA', 'Radau', 'BDF' for stiff
