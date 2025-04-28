@@ -34,7 +34,11 @@ def main():
     parser = argparse.ArgumentParser(description="Visualize results from an ARZ simulation.")
     parser.add_argument(
         '-i', '--input',
-        help="Path to a specific simulation result (.npz) file. If not provided, the latest .npz file in --results_dir will be used."
+        help="Path to a specific simulation result (.npz) file. If not provided, --scenario_name must be set to find the latest .npz in results/<scenario_name>."
+    )
+    parser.add_argument(
+        '--scenario_name',
+        help="Name of the scenario (used to find latest results in results/<scenario_name>/ if --input is not provided)."
     )
     parser.add_argument(
         '--results_dir',
@@ -50,7 +54,7 @@ def main():
     )
     parser.add_argument(
         '--output_dir',
-        help="Directory to save the plots (default: same as --results_dir)."
+        help="Directory to save the plots (default: the directory containing the input .npz file, or results/<scenario_name>/ if using --scenario_name)."
     )
     parser.add_argument(
         '--show',
@@ -65,21 +69,35 @@ def main():
 
     args = parser.parse_args()
 
-    # Determine input file
-    input_file = args.input
-    if not input_file:
-        print(f"No input file specified. Searching for latest .npz in '{args.results_dir}'...")
-        input_file = find_latest_npz(args.results_dir)
+    # Determine input file and default output directory
+    default_output_dir = None
+    if args.input:
+        input_file = args.input
+        if not os.path.exists(input_file):
+            print(f"Error: Specified input file not found: {input_file}")
+            sys.exit(1)
+        print(f"Using specified input file: {input_file}")
+        default_output_dir = os.path.dirname(input_file)
+    else:
+        # Input file not specified, scenario_name is required
+        if not args.scenario_name:
+            print("Error: Either --input or --scenario_name must be provided.")
+            sys.exit(1)
+
+        scenario_results_dir = os.path.join(args.results_dir, args.scenario_name)
+        print(f"No input file specified. Searching for latest .npz in '{scenario_results_dir}'...")
+        input_file = find_latest_npz(scenario_results_dir)
         if not input_file:
-            print(f"Error: No .npz files found in '{args.results_dir}'.")
+            print(f"Error: No .npz files found in '{scenario_results_dir}'.")
             sys.exit(1)
         print(f"Using latest file: {input_file}")
-    elif not os.path.exists(input_file):
-        print(f"Error: Specified input file not found: {input_file}")
-        sys.exit(1)
+        default_output_dir = scenario_results_dir
 
-    # Determine output directory
-    output_dir = args.output_dir if args.output_dir else args.results_dir
+    # Determine final output directory (use explicit override if provided)
+    output_dir = args.output_dir if args.output_dir else default_output_dir
+    if not output_dir: # Should not happen if logic above is correct, but safety check
+        print("Error: Could not determine output directory.")
+        sys.exit(1)
     os.makedirs(output_dir, exist_ok=True) # Ensure output directory exists
 
     # Determine save flag

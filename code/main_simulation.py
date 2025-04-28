@@ -205,10 +205,14 @@ def main():
             # Create a filename based on the scenario name
             scenario_name = runner.params.scenario_name
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            output_filename = os.path.join(output_dir, f"{scenario_name}_{timestamp}.npz")
+            # Construct scenario-specific output directory
+            scenario_output_dir = os.path.join(output_dir, scenario_name)
 
-            # Ensure output directory exists
-            os.makedirs(output_dir, exist_ok=True)
+            # Ensure scenario-specific output directory exists
+            os.makedirs(scenario_output_dir, exist_ok=True)
+
+            # Construct the final output filename within the subdirectory
+            output_filename = os.path.join(scenario_output_dir, f"{timestamp}.npz")
 
             data_manager.save_simulation_data(
                 filename=output_filename,

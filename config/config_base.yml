@@ -6,8 +6,8 @@ pressure:
   gamma_m: 1.5
   gamma_c: 2.0
   # Further reduced based on boundary instability
-  K_m_kmh: 1.0 # km/h
-  K_c_kmh: 1.5 # km/h
+  K_m_kmh: 5.0 # km/h (Increased from 1.0)
+  K_c_kmh: 7.5 # km/h (Increased from 1.5)
 relaxation:
   tau_m_sec: 5.0 # seconds
   tau_c_sec: 10.0 # seconds
