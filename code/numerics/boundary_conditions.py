@@ -29,11 +29,12 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
     if i < n_ghost:
         # --- Left Boundary ---
         left_ghost_idx = i
-        if left_type_code == 0: # Inflow
-            d_U[0, left_ghost_idx] = inflow_L_0
-            d_U[1, left_ghost_idx] = inflow_L_1
-            d_U[2, left_ghost_idx] = inflow_L_2
-            d_U[3, left_ghost_idx] = inflow_L_3
+        if left_type_code == 0: # Inflow (Modified: Impose rho, extrapolate w)
+            first_phys_idx = n_ghost
+            d_U[0, left_ghost_idx] = inflow_L_0 # Impose rho_m
+            d_U[1, left_ghost_idx] = d_U[1, first_phys_idx] # Extrapolate w_m
+            d_U[2, left_ghost_idx] = inflow_L_2 # Impose rho_c
+            d_U[3, left_ghost_idx] = d_U[3, first_phys_idx] # Extrapolate w_c
         elif left_type_code == 1: # Outflow (zero-order extrapolation)
             first_phys_idx = n_ghost
             d_U[0, left_ghost_idx] = d_U[0, first_phys_idx]
@@ -153,8 +154,12 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
         U = U_or_d_U # Rename for clarity
 
         # Left Boundary
-        if left_type_code == 0: # Inflow
-            U[:, 0:n_ghost] = np.array(inflow_L).reshape(-1, 1)
+        if left_type_code == 0: # Inflow (Modified: Impose rho, extrapolate w)
+            first_physical_cell_state = U[:, n_ghost:n_ghost+1]
+            U[0, 0:n_ghost] = inflow_L[0] # Impose rho_m
+            U[1, 0:n_ghost] = first_physical_cell_state[1] # Extrapolate w_m
+            U[2, 0:n_ghost] = inflow_L[2] # Impose rho_c
+            U[3, 0:n_ghost] = first_physical_cell_state[3] # Extrapolate w_c
         elif left_type_code == 1: # Outflow
             first_physical_cell_state = U[:, n_ghost:n_ghost+1]
             U[:, 0:n_ghost] = first_physical_cell_state
