@@ -8,7 +8,7 @@ from numba import cuda # Import cuda for device arrays
 
 from ..analysis import metrics
 from ..io import data_manager
-from ..core.parameters import ModelParameters
+from ..core.parameters import ModelParameters, VEH_KM_TO_VEH_M # Import the constant
 from ..grid.grid1d import Grid1D
 from ..numerics import boundary_conditions, cfl, time_integration
 from . import initial_conditions # Import the initial conditions module
@@ -255,8 +255,8 @@ class SimulationRunner:
                  raise ValueError("Uniform Equilibrium IC requires 'rho_m', 'rho_c', 'R_val'.")
 
             # Convert densities from veh/km (config) to veh/m (SI units)
-            rho_m_si = rho_m * self.params.VEH_KM_TO_VEH_M
-            rho_c_si = rho_c * self.params.VEH_KM_TO_VEH_M
+            rho_m_si = rho_m * VEH_KM_TO_VEH_M # Use imported constant
+            rho_c_si = rho_c * VEH_KM_TO_VEH_M # Use imported constant
 
             U_init = initial_conditions.uniform_state_from_equilibrium(
                 self.grid, rho_m_si, rho_c_si, R_val, self.params
