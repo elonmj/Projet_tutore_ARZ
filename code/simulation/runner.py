@@ -253,8 +253,13 @@ class SimulationRunner:
             R_val = ic_config.get('R_val') # Assumes uniform R for equilibrium calc
             if rho_m is None or rho_c is None or R_val is None:
                  raise ValueError("Uniform Equilibrium IC requires 'rho_m', 'rho_c', 'R_val'.")
+
+            # Convert densities from veh/km (config) to veh/m (SI units)
+            rho_m_si = rho_m * self.params.VEH_KM_TO_VEH_M
+            rho_c_si = rho_c * self.params.VEH_KM_TO_VEH_M
+
             U_init = initial_conditions.uniform_state_from_equilibrium(
-                self.grid, rho_m, rho_c, R_val, self.params
+                self.grid, rho_m_si, rho_c_si, R_val, self.params
             )
         elif ic_type == 'riemann':
             U_L = ic_config.get('U_L')

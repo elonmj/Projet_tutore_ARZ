@@ -131,7 +131,27 @@ class ModelParameters:
 
         # These are typically top-level in the scenario config or base config
         self.initial_conditions = config.get('initial_conditions', {})
-        self.boundary_conditions = config.get('boundary_conditions', {})
+
+        # Load boundary conditions and perform unit conversion for inflow states
+        raw_boundary_conditions = config.get('boundary_conditions', {})
+        self.boundary_conditions = {}
+        for boundary_side, bc_config in raw_boundary_conditions.items():
+            processed_bc_config = copy.deepcopy(bc_config) # Work on a copy
+            if processed_bc_config.get('type', '').lower() == 'inflow':
+                state = processed_bc_config.get('state')
+                if state is not None and len(state) == 4:
+                    # Convert state values from [veh/km, km/h, veh/km, km/h] to [veh/m, m/s, veh/m, m/s]
+                    processed_bc_config['state'] = [
+                        state[0] * VEH_KM_TO_VEH_M, # rho_m
+                        state[1] * KMH_TO_MS,      # w_m (assuming w is in same units as v in config)
+                        state[2] * VEH_KM_TO_VEH_M, # rho_c
+                        state[3] * KMH_TO_MS       # w_c (assuming w is in same units as v in config)
+                    ]
+                    # DEBUG print to verify conversion
+                    # print(f"DEBUG PARAMS: Converted {boundary_side} inflow state: {state} -> {processed_bc_config['state']}")
+
+            self.boundary_conditions[boundary_side] = processed_bc_config
+
         # Store the entire 'road' dictionary from the config
         self.road = config.get('road', {}) # Store the dict itself
 

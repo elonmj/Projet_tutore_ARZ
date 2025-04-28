@@ -152,6 +152,17 @@ def plot_spacetime(times: np.ndarray | list, states: np.ndarray | list, grid: Gr
         unit = "veh/km"
         if vmin is None: vmin = 0
         if vmax is None: vmax = params.rho_jam / VEH_KM_TO_VEH_M # Use jam density as max
+
+        # --- Debugging Prints for Density ---
+        print(f"  DEBUG: Density data_to_plot shape: {data_to_plot.shape}")
+        print(f"  DEBUG: Density data_to_plot min: {np.min(data_to_plot):.4e}, max: {np.max(data_to_plot):.4e}, mean: {np.mean(data_to_plot):.4e}")
+        # Print a few sample values (e.g., corners and center)
+        if data_to_plot.shape[0] > 1 and data_to_plot.shape[1] > 1:
+             print(f"  DEBUG: Sample density values: TL={data_to_plot[0, 0]:.4e}, TR={data_to_plot[0, -1]:.4e}, BL={data_to_plot[-1, 0]:.4e}, BR={data_to_plot[-1, -1]:.4e}, Center={data_to_plot[data_to_plot.shape[0]//2, data_to_plot.shape[1]//2]:.4e}")
+        elif data_to_plot.shape[0] > 0 and data_to_plot.shape[1] > 0:
+             print(f"  DEBUG: Sample density value: {data_to_plot[0, 0]:.4e}")
+        # --- End Debugging Prints ---
+
     elif variable.lower() == 'velocity':
         # Need to calculate velocity for all times
         velocities = np.zeros((len(times), grid.N_physical))
