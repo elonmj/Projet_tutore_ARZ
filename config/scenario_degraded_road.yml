@@ -13,7 +13,7 @@ grid:
 road:
   quality_type: from_file # Use file-based definition for R(x)
   # Path relative to project root (where main_simulation.py is run from)
-  quality_file: data/R_degraded_road_N200.txt
+  quality_file: data/R_degraded_road_sharp_N200.txt
 
 initial_conditions:
   type: uniform_equilibrium # Use equilibrium calculation
