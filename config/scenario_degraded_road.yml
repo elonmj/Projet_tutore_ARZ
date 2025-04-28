@@ -29,7 +29,8 @@ boundary_conditions:
     type: inflow
     # Use the state corresponding to equilibrium at R=1
     # Densities in veh/km, w in m/s (calculated equilibrium values)
-    state: [15.0, 21.85, 5.0, 19.17] # [rho_m(veh/km), w_m_eq(m/s), rho_c(veh/km), w_c_eq(m/s)]
+    # state: [15.0, 21.85, 5.0, 19.17] # Old state for K=1.0/1.5
+    state: [15.0, 21.86, 5.0, 19.18] # [rho_m(veh/km), w_m_eq(m/s), rho_c(veh/km), w_c_eq(m/s)] - Updated for K=5.0/7.5
   right:
     type: outflow # Allow vehicles to leave freely
 
