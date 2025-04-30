@@ -25,7 +25,7 @@ def uniform_state(grid: Grid1D, rho_m_val: float, w_m_val: float, rho_c_val: flo
     U_initial[3, :] = w_c_val
     return U_initial
 
-def uniform_state_from_equilibrium(grid: Grid1D, rho_m_eq: float, rho_c_eq: float, R_val: int, params: ModelParameters) -> np.ndarray:
+def uniform_state_from_equilibrium(grid: Grid1D, rho_m_eq: float, rho_c_eq: float, R_val: int, params: ModelParameters) -> tuple[np.ndarray, list[float]]:
     """
     Creates a uniform initial state assuming equilibrium velocity.
     Calculates w_m and w_c based on V_e and p.
@@ -38,7 +38,9 @@ def uniform_state_from_equilibrium(grid: Grid1D, rho_m_eq: float, rho_c_eq: floa
         params (ModelParameters): Model parameters object.
 
     Returns:
-        np.ndarray: The initial state array U. Shape (4, N_total).
+        tuple[np.ndarray, list[float]]: A tuple containing:
+            - The initial state array U. Shape (4, N_total).
+            - The calculated equilibrium state vector [rho_m, w_m, rho_c, w_c] in SI units.
     """
     rho_m_eq = max(rho_m_eq, 0.0)
     rho_c_eq = max(rho_c_eq, 0.0)
@@ -55,8 +57,12 @@ def uniform_state_from_equilibrium(grid: Grid1D, rho_m_eq: float, rho_c_eq: floa
     w_c_eq = Ve_c + p_c
 
     # Create uniform state
-    return uniform_state(grid, rho_m_eq, w_m_eq, rho_c_eq, w_c_eq)
+    U_init = uniform_state(grid, rho_m_eq, w_m_eq, rho_c_eq, w_c_eq)
 
+    # Create the equilibrium state vector to return (already in SI units)
+    eq_state_vector = [rho_m_eq, w_m_eq, rho_c_eq, w_c_eq]
+
+    return U_init, eq_state_vector
 
 def riemann_problem(grid: Grid1D, U_L: list | np.ndarray, U_R: list | np.ndarray, split_pos: float) -> np.ndarray:
     """

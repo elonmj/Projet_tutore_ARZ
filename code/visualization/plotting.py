@@ -84,7 +84,7 @@ def plot_profiles(state_physical: np.ndarray, grid: Grid1D, time: float, params:
 
     if save:
         if filename is None:
-            filename = f"profiles_{params.scenario_name}_t{time:.2f}.png".replace('.', '_')
+            filename = f"profiles_{params.scenario_name}_t{time:.2f}".replace('.', '_') + ".png"
         elif not filename.lower().endswith(('.png', '.pdf', '.jpg')):
              filename += ".png" # Default to png if no extension
 

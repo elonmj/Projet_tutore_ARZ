@@ -384,3 +384,112 @@ Dans l'ensemble des simulations effectuées pour cette étude, couvrant une gamm
 
 \textbf{Conclusion du Test :}
 Ce résultat indique que le schéma numérique FVM/Central-Upwind implémenté, combiné avec le pas de temps régi par la condition CFL (\( \nu=0.8 \)), est suffisamment robuste pour préserver la positivité des densités dans les conditions et pour les plages de paramètres explorées dans ce travail. Le mécanisme de plancher, bien qu'implémenté par sécurité, n'a pas été nécessaire, renforçant la confiance dans la fiabilité physique des résultats de simulation qui seront présentés par la suite.
+
+
+\section{Validation Phénoménologique via Scénarios de Simulation}
+\label{sec:validation_phenomenologique}
+
+Après avoir validé numériquement la correction et les propriétés fondamentales du schéma implémenté (Section \ref{sec:validation_numerique}), cette section vise à évaluer la capacité du modèle ARZ multi-classes étendu, paramétré avec le jeu de base estimé (Section \ref{sec:strategie_params}), à reproduire \textit{qualitativement} les phénomènes dynamiques clés attendus dans le trafic, en particulier ceux pertinents pour le contexte béninois.
+
+Faute de données quantitatives détaillées pour une calibration et une validation rigoureuses, cette validation phénoménologique repose sur la simulation de scénarios tests conçus pour solliciter des aspects spécifiques du modèle : l'impact des changements d'infrastructure, la dynamique de congestion et de redémarrage en trafic mixte, le comportement de creeping en condition de saturation, et les dynamiques non-linéaires propres aux modèles de second ordre. L'objectif est de vérifier si les comportements simulés sont physiquement plausibles et cohérents avec les observations qualitatives et les mécanismes intégrés au modèle (Chapitres \ref{chap:caracteristiques_benin} et \ref{chap:formulation_modele}).
+
+\subsection{Scénarios Tests et Résultats Qualitatifs}
+\label{subsec:scenarios_resultats}
+
+Nous présentons ci-dessous les résultats pour une sélection de scénarios représentatifs. Chaque scénario est décrit, les défis potentiels rencontrés lors de sa simulation sont discutés, et les résultats finaux obtenus après stabilisation et correction sont analysés qualitativement.
+
+\subsubsection{Scénario "Route Dégradée" : Impact de R(x)}
+
+\textbf{Objectif et Configuration :}
+Ce premier scénario vise à tester la capacité du modèle à simuler l'effet d'un changement brusque de la qualité de l'infrastructure sur la dynamique du flux, et en particulier l'impact différentiel sur les motos et les autres véhicules. La simulation est réalisée sur un segment de route de 1000 m (N=200 cellules, \( \Delta x=5 \) m). La qualité de la route est définie par le paramètre \( R(x) \) qui passe de \( R=1 \) (Route Majeure, bonne qualité) pour \( x < 500 \) m à \( R=4 \) (Piste Carrossable, mauvaise qualité) pour \( x \ge 500 \) m, en utilisant le fichier de données spatiales \texttt{data/R\_degraded\_road\_sharp\_N200.txt}. La condition initiale est un état de flux quasi-libre uniforme (\(\rho_m=15, \rho_c=5\) veh/km) avec les vitesses d'équilibre correspondantes pour R=1. Une condition d'entrée (Inflow) maintient cet état à \( x=0 \), tandis qu'une condition de sortie libre (Outflow) est appliquée à \( x=1000 \) m. La simulation est effectuée sur 120 secondes. L'objectif est d'observer si le modèle prédit un ralentissement à \( x=500 \) m, avec une adaptation des vitesses aux \( V_{max,i}(R=4) \) et une différence marquée entre \( v_m \) et \( v_c \) dans la zone dégradée.
+
+\textbf{Parcours de Développement et Stabilisation :}
+La simulation de ce scénario, bien que conceptuellement simple, a présenté des défis significatifs en termes de stabilité numérique, nécessitant un débogage itératif détaillé dans le document \texttt{development\_summary.md}. Ce processus a permis d'affiner la compréhension du modèle et de son implémentation.
+
+Les premières tentatives d'exécution ont systématiquement échoué très tôt (souvent avant \(t=5\)s) avec une erreur de violation de la condition CFL, indiquant des vitesses caractéristiques (\( \lambda_k \)) devenant extrêmement grandes. Par exemple, des valeurs de \( \max_k |\lambda_k| \) dépassant 1000 m/s étaient fréquemment rapportées par le mécanisme de vérification CFL, alors que les vitesses physiques des véhicules ne devraient pas excéder 25-30 m/s (\(\approx\) 90-110 km/h) dans ce scénario. De plus, les résultats obtenus juste avant l'échec montraient des comportements physiquement incohérents, tels qu'un blocage global immédiat ou des diagrammes de densité espace-temps uniformément saturés contredisant les profils instantanés.
+
+Plusieurs hypothèses ont été explorées pour identifier la source de cette instabilité :
+
+\begin{enumerate}
+    \item \textbf{Paramètres de Pression (\(K_m, K_c\)) :} Soupçonnant une réaction excessive du modèle, les paramètres de pression ont été réduits par étapes depuis les valeurs initialement estimées (ex: \(K_m=10, K_c=15\) km/h). Une réduction drastique (ex: \(K_m=1.0, K_c=1.5\) km/h) a permis d'éviter l'erreur CFL mais a conduit aux résultats physiquement aberrants mentionnés précédemment (blocage global non expliqué). Cela a indiqué que la pression, bien que source potentielle d'instabilité si trop élevée, était aussi nécessaire pour une dynamique réaliste et que le problème principal se situait ailleurs. Des valeurs intermédiaires (\(K_m=5.0, K_c=7.5\) km/h) ont été retenues pour les tests suivants.
+
+    \item \textbf{Conditions aux Limites d'Entrée :} L'analyse via l'exécution CPU avec débogage a montré que l'erreur CFL maximale apparaissait systématiquement près de la frontière d'entrée (cellule physique j=1 ou j=2). L'inspection des variables d'état à cet endroit révélait des densités pouvant atteindre des valeurs extrêmes (ex: \( \rho_m \approx 22 \) veh/m \(\approx\) 22000 veh/km)!) juste avant le crash. Cela a mis en évidence un problème avec l'état injecté par la condition aux limites \texttt{inflow}.
+        L'état initialement spécifié dans \texttt{config/scenario\_degraded\_road.yml} pour l'entrée (correspondant à \(\rho_m=15, \rho_c=5\) veh/km et \(R=1\)) utilisait des valeurs pour \(w_m, w_c\) (ex: 78.78, 69.10 m/s) qui n'étaient pas cohérentes avec l'état d'équilibre calculé pour ces densités \textit{et les paramètres de pression courants}. En utilisant les formules \(v_i = V_{e,i}(\rho, R=1)\) et \(w_i = v_i + P_i(\rho_{eff,i})\) avec les paramètres \(K_m=5.0, K_c=7.5\) km/h, les valeurs d'équilibre correctes pour \(w_m\) et \(w_c\) à l'entrée ont été recalculées (environ \(w_m \approx 21.86\) m/s et \(w_c \approx 19.18\) m/s). La mise à jour de ces valeurs dans la configuration a considérablement amélioré la stabilité, mais des échecs CFL survenaient encore après plusieurs secondes.
+
+    \item \textbf{Implémentation de la CL d'Entrée :} La méthode consistant à fixer l'état complet \(U\) (y compris \(w_i\)) dans les cellules fantômes s'est avérée trop rigide. Une approche plus robuste a été implémentée dans \texttt{code/numerics/boundary\_conditions.py} : seules les densités \( \rho_i \) sont imposées à leurs valeurs d'entrée dans les cellules fantômes, tandis que les variables \( w_i \) sont extrapolées à partir de la première cellule physique (extrapolation d'ordre zéro). Cela permet aux \( w_i \) à la frontière de s'adapter à la dynamique interne du domaine tout en assurant l'injection du bon flux de masse. Cette modification a été **décisive pour obtenir la stabilité** de la simulation avec les paramètres de pression intermédiaires.
+
+    \item \textbf{Cohérence des Unités :} Une dernière vérification a permis d'identifier et de corriger des incohérences résiduelles dans la conversion des unités (veh/km et km/h en config vs veh/m et m/s en interne) lors du chargement des paramètres et de l'initialisation de l'état, assurant ainsi la cohérence des résultats et des visualisations.
+\end{enumerate}
+Ces étapes illustrent l'interaction complexe entre les paramètres physiques, les conditions aux limites et la stabilité numérique dans les modèles de trafic de second ordre. Les résultats présentés ci-dessous sont ceux obtenus après l'application de l'ensemble de ces corrections.
+
+\textbf{Résultats Qualitatifs :}
+La Figure \ref{fig:degraded_road_profiles} montre les profils de densité et de vitesse à la fin de la simulation (t=120 s), tandis que les Figures \ref{fig:degraded_road_spacetime_rho_m} à \ref{fig:degraded_road_spacetime_vc} montrent l'évolution spatio-temporelle
+\textbf{Résultats Qualitatifs :}
+La Figure \ref{fig:degraded_road_profiles} montre les profils de densité et de vitesse à la fin de la simulation (t=120 s), tandis que les Figures \ref{fig:degraded_road_spacetime_rho_m} à \ref{fig:degraded_road_spacetime_vc} montrent l'évolution spatio-temporelle.
+
+% --- Insérer les Figures ---
+\begin{figure}[htbp]
+    \centering
+    % Profile plot at t=120s
+    \includegraphics[width=0.9\textwidth]{results/degraded_road_test/profiles_degraded_road_test_t120_00.png}
+    \caption{Profils de densité et de vitesse à t=120s pour le scénario "Route Dégradée".}
+    \label{fig:degraded_road_profiles}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        % Spacetime rho_m
+        \includegraphics[width=\textwidth]{results/degraded_road_test/spacetime_degraded_road_test_density_m.png}
+        \caption{Densité Motos (\(\rho_m\))}
+        \label{fig:degraded_road_spacetime_rho_m}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        % Spacetime rho_c
+        \includegraphics[width=\textwidth]{results/degraded_road_test/spacetime_degraded_road_test_density_c.png}
+        \caption{Densité Voitures (\(\rho_c\))}
+        \label{fig:degraded_road_spacetime_rho_c}
+    \end{subfigure}
+    \caption{Évolution spatio-temporelle des densités pour le scénario "Route Dégradée".}
+    \label{fig:degraded_road_spacetime_density}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        % Spacetime v_m
+        \includegraphics[width=\textwidth]{results/degraded_road_test/spacetime_degraded_road_test_velocity_m.png}
+        \caption{Vitesse Motos (\(v_m\))}
+        \label{fig:degraded_road_spacetime_vm}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        % Spacetime v_c
+        \includegraphics[width=\textwidth]{results/degraded_road_test/spacetime_degraded_road_test_velocity_c.png}
+        \caption{Vitesse Voitures (\(v_c\))}
+        \label{fig:degraded_road_spacetime_vc}
+    \end{subfigure}
+    \caption{Évolution spatio-temporelle des vitesses pour le scénario "Route Dégradée".}
+    \label{fig:degraded_road_spacetime_velocity}
+\end{figure}
+% --- Fin Insertion Figures ---
+
+L'analyse des résultats montre un comportement cohérent avec les attentes physiques :
+\begin{itemize}
+    \item \textbf{Formation d'un Choc :} La discontinuité de la qualité de route à x=500m induit une chute brutale de la vitesse d'équilibre (\( V_{e,i}(R=4) < V_{e,i}(R=1) \)). Cela génère une onde de choc (visible comme une transition nette dans les diagrammes espace-temps de vitesse, Fig. \ref{fig:degraded_road_spacetime_velocity}) qui remonte lentement vers l'amont (vers la gauche).
+    \item \textbf{Zones de Flux Distinctes :} Deux zones de flux quasi-stationnaires s'établissent : en amont du choc (x < ~480m à t=120s), le flux est rapide et peu dense, proche de l'état d'entrée (R=1). En aval du choc (x > ~500m), le flux est très congestionné (densités élevées, Fig. \ref{fig:degraded_road_profiles} et \ref{fig:degraded_road_spacetime_density}) et lent.
+    \item \textbf{Impact Différentiel de R(x) Validé :} Dans la zone congestionnée en aval (x > 500m), les vitesses se stabilisent à des valeurs très basses, mais distinctes pour les deux classes (Fig. \ref{fig:degraded_road_profiles}) : \( v_m \approx 5-6 \) km/h et \( v_c \approx 1-2 \) km/h. Bien que ces vitesses soient inférieures aux \(V_{max,i}(R=4)\) (45 et 25 km/h) à cause de la forte densité, l'écart entre les deux et le fait que \( v_m \) reste proche de \( V_{creeping} \) (5 km/h) tandis que \( v_c \) est quasi nulle démontrent que le modèle capture bien la capacité supérieure des motos à maintenir un mouvement (creeping) dans des conditions où les voitures sont pratiquement à l'arrêt, une situation exacerbée ici par la faible capacité intrinsèque de la section R=4.
+    \item \textbf{Cohérence des Figures :} L'incohérence précédemment observée entre les profils instantanés et les diagrammes espace-temps de densité a été résolue après la correction des unités. Les diagrammes espace-temps (Fig. \ref{fig:degraded_road_spacetime_density}) montrent maintenant l'onde de choc avec des densités élevées (jaune) se formant près de x=500m et remontant, ce qui est cohérent avec le pic de densité visible sur le profil instantané (Fig. \ref{fig:degraded_road_profiles}).
+\end{itemize}
+
+\textbf{Conclusion pour ce Scénario :}
+Le modèle ARZ multi-classes étendu, une fois correctement paramétré et stabilisé, reproduit avec succès l'impact phénoménologique d'une discontinuité de la qualité de la route. Il capture la formation d'une congestion due à la réduction de capacité et, surtout, met en évidence l'avantage des motos qui maintiennent une vitesse résiduelle (creeping) dans la zone congestionnée où les voitures sont quasiment à l'arrêt, conformément aux observations qualitatives et aux mécanismes intégrés au modèle.
+
+% --- La suite viendra ici avec le prochain scénario ---
+% \subsubsection{Scénario "Feu Rouge / Congestion" : Gap-Filling et Relaxation}
+% ...

@@ -119,10 +119,17 @@ class SimulationRunner:
                 raise RuntimeError(f"Failed to initialize GPU data: {e}") from e
         # ----------------------------------------------------------------
 
+        # --- Initialize Boundary Condition Schedules and Current State ---
+        # This needs to happen *before* applying initial BCs so current_bc_params is ready
+        self._initialize_boundary_conditions()
+        # -------------------------------------------------------------
+
         # --- Apply initial boundary conditions ---
-        # Apply BCs *after* potential GPU transfer, using the correct array
+        # Apply BCs *after* potential GPU transfer and *after* initializing BC schedules
         initial_U_array = self.d_U if self.device == 'gpu' else self.U
-        boundary_conditions.apply_boundary_conditions(initial_U_array, self.grid, self.params)
+        # Use the initialized current_bc_params which has the correct type for t=0
+        # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
+        boundary_conditions.apply_boundary_conditions(initial_U_array, self.grid, self.params, self.current_bc_params)
         if not self.quiet:
             print("Initial boundary conditions applied.")
         # -----------------------------------------
@@ -158,6 +165,10 @@ class SimulationRunner:
                     print(f"Error calculating initial mass: {e}")
                 # Decide how to handle this - maybe disable the check?
                 self.mass_check_config = None # Disable check if initial calc fails
+
+        # --- Mass Conservation Check Initialization (uses CPU data) ---
+        # (Moved _initialize_boundary_conditions call earlier)
+
 
     def _load_road_quality(self):
         """ Loads road quality data based on the definition in params. """
@@ -241,6 +252,7 @@ class SimulationRunner:
         """ Creates the initial state array U based on config. """
         ic_config = self.params.initial_conditions
         ic_type = ic_config.get('type', '').lower()
+        self.initial_equilibrium_state = None # Initialize attribute
 
         if ic_type == 'uniform':
             state_vals = ic_config.get('state')
@@ -258,9 +270,12 @@ class SimulationRunner:
             rho_m_si = rho_m * VEH_KM_TO_VEH_M # Use imported constant
             rho_c_si = rho_c * VEH_KM_TO_VEH_M # Use imported constant
 
-            U_init = initial_conditions.uniform_state_from_equilibrium(
+            # Capture both the initial state array and the equilibrium state vector
+            U_init, eq_state_vector = initial_conditions.uniform_state_from_equilibrium(
                 self.grid, rho_m_si, rho_c_si, R_val, self.params
             )
+            # Store the equilibrium state vector for potential BC use
+            self.initial_equilibrium_state = eq_state_vector
         elif ic_type == 'riemann':
             U_L = ic_config.get('U_L')
             U_R = ic_config.get('U_R')
@@ -300,6 +315,103 @@ class SimulationRunner:
         # Return the raw initial state without BCs applied yet
         return U_init
 
+    def _initialize_boundary_conditions(self):
+        """Initializes boundary condition schedules and current state."""
+        self.left_bc_schedule = None
+        self.right_bc_schedule = None
+        self.left_bc_schedule_idx = -1 # Index of the currently active schedule entry
+        self.right_bc_schedule_idx = -1
+
+        # Make a working copy of BC params from the main params object
+        self.current_bc_params = copy.deepcopy(self.params.boundary_conditions)
+
+        # --- Reuse initial equilibrium state for inflow BC if applicable ---
+        if self.initial_equilibrium_state is not None:
+            if self.current_bc_params.get('left', {}).get('type') == 'inflow':
+                if 'state' not in self.current_bc_params['left'] or self.current_bc_params['left']['state'] is None:
+                    self.current_bc_params['left']['state'] = self.initial_equilibrium_state
+                    if not self.quiet:
+                        print("  Populated left inflow BC state from initial equilibrium.")
+            # Could add similar logic for right BC if needed
+        # --------------------------------------------------------------------
+
+        # --- Parse schedules for time-dependent BCs ---
+        if self.current_bc_params.get('left', {}).get('type') == 'time_dependent':
+            self.left_bc_schedule = self.current_bc_params['left'].get('schedule')
+            if not isinstance(self.left_bc_schedule, list) or not self.left_bc_schedule:
+                raise ValueError("Left 'time_dependent' BC requires a non-empty 'schedule' list.")
+            # Validate schedule format? (e.g., time ordering, content) - Optional
+            self._update_bc_from_schedule('left', 0.0) # Set initial state from schedule
+
+        if self.current_bc_params.get('right', {}).get('type') == 'time_dependent':
+            self.right_bc_schedule = self.current_bc_params['right'].get('schedule')
+            if not isinstance(self.right_bc_schedule, list) or not self.right_bc_schedule:
+                raise ValueError("Right 'time_dependent' BC requires a non-empty 'schedule' list.")
+            # Validate schedule format? - Optional
+            self._update_bc_from_schedule('right', 0.0) # Set initial state from schedule
+        # ---------------------------------------------
+
+    def _update_bc_from_schedule(self, side: str, current_time: float):
+        """Updates the current_bc_params for a given side based on the schedule."""
+        schedule = self.left_bc_schedule if side == 'left' else self.right_bc_schedule
+        current_idx = self.left_bc_schedule_idx if side == 'left' else self.right_bc_schedule_idx
+
+        if not schedule: return # No schedule for this side
+
+        new_idx = -1
+        for idx, entry in enumerate(schedule):
+            # Unpack schedule entry
+            t_start_raw, t_end_raw, bc_type, *bc_state_info = entry
+
+            # --- Explicitly cast times to float to handle potential loading issues ---
+            try:
+                t_start = float(t_start_raw)
+                t_end = float(t_end_raw)
+            except (ValueError, TypeError) as e:
+                print(f"\nERROR: Could not convert schedule time to float: entry={entry}, error={e}")
+                # Decide how to handle: skip entry, raise error? Skipping for now.
+                continue
+            # -----------------------------------------------------------------------
+
+            if t_start <= current_time < t_end:
+                new_idx = idx
+                break
+
+        if new_idx != -1 and new_idx != current_idx:
+            # Active schedule entry has changed
+            t_start_raw, t_end_raw, bc_type, *bc_state_info = schedule[new_idx] # Retrieve raw values
+
+            # --- Ensure times are float before using in f-string ---
+            try:
+                t_start = float(t_start_raw)
+                t_end = float(t_end_raw)
+            except (ValueError, TypeError) as e:
+                 # Log error but try to continue with raw values for BC config? Or raise?
+                 # For now, log and keep raw type for bc_type, state
+                 print(f"\nERROR: Could not convert schedule time for printing: entry={schedule[new_idx]}, error={e}")
+                 t_start, t_end = t_start_raw, t_end_raw # Keep raw for message formatting attempt
+            # ------------------------------------------------------
+
+            new_bc_config = {'type': bc_type}
+            if bc_state_info: # If state information is provided (e.g., for inflow)
+                # Assume state info is the state list/array itself
+                new_bc_config['state'] = bc_state_info[0]
+
+            self.current_bc_params[side] = new_bc_config
+            if side == 'left':
+                self.left_bc_schedule_idx = new_idx
+            else:
+                self.right_bc_schedule_idx = new_idx
+
+            if not self.quiet:
+                pbar_message = f"\nBC Change ({side.capitalize()}): Switched to type '{bc_type}' at t={current_time:.4f}s (Scheduled for [{t_start:.1f}, {t_end:.1f}))"
+                # Try to write using tqdm's method if available, otherwise print
+                try:
+                    self.pbar.write(pbar_message)
+                except AttributeError:
+                    print(pbar_message)
+
+
     def run(self, t_final: float = None, output_dt: float = None, max_steps: int = None) -> tuple[list[float], list[np.ndarray]]:
         """
         Runs the simulation loop until t_final.
@@ -328,6 +440,7 @@ class SimulationRunner:
 
         # Initialize tqdm progress bar, disable if quiet
         pbar = tqdm(total=t_final, desc="Running Simulation", unit="s", initial=self.t, leave=True, disable=self.quiet)
+        self.pbar = pbar # Store pbar instance for writing messages
 
         try: # Ensure pbar is closed even if errors occur
             while self.t < t_final and (max_steps is None or self.step_count < max_steps):
@@ -336,12 +449,17 @@ class SimulationRunner:
                 current_U = self.d_U if self.device == 'gpu' else self.U
                 # -----------------------------------------
 
-                # 1. Apply Boundary Conditions
-                # Ensures ghost cells are up-to-date before CFL calc and time step
-                # NOTE: This function will need modification to handle GPU arrays
-                boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params)
+                # 1. Update Time-Dependent Boundary Conditions (if any)
+                self._update_bc_from_schedule('left', self.t)
+                self._update_bc_from_schedule('right', self.t)
 
-                # 2. Calculate Stable Timestep
+                # 2. Apply Boundary Conditions
+                # Ensures ghost cells are up-to-date before CFL calc and time step
+                # Use the potentially updated current_bc_params
+                # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
+                boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params, self.current_bc_params)
+
+                # 3. Calculate Stable Timestep
                 # NOTE: calculate_cfl_dt now handles GPU arrays directly
                 # Pass the appropriate array slice based on device
                 if self.device == 'gpu':

@@ -3,6 +3,7 @@ from numba import cuda, float64, int32 # Import cuda and types
 import math # For ceil
 from ..grid.grid1d import Grid1D
 from ..core.parameters import ModelParameters
+from ..core import physics # Import the physics module for pressure calculation
 
 # --- CUDA Kernel ---
 
@@ -10,7 +11,9 @@ from ..core.parameters import ModelParameters
 def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
                                       left_type_code, right_type_code,
                                       inflow_L_0, inflow_L_1, inflow_L_2, inflow_L_3,
-                                      inflow_R_0, inflow_R_1, inflow_R_2, inflow_R_3):
+                                      inflow_R_0, inflow_R_1, inflow_R_2, inflow_R_3,
+                                      # Add physics parameters needed for wall BC pressure calc
+                                      alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c):
     """
     CUDA kernel to apply boundary conditions directly on the GPU device array d_U.
 
@@ -47,6 +50,20 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
             d_U[1, left_ghost_idx] = d_U[1, src_idx]
             d_U[2, left_ghost_idx] = d_U[2, src_idx]
             d_U[3, left_ghost_idx] = d_U[3, src_idx]
+        elif left_type_code == 3: # Wall (v=0 -> w=p)
+            first_phys_idx = n_ghost
+            # Get state from first physical cell
+            rho_m_phys = d_U[0, first_phys_idx]
+            rho_c_phys = d_U[2, first_phys_idx]
+            # Calculate pressure at physical cell state
+            p_m_phys, p_c_phys = physics._calculate_pressure_cuda(
+                rho_m_phys, rho_c_phys, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+            )
+            # Set ghost cell state
+            d_U[0, left_ghost_idx] = rho_m_phys # Copy density
+            d_U[1, left_ghost_idx] = p_m_phys   # Set w = p
+            d_U[2, left_ghost_idx] = rho_c_phys # Copy density
+            d_U[3, left_ghost_idx] = p_c_phys   # Set w = p
 
         # --- Right Boundary ---
         right_ghost_idx = n_phys + n_ghost + i
@@ -67,10 +84,24 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
             d_U[1, right_ghost_idx] = d_U[1, src_idx]
             d_U[2, right_ghost_idx] = d_U[2, src_idx]
             d_U[3, right_ghost_idx] = d_U[3, src_idx]
+        elif right_type_code == 3: # Wall (v=0 -> w=p)
+            last_phys_idx = n_phys + n_ghost - 1
+            # Get state from last physical cell
+            rho_m_phys = d_U[0, last_phys_idx]
+            rho_c_phys = d_U[2, last_phys_idx]
+            # Calculate pressure at physical cell state
+            p_m_phys, p_c_phys = physics._calculate_pressure_cuda(
+                rho_m_phys, rho_c_phys, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+            )
+            # Set ghost cell state
+            d_U[0, right_ghost_idx] = rho_m_phys # Copy density
+            d_U[1, right_ghost_idx] = p_m_phys   # Set w = p
+            d_U[2, right_ghost_idx] = rho_c_phys # Copy density
+            d_U[3, right_ghost_idx] = p_c_phys   # Set w = p
 
 # --- Main Function ---
 
-def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
+def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, current_bc_params: dict | None = None):
     """
     Applies boundary conditions to the state vector array including ghost cells.
     Works for both CPU (NumPy) and GPU (Numba DeviceNDArray) arrays.
@@ -93,7 +124,9 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
     n_ghost = grid.num_ghost_cells
     n_phys = grid.N_physical
     N_total = grid.N_total
-    bc_config = params.boundary_conditions
+    
+   # Use current_bc_params if provided, otherwise default to params.boundary_conditions
+    bc_config = current_bc_params if current_bc_params is not None else params.boundary_conditions
 
     # --- Determine Device and Prepare ---
     is_gpu = hasattr(params, 'device') and params.device == 'gpu'
@@ -108,7 +141,7 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
     left_type_str = left_bc.get('type', 'outflow').lower()
     right_type_str = right_bc.get('type', 'outflow').lower()
 
-    type_map = {'inflow': 0, 'outflow': 1, 'periodic': 2}
+    type_map = {'inflow': 0, 'outflow': 1, 'periodic': 2, 'wall': 3} # Added wall
     left_type_code = type_map.get(left_type_str)
     right_type_code = type_map.get(right_type_str)
 
@@ -145,7 +178,11 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
             left_type_code, right_type_code,
             # Pass inflow states as individual float arguments
             float64(inflow_L[0]), float64(inflow_L[1]), float64(inflow_L[2]), float64(inflow_L[3]),
-            float64(inflow_R[0]), float64(inflow_R[1]), float64(inflow_R[2]), float64(inflow_R[3])
+            float64(inflow_R[0]), float64(inflow_R[1]), float64(inflow_R[2]), float64(inflow_R[3]),
+            # Pass pressure parameters needed by wall BC
+            float64(params.alpha), float64(params.rho_jam), float64(params.epsilon),
+            float64(params.K_m), float64(params.gamma_m),
+            float64(params.K_c), float64(params.gamma_c)
         )
         # No explicit sync needed here, subsequent kernels will sync
 
@@ -165,6 +202,20 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
             U[:, 0:n_ghost] = first_physical_cell_state
         elif left_type_code == 2: # Periodic
             U[:, 0:n_ghost] = U[:, n_phys:n_phys + n_ghost]
+        elif left_type_code == 3: # Wall (v=0 -> w=p)
+            first_physical_cell_state = U[:, n_ghost] # Shape (4,)
+            rho_m_phys = first_physical_cell_state[0]
+            rho_c_phys = first_physical_cell_state[2]
+            # Calculate pressure (CPU version)
+            p_m_phys, p_c_phys = physics.calculate_pressure(
+                rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
+                params.K_m, params.gamma_m, params.K_c, params.gamma_c
+            )
+            # Set ghost cells
+            U[0, 0:n_ghost] = rho_m_phys
+            U[1, 0:n_ghost] = p_m_phys
+            U[2, 0:n_ghost] = rho_c_phys
+            U[3, 0:n_ghost] = p_c_phys
 
         # Right Boundary
         if right_type_code == 0: # Inflow
@@ -174,6 +225,20 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters):
             U[:, n_phys + n_ghost:] = last_physical_cell_state
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
+        elif right_type_code == 3: # Wall (v=0 -> w=p)
+            last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
+            rho_m_phys = last_physical_cell_state[0]
+            rho_c_phys = last_physical_cell_state[2]
+            # Calculate pressure (CPU version)
+            p_m_phys, p_c_phys = physics.calculate_pressure(
+                rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
+                params.K_m, params.gamma_m, params.K_c, params.gamma_c
+            )
+            # Set ghost cells
+            U[0, n_phys + n_ghost:] = rho_m_phys
+            U[1, n_phys + n_ghost:] = p_m_phys
+            U[2, n_phys + n_ghost:] = rho_c_phys
+            U[3, n_phys + n_ghost:] = p_c_phys
 
     # Note: No return value, U_or_d_U is modified in-place.
 
