@@ -460,9 +460,11 @@ class SimulationRunner:
                 # 2. Apply Boundary Conditions
                 # Debug: show current time and right BC type before applying
                 try:
-                    self.pbar.write(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
+                    # Corrected default value from {{}} to {}
+                    self.pbar.write(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right', {}).get('type')}")
                 except AttributeError:
-                    print(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
+                     # Corrected default value from {{}} to {}
+                    print(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right', {}).get('type')}")
                 # Ensures ghost cells are up-to-date before CFL calc and time step
                 # Use the potentially updated current_bc_params
                 # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
