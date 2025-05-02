@@ -18,8 +18,8 @@ road:
 initial_conditions: # Changed key to plural
   type: uniform_equilibrium
   # Densities in veh/km (will be converted internally)
-  rho_m: 50.0       # 75% motorcycles
-  rho_c: 16.67      # 25% cars (approx) -> Total ~67 veh/km
+  rho_m: 100.0       # 75% motorcycles
+  rho_c: 33.33      # 25% cars (approx) -> Total ~133.33 veh/km
   R_val: 1          # Equilibrium calculated for R=1
 
 boundary_conditions:
