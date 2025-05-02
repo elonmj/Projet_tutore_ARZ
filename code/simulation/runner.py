@@ -41,7 +41,7 @@ class SimulationRunner:
         if not self.quiet:
             print(f"Initializing simulation from scenario: {scenario_config_path}")
             print(f"Using device: {self.device}") # Indicate which device is being used
-        # Load parameters
+        # Load parameters 
         self.params = ModelParameters()
         self.params.load_from_yaml(base_config_path, scenario_config_path) # Load base and scenario
 
