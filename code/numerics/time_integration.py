@@ -304,6 +304,17 @@ def solve_hyperbolic_step_cpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, par
         U_L = U_in[:, j]
         U_R = U_in[:, j + 1]
         fluxes[:, j] = riemann_solvers.central_upwind_flux(U_L, U_R, params)
+        # DEBUG: Print flux at the right boundary interface (j = g + N - 1)
+        g = grid.num_ghost_cells
+        N = grid.N_physical
+        if j == g + N - 1:
+             # Check if params has a current_time attribute for conditional printing
+             current_t = getattr(params, 'current_time', -1.0) # Get time if available, else -1
+             if current_t >= 0 and current_t < 1.0: # Print only for first second if time is available
+                 print(f"DEBUG (t={current_t:.4f}): Flux at right boundary interface (j={j}): {fluxes[:, j]}")
+             elif current_t < 0: # Print always if time is not available in params
+                 print(f"DEBUG: Flux at right boundary interface (j={j}): {fluxes[:, j]}")
+
 
     # Update physical cells using flux differences
     # Update cell j using F_{j+1/2} - F_{j-1/2}

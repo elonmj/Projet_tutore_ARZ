@@ -252,6 +252,13 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[1, n_phys + n_ghost:] = 0.0        # Set zero momentum density
             U[2, n_phys + n_ghost:] = rho_c_phys # Copy density
             U[3, n_phys + n_ghost:] = 0.0        # Set zero momentum density
+            # --- NEW DEBUG PRINT: CPU Right Wall Ghost State ---
+            # Check if t_current is available and within the desired range
+            if params.device == 'cpu' and t_current >= 0 and t_current < 1.0: # Print only for first second if time is available
+                 print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall ZeroVel): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
+            elif params.device == 'cpu' and t_current < 0: # Print always if time is not available
+                 print(f"DEBUG CPU BC (Right Wall ZeroVel): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
+            # -------------------------------------------------
             # --- DEBUG PRINT: CPU Right Wall ---
             if params.device == 'cpu' and t_current < 61.0:
                  print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall ZeroVel): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
