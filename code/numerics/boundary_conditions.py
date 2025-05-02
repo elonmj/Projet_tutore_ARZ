@@ -101,7 +101,7 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
 
 # --- Main Function ---
 
-def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, current_bc_params: dict | None = None):
+def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, current_bc_params: dict | None = None, current_time: float = -1.0): # Add current_time
     """
     Applies boundary conditions to the state vector array including ghost cells.
     Works for both CPU (NumPy) and GPU (Numba DeviceNDArray) arrays.
@@ -172,6 +172,12 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
         threadsperblock = 64 # Can be tuned, but likely small enough
         blockspergrid = math.ceil(n_ghost / threadsperblock)
 
+        # --- DEBUG PRINT (GPU - Host): Print state before and after kernel ---
+        if right_type_code == 3: # If right BC is wall
+            U_host_before = d_U.copy_to_host()
+            last_phys_idx_host = n_phys + n_ghost - 1
+            print(f"DEBUG GPU Pre-Wall (t={current_time:.6f}): Last Phys Cell [{last_phys_idx_host}]: {U_host_before[:, last_phys_idx_host]}") # Use current_time
+
         # Launch kernel
         _apply_boundary_conditions_kernel[blockspergrid, threadsperblock](
             d_U, n_ghost, n_phys,
@@ -184,7 +190,14 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             float64(params.K_m), float64(params.gamma_m),
             float64(params.K_c), float64(params.gamma_c)
         )
-        # No explicit sync needed here, subsequent kernels will sync
+        cuda.synchronize() # Ensure kernel finishes before copying back for debug print
+
+        if right_type_code == 3: # If right BC is wall
+            U_host_after = d_U.copy_to_host()
+            first_ghost_idx_host = n_phys + n_ghost
+            # Print the first ghost cell state (index N_phys + n_ghost)
+            print(f"DEBUG GPU Post-Wall (t={current_time:.6f}): First Ghost Cell [{first_ghost_idx_host}]: {U_host_after[:, first_ghost_idx_host]}") # Use current_time
+        # --------------------------------------------------------------------
 
     else:
         # --- CPU Implementation (Original Logic) ---
@@ -226,9 +239,11 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
         elif right_type_code == 3: # Wall (v=0 -> w=p)
-            # Debug CPU Pre-Wall: last physical cell state
-            print(f"DEBUG CPU Pre-Wall last physical cell: {U[:, n_phys + n_ghost - 1]}")
-            last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
+            # --- DEBUG PRINT (CPU): Print state before applying BC ---
+            last_phys_idx_cpu = n_phys + n_ghost - 1
+            last_physical_cell_state = U[:, last_phys_idx_cpu] # Shape (4,)
+            print(f"DEBUG CPU Pre-Wall (t={current_time:.6f}): Last Phys Cell [{last_phys_idx_cpu}]: {last_physical_cell_state}") # Use current_time
+            # ---------------------------------------------------------
             rho_m_phys = last_physical_cell_state[0]
             rho_c_phys = last_physical_cell_state[2]
             # Calculate pressure (CPU version)
@@ -241,8 +256,11 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[1, n_phys + n_ghost:] = p_m_phys
             U[2, n_phys + n_ghost:] = rho_c_phys
             U[3, n_phys + n_ghost:] = p_c_phys
-            # Debug CPU Post-Wall: ghost cells
-            print(f"DEBUG CPU Post-Wall ghost cells: {U[:, n_phys + n_ghost: n_phys + 2*n_ghost]}")
+            # --- DEBUG PRINT (CPU): Print state after applying BC ---
+            first_ghost_idx_cpu = n_phys + n_ghost
+            # Print the first ghost cell state (index N_phys + n_ghost)
+            print(f"DEBUG CPU Post-Wall (t={current_time:.6f}): First Ghost Cell [{first_ghost_idx_cpu}]: {U[:, first_ghost_idx_cpu]}") # Use current_time
+            # --------------------------------------------------------
 
     # Note: No return value, U_or_d_U is modified in-place.
 

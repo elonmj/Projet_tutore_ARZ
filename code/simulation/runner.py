@@ -41,7 +41,7 @@ class SimulationRunner:
         if not self.quiet:
             print(f"Initializing simulation from scenario: {scenario_config_path}")
             print(f"Using device: {self.device}") # Indicate which device is being used
-        # Load parameters 
+        # Load parameters
         self.params = ModelParameters()
         self.params.load_from_yaml(base_config_path, scenario_config_path) # Load base and scenario
 
@@ -460,27 +460,21 @@ class SimulationRunner:
                 # 2. Apply Boundary Conditions
                 # Debug: show current time and right BC type before applying
                 try:
-                    # Corrected default value from {{}} to {}
-                    self.pbar.write(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right', {}).get('type')}")
+                    self.pbar.write(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
                 except AttributeError:
-                     # Corrected default value from {{}} to {}
-                    print(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right', {}).get('type')}")
+                    print(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
                 # Ensures ghost cells are up-to-date before CFL calc and time step
                 # Use the potentially updated current_bc_params
                 # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
-                boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params, self.current_bc_params)
-                # Debug: inspect right ghost cells immediately after BC application
+                # --- DEBUG PRINT: Show time and right BC type being applied ---
+                right_bc_type_to_print = self.current_bc_params.get('right', {}).get('type', 'N/A')
+                debug_msg = f"DEBUG Runner: t={self.t:.6f}, Applying Right BC: '{right_bc_type_to_print}'"
                 try:
-                    if self.device == 'gpu':
-                        host_U = current_U.copy_to_host()
-                    else:
-                        host_U = current_U
-                    # Right ghost cell start index
-                    rg_start = self.grid.N_physical + self.grid.num_ghost_cells
-                    rg_end = rg_start + self.grid.num_ghost_cells
-                    self.pbar.write(f"DEBUG After BC: ghost cells [{rg_start}:{rg_end}] = {host_U[:, rg_start:rg_end].tolist()}")
-                except Exception as e:
-                    print(f"DEBUG After BC error: {e}")
+                    self.pbar.write(debug_msg)
+                except AttributeError: # If pbar doesn't exist or is closed
+                    print(debug_msg)
+                # --- END DEBUG PRINT ---
+                boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params, self.current_bc_params, self.t) # Pass current time t
 
                 # 3. Calculate Stable Timestep
                 # NOTE: calculate_cfl_dt now handles GPU arrays directly
