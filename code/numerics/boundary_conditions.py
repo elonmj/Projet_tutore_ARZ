@@ -226,6 +226,8 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
         elif right_type_code == 3: # Wall (v=0 -> w=p)
+            # Debug CPU Pre-Wall: last physical cell state
+            print(f"DEBUG CPU Pre-Wall last physical cell: {U[:, n_phys + n_ghost - 1]}")
             last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
             rho_m_phys = last_physical_cell_state[0]
             rho_c_phys = last_physical_cell_state[2]
@@ -239,6 +241,8 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[1, n_phys + n_ghost:] = p_m_phys
             U[2, n_phys + n_ghost:] = rho_c_phys
             U[3, n_phys + n_ghost:] = p_c_phys
+            # Debug CPU Post-Wall: ghost cells
+            print(f"DEBUG CPU Post-Wall ghost cells: {U[:, n_phys + n_ghost: n_phys + 2*n_ghost]}")
 
     # Note: No return value, U_or_d_U is modified in-place.
 

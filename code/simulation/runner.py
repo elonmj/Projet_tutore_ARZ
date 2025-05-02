@@ -458,10 +458,27 @@ class SimulationRunner:
                 self._update_bc_from_schedule('right', self.t)
 
                 # 2. Apply Boundary Conditions
+                # Debug: show current time and right BC type before applying
+                try:
+                    self.pbar.write(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
+                except AttributeError:
+                    print(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
                 # Ensures ghost cells are up-to-date before CFL calc and time step
                 # Use the potentially updated current_bc_params
                 # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
                 boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params, self.current_bc_params)
+                # Debug: inspect right ghost cells immediately after BC application
+                try:
+                    if self.device == 'gpu':
+                        host_U = current_U.copy_to_host()
+                    else:
+                        host_U = current_U
+                    # Right ghost cell start index
+                    rg_start = self.grid.N_physical + self.grid.num_ghost_cells
+                    rg_end = rg_start + self.grid.num_ghost_cells
+                    self.pbar.write(f"DEBUG After BC: ghost cells [{rg_start}:{rg_end}] = {host_U[:, rg_start:rg_end].tolist()}")
+                except Exception as e:
+                    print(f"DEBUG After BC error: {e}")
 
                 # 3. Calculate Stable Timestep
                 # NOTE: calculate_cfl_dt now handles GPU arrays directly
