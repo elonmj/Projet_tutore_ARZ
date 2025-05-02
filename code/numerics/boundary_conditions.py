@@ -84,18 +84,18 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
             d_U[1, right_ghost_idx] = d_U[1, src_idx]
             d_U[2, right_ghost_idx] = d_U[2, src_idx]
             d_U[3, right_ghost_idx] = d_U[3, src_idx]
-        elif right_type_code == 3: # Wall (Reflection: rho_ghost=rho_phys, w_ghost=-w_phys)
+        elif right_type_code == 3: # Wall (Zero Velocity: rho_ghost=rho_phys, w_ghost=0)
             last_phys_idx = n_phys + n_ghost - 1
             # Get state from last physical cell
             rho_m_phys = d_U[0, last_phys_idx]
-            w_m_phys   = d_U[1, last_phys_idx]
+            # w_m_phys   = d_U[1, last_phys_idx] # Not needed
             rho_c_phys = d_U[2, last_phys_idx]
-            w_c_phys   = d_U[3, last_phys_idx]
+            # w_c_phys   = d_U[3, last_phys_idx] # Not needed
             # Set ghost cell state
             d_U[0, right_ghost_idx] = rho_m_phys # Copy density
-            d_U[1, right_ghost_idx] = -w_m_phys  # Negate momentum density
+            d_U[1, right_ghost_idx] = 0.0        # Set zero momentum density
             d_U[2, right_ghost_idx] = rho_c_phys # Copy density
-            d_U[3, right_ghost_idx] = -w_c_phys  # Negate momentum density
+            d_U[3, right_ghost_idx] = 0.0        # Set zero momentum density
 
 # --- Main Function ---
 
@@ -179,13 +179,10 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             last_phys_state_host = d_U[:, last_phys_idx:last_phys_idx+1].copy_to_host()[:, 0]
             rho_m_phys_h = last_phys_state_host[0]
             rho_c_phys_h = last_phys_state_host[2]
-            # Calculate pressure that *should* be set in ghost cell
-            p_m_ghost_h, p_c_ghost_h = physics.calculate_pressure(
-                 rho_m_phys_h, rho_c_phys_h, params.alpha, params.rho_jam, params.epsilon,
-                 params.K_m, params.gamma_m, params.K_c, params.gamma_c
-            )
-            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall): BEFORE Kernel - Phys Cell {last_phys_idx}: {last_phys_state_host}")
-            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall): INTENDED Ghost State: [{rho_m_phys_h}, {p_m_ghost_h}, {rho_c_phys_h}, {p_c_ghost_h}]")
+            # w_m_phys_h = last_phys_state_host[1] # Not needed for w=0
+            # w_c_phys_h = last_phys_state_host[3] # Not needed for w=0
+            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall ZeroVel): BEFORE Kernel - Phys Cell {last_phys_idx}: {last_phys_state_host}")
+            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall ZeroVel): INTENDED Ghost State: [{rho_m_phys_h}, {0.0}, {rho_c_phys_h}, {0.0}]")
         # -------------------------------------------------
 
         _apply_boundary_conditions_kernel[blockspergrid, threadsperblock](
@@ -240,17 +237,25 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[:, n_phys + n_ghost:] = last_physical_cell_state
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
-        elif right_type_code == 3: # Wall (Reflection: rho_ghost=rho_phys, w_ghost=-w_phys)
+        elif right_type_code == 3: # Wall (Zero Velocity: rho_ghost=rho_phys, w_ghost=0)
+            # --- DEBUG PRINT: CPU Right Wall ---
+            if params.device == 'cpu' and t_current < 61.0: # Assuming t_current is accessible or passed
+                 print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall ZeroVel): BEFORE - Phys Cell {n_phys + n_ghost - 1}: {U[:, n_phys + n_ghost - 1]}")
+            # ----------------------------------
             last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
             rho_m_phys = last_physical_cell_state[0]
-            w_m_phys   = last_physical_cell_state[1]
+            # w_m_phys   = last_physical_cell_state[1] # Not needed
             rho_c_phys = last_physical_cell_state[2]
-            w_c_phys   = last_physical_cell_state[3]
+            # w_c_phys   = last_physical_cell_state[3] # Not needed
             # Set ghost cells
             U[0, n_phys + n_ghost:] = rho_m_phys # Copy density
-            U[1, n_phys + n_ghost:] = -w_m_phys  # Negate momentum density
+            U[1, n_phys + n_ghost:] = 0.0        # Set zero momentum density
             U[2, n_phys + n_ghost:] = rho_c_phys # Copy density
-            U[3, n_phys + n_ghost:] = -w_c_phys  # Negate momentum density
+            U[3, n_phys + n_ghost:] = 0.0        # Set zero momentum density
+            # --- DEBUG PRINT: CPU Right Wall ---
+            if params.device == 'cpu' and t_current < 61.0:
+                 print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall ZeroVel): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
+            # ----------------------------------
 
     # Note: No return value, U_or_d_U is modified in-place.
 
