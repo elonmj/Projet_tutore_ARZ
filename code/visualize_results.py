@@ -66,6 +66,16 @@ def main():
         action='store_true',
         help="Do not save the generated plots."
     )
+    parser.add_argument(
+        '--vmin',
+        type=float,
+        help="Minimum color scale value for spacetime plots."
+    )
+    parser.add_argument(
+        '--vmax',
+        type=float,
+        help="Maximum color scale value for spacetime plots."
+    )
 
     args = parser.parse_args()
 
@@ -149,7 +159,9 @@ def main():
             class_index=0, # Motorcycles
             output_dir=output_dir,
             show=args.show,
-            save=save_plots
+            save=save_plots,
+            vmin=args.vmin,
+            vmax=args.vmax
         )
 
     if 'spacetime_velocity_m' in plots_to_generate:
@@ -163,7 +175,9 @@ def main():
             class_index=0, # Motorcycles
             output_dir=output_dir,
             show=args.show,
-            save=save_plots
+            save=save_plots,
+            vmin=args.vmin,
+            vmax=args.vmax
         )
 
     if 'spacetime_density_c' in plots_to_generate:
@@ -177,7 +191,9 @@ def main():
             class_index=2, # Cars
             output_dir=output_dir,
             show=args.show,
-            save=save_plots
+            save=save_plots,
+            vmin=args.vmin,
+            vmax=args.vmax
         )
 
     if 'spacetime_velocity_c' in plots_to_generate:
@@ -191,7 +207,9 @@ def main():
             class_index=2, # Cars
             output_dir=output_dir,
             show=args.show,
-            save=save_plots
+            save=save_plots,
+            vmin=args.vmin,
+            vmax=args.vmax
         )
 
     print("Plot generation finished.")

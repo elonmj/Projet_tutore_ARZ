@@ -189,7 +189,7 @@ def plot_spacetime(times: np.ndarray | list, states: np.ndarray | list, grid: Gr
         raise ValueError("Variable must be 'density' or 'velocity'.")
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    pcm = ax.pcolormesh(x_coords, t_coords, data_to_plot, cmap=cmap, shading='gouraud', vmin=vmin, vmax=vmax)
+    pcm = ax.pcolormesh(x_coords, t_coords, data_to_plot, cmap=cmap, shading='nearest', vmin=vmin, vmax=vmax)
     # Use shading='auto' or 'nearest' if 'gouraud' causes issues with non-monotonic coords (shouldn't here)
 
     fig.colorbar(pcm, ax=ax, label=f"{var_label} ({unit})")
