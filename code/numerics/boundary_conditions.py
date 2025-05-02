@@ -84,20 +84,18 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
             d_U[1, right_ghost_idx] = d_U[1, src_idx]
             d_U[2, right_ghost_idx] = d_U[2, src_idx]
             d_U[3, right_ghost_idx] = d_U[3, src_idx]
-        elif right_type_code == 3: # Wall (v=0 -> w=p)
+        elif right_type_code == 3: # Wall (Reflection: rho_ghost=rho_phys, w_ghost=-w_phys)
             last_phys_idx = n_phys + n_ghost - 1
             # Get state from last physical cell
             rho_m_phys = d_U[0, last_phys_idx]
+            w_m_phys   = d_U[1, last_phys_idx]
             rho_c_phys = d_U[2, last_phys_idx]
-            # Calculate pressure at physical cell state
-            p_m_phys, p_c_phys = physics._calculate_pressure_cuda(
-                rho_m_phys, rho_c_phys, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
-            )
+            w_c_phys   = d_U[3, last_phys_idx]
             # Set ghost cell state
             d_U[0, right_ghost_idx] = rho_m_phys # Copy density
-            d_U[1, right_ghost_idx] = p_m_phys   # Set w = p
+            d_U[1, right_ghost_idx] = -w_m_phys  # Negate momentum density
             d_U[2, right_ghost_idx] = rho_c_phys # Copy density
-            d_U[3, right_ghost_idx] = p_c_phys   # Set w = p
+            d_U[3, right_ghost_idx] = -w_c_phys  # Negate momentum density
 
 # --- Main Function ---
 
@@ -242,20 +240,17 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[:, n_phys + n_ghost:] = last_physical_cell_state
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
-        elif right_type_code == 3: # Wall (v=0 -> w=p)
+        elif right_type_code == 3: # Wall (Reflection: rho_ghost=rho_phys, w_ghost=-w_phys)
             last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
             rho_m_phys = last_physical_cell_state[0]
+            w_m_phys   = last_physical_cell_state[1]
             rho_c_phys = last_physical_cell_state[2]
-            # Calculate pressure (CPU version)
-            p_m_phys, p_c_phys = physics.calculate_pressure(
-                rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
-                params.K_m, params.gamma_m, params.K_c, params.gamma_c
-            )
+            w_c_phys   = last_physical_cell_state[3]
             # Set ghost cells
-            U[0, n_phys + n_ghost:] = rho_m_phys
-            U[1, n_phys + n_ghost:] = p_m_phys
-            U[2, n_phys + n_ghost:] = rho_c_phys
-            U[3, n_phys + n_ghost:] = p_c_phys
+            U[0, n_phys + n_ghost:] = rho_m_phys # Copy density
+            U[1, n_phys + n_ghost:] = -w_m_phys  # Negate momentum density
+            U[2, n_phys + n_ghost:] = rho_c_phys # Copy density
+            U[3, n_phys + n_ghost:] = -w_c_phys  # Negate momentum density
 
     # Note: No return value, U_or_d_U is modified in-place.
 
