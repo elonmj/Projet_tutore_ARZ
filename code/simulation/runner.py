@@ -327,11 +327,15 @@ class SimulationRunner:
 
         # --- Reuse initial equilibrium state for inflow BC if applicable ---
         if self.initial_equilibrium_state is not None:
+            if not self.quiet:
+                print(f"  DEBUG BC Init: Calculated initial_equilibrium_state = {self.initial_equilibrium_state}") # Debug print
+
             if self.current_bc_params.get('left', {}).get('type') == 'inflow':
                 if 'state' not in self.current_bc_params['left'] or self.current_bc_params['left']['state'] is None:
                     self.current_bc_params['left']['state'] = self.initial_equilibrium_state
                     if not self.quiet:
                         print("  Populated left inflow BC state from initial equilibrium.")
+                        print(f"  DEBUG BC Init: Final left inflow BC state = {self.current_bc_params['left']['state']}") # Debug print
             # Could add similar logic for right BC if needed
         # --------------------------------------------------------------------
 
