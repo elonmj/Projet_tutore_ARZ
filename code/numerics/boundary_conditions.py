@@ -101,10 +101,11 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
 
 # --- Main Function ---
 
-def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, current_bc_params: dict | None = None, current_time: float = -1.0): # Add current_time
+def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, current_bc_params: dict | None = None, t_current: float = -1.0): # Add t_current
     """
     Applies boundary conditions to the state vector array including ghost cells.
     Works for both CPU (NumPy) and GPU (Numba DeviceNDArray) arrays.
+    Includes t_current for debug printing.
 
     Modifies U_or_d_U in-place.
 
@@ -172,13 +173,23 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
         threadsperblock = 64 # Can be tuned, but likely small enough
         blockspergrid = math.ceil(n_ghost / threadsperblock)
 
-        # --- DEBUG PRINT (GPU - Host): Print state before and after kernel ---
-        if right_type_code == 3: # If right BC is wall
-            U_host_before = d_U.copy_to_host()
-            last_phys_idx_host = n_phys + n_ghost - 1
-            print(f"DEBUG GPU Pre-Wall (t={current_time:.6f}): Last Phys Cell [{last_phys_idx_host}]: {U_host_before[:, last_phys_idx_host]}") # Use current_time
-
         # Launch kernel
+        # --- DEBUG PRINT: GPU Right Wall (Before Kernel) ---
+        if is_gpu and right_type_code == 3 and t_current < 61.0:
+            # Copy last physical cell back to host for printing
+            last_phys_idx = n_phys + n_ghost - 1
+            last_phys_state_host = d_U[:, last_phys_idx:last_phys_idx+1].copy_to_host()[:, 0]
+            rho_m_phys_h = last_phys_state_host[0]
+            rho_c_phys_h = last_phys_state_host[2]
+            # Calculate pressure that *should* be set in ghost cell
+            p_m_ghost_h, p_c_ghost_h = physics.calculate_pressure(
+                 rho_m_phys_h, rho_c_phys_h, params.alpha, params.rho_jam, params.epsilon,
+                 params.K_m, params.gamma_m, params.K_c, params.gamma_c
+            )
+            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall): BEFORE Kernel - Phys Cell {last_phys_idx}: {last_phys_state_host}")
+            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall): INTENDED Ghost State: [{rho_m_phys_h}, {p_m_ghost_h}, {rho_c_phys_h}, {p_c_ghost_h}]")
+        # -------------------------------------------------
+
         _apply_boundary_conditions_kernel[blockspergrid, threadsperblock](
             d_U, n_ghost, n_phys,
             left_type_code, right_type_code,
@@ -190,14 +201,7 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             float64(params.K_m), float64(params.gamma_m),
             float64(params.K_c), float64(params.gamma_c)
         )
-        cuda.synchronize() # Ensure kernel finishes before copying back for debug print
-
-        if right_type_code == 3: # If right BC is wall
-            U_host_after = d_U.copy_to_host()
-            first_ghost_idx_host = n_phys + n_ghost
-            # Print the first ghost cell state (index N_phys + n_ghost)
-            print(f"DEBUG GPU Post-Wall (t={current_time:.6f}): First Ghost Cell [{first_ghost_idx_host}]: {U_host_after[:, first_ghost_idx_host]}") # Use current_time
-        # --------------------------------------------------------------------
+        # No explicit sync needed here, subsequent kernels will sync
 
     else:
         # --- CPU Implementation (Original Logic) ---
@@ -239,11 +243,7 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
         elif right_type_code == 3: # Wall (v=0 -> w=p)
-            # --- DEBUG PRINT (CPU): Print state before applying BC ---
-            last_phys_idx_cpu = n_phys + n_ghost - 1
-            last_physical_cell_state = U[:, last_phys_idx_cpu] # Shape (4,)
-            print(f"DEBUG CPU Pre-Wall (t={current_time:.6f}): Last Phys Cell [{last_phys_idx_cpu}]: {last_physical_cell_state}") # Use current_time
-            # ---------------------------------------------------------
+            last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
             rho_m_phys = last_physical_cell_state[0]
             rho_c_phys = last_physical_cell_state[2]
             # Calculate pressure (CPU version)
@@ -256,11 +256,6 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[1, n_phys + n_ghost:] = p_m_phys
             U[2, n_phys + n_ghost:] = rho_c_phys
             U[3, n_phys + n_ghost:] = p_c_phys
-            # --- DEBUG PRINT (CPU): Print state after applying BC ---
-            first_ghost_idx_cpu = n_phys + n_ghost
-            # Print the first ghost cell state (index N_phys + n_ghost)
-            print(f"DEBUG CPU Post-Wall (t={current_time:.6f}): First Ghost Cell [{first_ghost_idx_cpu}]: {U[:, first_ghost_idx_cpu]}") # Use current_time
-            # --------------------------------------------------------
 
     # Note: No return value, U_or_d_U is modified in-place.
 
@@ -272,6 +267,10 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
 #     N_total = N_phys + 2 * n_ghost
 #     dummy_grid = Grid1D(N=N_phys, xmin=0, xmax=100, num_ghost_cells=n_ghost)
 #     dummy_params = ModelParameters() # Need to load or set boundary_conditions
+# --- DEBUG PRINT: CPU Right Wall ---
+            if params.device == 'cpu' and params.t_current < 61.0:
+                 print(f"DEBUG CPU BC @ t={params.t_current:.4f} (Right Wall): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
+            # ----------------------------------
 #
 #     # --- Test Case 1: Inflow Left, Outflow Right ---
 #     print("--- Test Case 1: Inflow Left, Outflow Right ---")

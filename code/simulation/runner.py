@@ -128,8 +128,8 @@ class SimulationRunner:
         # Apply BCs *after* potential GPU transfer and *after* initializing BC schedules
         initial_U_array = self.d_U if self.device == 'gpu' else self.U
         # Use the initialized current_bc_params which has the correct type for t=0
-        # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
-        boundary_conditions.apply_boundary_conditions(initial_U_array, self.grid, self.params, self.current_bc_params)
+        # Pass both params (for device, physics constants) and current_bc_params (for BC types/states), and t_current
+        boundary_conditions.apply_boundary_conditions(initial_U_array, self.grid, self.params, self.current_bc_params, t_current=0.0)
         if not self.quiet:
             print("Initial boundary conditions applied.")
         # -----------------------------------------
@@ -458,23 +458,16 @@ class SimulationRunner:
                 self._update_bc_from_schedule('right', self.t)
 
                 # 2. Apply Boundary Conditions
-                # Debug: show current time and right BC type before applying
-                try:
-                    self.pbar.write(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
-                except AttributeError:
-                    print(f"DEBUG Runner: t={self.t:.4f}, right BC type={self.current_bc_params.get('right',{{}}).get('type')}")
                 # Ensures ghost cells are up-to-date before CFL calc and time step
                 # Use the potentially updated current_bc_params
                 # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
-                # --- DEBUG PRINT: Show time and right BC type being applied ---
-                right_bc_type_to_print = self.current_bc_params.get('right', {}).get('type', 'N/A')
-                debug_msg = f"DEBUG Runner: t={self.t:.6f}, Applying Right BC: '{right_bc_type_to_print}'"
-                try:
-                    self.pbar.write(debug_msg)
-                except AttributeError: # If pbar doesn't exist or is closed
-                    print(debug_msg)
-                # --- END DEBUG PRINT ---
-                boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params, self.current_bc_params, self.t) # Pass current time t
+# --- DEBUG PRINT: Check BC type passed ---
+                if self.t < 61.0 and not self.quiet: # Print for the first 60s + a bit
+                    right_bc_type_passed = self.current_bc_params.get('right', {}).get('type', 'N/A')
+                    print(f"DEBUG RUNNER @ t={self.t:.4f}: Passing right BC type '{right_bc_type_passed}' to apply_boundary_conditions")
+                # -----------------------------------------
+                # Pass both params (for device, physics constants) and current_bc_params (for BC types/states), and t_current
+                boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params, self.current_bc_params, t_current=self.t)
 
                 # 3. Calculate Stable Timestep
                 # NOTE: calculate_cfl_dt now handles GPU arrays directly
