@@ -461,10 +461,10 @@ class SimulationRunner:
                 # Ensures ghost cells are up-to-date before CFL calc and time step
                 # Use the potentially updated current_bc_params
                 # Pass both params (for device, physics constants) and current_bc_params (for BC types/states)
-# --- DEBUG PRINT: Check BC type passed ---
-                if self.t < 61.0 and not self.quiet: # Print for the first 60s + a bit
-                    right_bc_type_passed = self.current_bc_params.get('right', {}).get('type', 'N/A')
-                    print(f"DEBUG RUNNER @ t={self.t:.4f}: Passing right BC type '{right_bc_type_passed}' to apply_boundary_conditions")
+                # --- DEBUG PRINT: Check BC type passed (Commented out) ---
+                # if self.t < 61.0 and not self.quiet: # Print for the first 60s + a bit
+                #     right_bc_type_passed = self.current_bc_params.get('right', {}).get('type', 'N/A')
+                #     print(f"DEBUG RUNNER @ t={self.t:.4f}: Passing right BC type '{right_bc_type_passed}' to apply_boundary_conditions")
                 # -----------------------------------------
                 # Pass both params (for device, physics constants) and current_bc_params (for BC types/states), and t_current
                 boundary_conditions.apply_boundary_conditions(current_U, self.grid, self.params, self.current_bc_params, t_current=self.t)

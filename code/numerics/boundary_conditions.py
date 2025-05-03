@@ -172,36 +172,36 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
         blockspergrid = math.ceil(n_ghost / threadsperblock)
 
         # Launch kernel
-        # --- DEBUG PRINT: GPU Right Wall (Before Kernel) ---
-        if is_gpu and right_type_code == 3 and t_current < 61.0:
-            # Copy last physical cell back to host for printing
-            last_phys_idx = n_phys + n_ghost - 1
-            last_phys_state_host = d_U[:, last_phys_idx:last_phys_idx+1].copy_to_host()[:, 0]
-            rho_m_phys_h = last_phys_state_host[0]
-            w_m_phys_h = last_phys_state_host[1]
-            rho_c_phys_h = last_phys_state_host[2]
-            w_c_phys_h = last_phys_state_host[3]
-            # Calculate pressure and velocity for debug print
-            p_m_phys_h, p_c_phys_h = physics.calculate_pressure(
-                rho_m_phys_h, rho_c_phys_h, params.alpha, params.rho_jam, params.epsilon,
-                params.K_m, params.gamma_m, params.K_c, params.gamma_c
-            )
-            v_m_phys_h, v_c_phys_h = physics.calculate_physical_velocity(
-                w_m_phys_h, w_c_phys_h, p_m_phys_h, p_c_phys_h
-            )
-            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall Reflection): BEFORE Kernel - Phys Cell {last_phys_idx}: {last_phys_state_host} (v_m={v_m_phys_h:.4f}, v_c={v_c_phys_h:.4f})")
-            # Calculate intended ghost state for debug print
-            v_m_ghost_h = -v_m_phys_h
-            v_c_ghost_h = -v_c_phys_h
-            # Need pressure in ghost cell based on copied densities
-            p_m_ghost_h, p_c_ghost_h = physics.calculate_pressure(
-                rho_m_phys_h, rho_c_phys_h, params.alpha, params.rho_jam, params.epsilon,
-                params.K_m, params.gamma_m, params.K_c, params.gamma_c
-            )
-            w_m_ghost_h = v_m_ghost_h + p_m_ghost_h
-            w_c_ghost_h = v_c_ghost_h + p_c_ghost_h
-            print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall Reflection): INTENDED Ghost State: [{rho_m_phys_h:.4f}, {w_m_ghost_h:.4f}, {rho_c_phys_h:.4f}, {w_c_ghost_h:.4f}] (v_m={v_m_ghost_h:.4f}, v_c={v_c_ghost_h:.4f})")
-        # -------------------------------------------------
+        # --- DEBUG PRINT: GPU Right Wall (Before Kernel) (Commented out) ---
+        # if is_gpu and right_type_code == 3 and t_current < 61.0:
+        #     # Copy last physical cell back to host for printing
+        #     last_phys_idx = n_phys + n_ghost - 1
+        #     last_phys_state_host = d_U[:, last_phys_idx:last_phys_idx+1].copy_to_host()[:, 0]
+        #     rho_m_phys_h = last_phys_state_host[0]
+        #     w_m_phys_h = last_phys_state_host[1]
+        #     rho_c_phys_h = last_phys_state_host[2]
+        #     w_c_phys_h = last_phys_state_host[3]
+        #     # Calculate pressure and velocity for debug print
+        #     p_m_phys_h, p_c_phys_h = physics.calculate_pressure(
+        #         rho_m_phys_h, rho_c_phys_h, params.alpha, params.rho_jam, params.epsilon,
+        #         params.K_m, params.gamma_m, params.K_c, params.gamma_c
+        #     )
+        #     v_m_phys_h, v_c_phys_h = physics.calculate_physical_velocity(
+        #         w_m_phys_h, w_c_phys_h, p_m_phys_h, p_c_phys_h
+        #     )
+        #     print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall Reflection): BEFORE Kernel - Phys Cell {last_phys_idx}: {last_phys_state_host} (v_m={v_m_phys_h:.4f}, v_c={v_c_phys_h:.4f})")
+        #     # Calculate intended ghost state for debug print
+        #     v_m_ghost_h = -v_m_phys_h
+        #     v_c_ghost_h = -v_c_phys_h
+        #     # Need pressure in ghost cell based on copied densities
+        #     p_m_ghost_h, p_c_ghost_h = physics.calculate_pressure(
+        #         rho_m_phys_h, rho_c_phys_h, params.alpha, params.rho_jam, params.epsilon,
+        #         params.K_m, params.gamma_m, params.K_c, params.gamma_c
+        #     )
+        #     w_m_ghost_h = v_m_ghost_h + p_m_ghost_h
+        #     w_c_ghost_h = v_c_ghost_h + p_c_ghost_h
+        #     print(f"DEBUG GPU BC @ t={t_current:.4f} (Right Wall Reflection): INTENDED Ghost State: [{rho_m_phys_h:.4f}, {w_m_ghost_h:.4f}, {rho_c_phys_h:.4f}, {w_c_ghost_h:.4f}] (v_m={v_m_ghost_h:.4f}, v_c={v_c_ghost_h:.4f})")
+        # # -------------------------------------------------
 
         _apply_boundary_conditions_kernel[blockspergrid, threadsperblock](
             d_U, n_ghost, n_phys,
@@ -255,32 +255,57 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[:, n_phys + n_ghost:] = last_physical_cell_state
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
-        elif right_type_code == 3: # Wall (Zero Velocity: rho_ghost=rho_phys, w_ghost=0)
-            # --- DEBUG PRINT: CPU Right Wall ---
-            if params.device == 'cpu' and t_current < 61.0: # Assuming t_current is accessible or passed
-                 print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall ZeroVel): BEFORE - Phys Cell {n_phys + n_ghost - 1}: {U[:, n_phys + n_ghost - 1]}")
-            # ----------------------------------
+        elif right_type_code == 3: # Wall (Reflection Boundary Condition)
+            # --- DEBUG PRINT: CPU Right Wall (Commented out) ---
+            # if params.device == 'cpu' and t_current < 61.0: # Assuming t_current is accessible or passed
+            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): BEFORE - Phys Cell {n_phys + n_ghost - 1}: {U[:, n_phys + n_ghost - 1]}")
+            # # ----------------------------------
             last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
             rho_m_phys = last_physical_cell_state[0]
-            # w_m_phys   = last_physical_cell_state[1] # Not needed
+            w_m_phys   = last_physical_cell_state[1]
             rho_c_phys = last_physical_cell_state[2]
-            # w_c_phys   = last_physical_cell_state[3] # Not needed
-            # Set ghost cells
+            w_c_phys   = last_physical_cell_state[3]
+
+            # Calculate pressure (CPU version)
+            p_m_phys, p_c_phys = physics.calculate_pressure(
+                rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
+                params.K_m, params.gamma_m, params.K_c, params.gamma_c
+            )
+
+            # Calculate physical velocities (CPU version)
+            v_m_phys, v_c_phys = physics.calculate_physical_velocity(
+                w_m_phys, w_c_phys, p_m_phys, p_c_phys
+            )
+
+            # Set ghost cell state (reflection)
             U[0, n_phys + n_ghost:] = rho_m_phys # Copy density
-            U[1, n_phys + n_ghost:] = 0.0        # Set zero momentum density
             U[2, n_phys + n_ghost:] = rho_c_phys # Copy density
-            U[3, n_phys + n_ghost:] = 0.0        # Set zero momentum density
-            # --- NEW DEBUG PRINT: CPU Right Wall Ghost State ---
-            # Check if t_current is available and within the desired range
-            if params.device == 'cpu' and t_current >= 0 and t_current < 1.0: # Print only for first second if time is available
-                 print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall ZeroVel): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
-            elif params.device == 'cpu' and t_current < 0: # Print always if time is not available
-                 print(f"DEBUG CPU BC (Right Wall ZeroVel): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
-            # -------------------------------------------------
-            # --- DEBUG PRINT: CPU Right Wall ---
-            if params.device == 'cpu' and t_current < 61.0:
-                 print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall ZeroVel): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
-            # ----------------------------------
+
+            # Set ghost velocity to negative of physical velocity
+            v_m_ghost = -v_m_phys
+            v_c_ghost = -v_c_phys
+
+            # Recalculate momentum density in ghost cell: w = v + P(rho_eff)
+            # Need pressure in ghost cell based on copied densities
+            p_m_ghost, p_c_ghost = physics.calculate_pressure(
+                rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
+                params.K_m, params.gamma_m, params.K_c, params.gamma_c
+            )
+
+            U[1, n_phys + n_ghost:] = v_m_ghost + p_m_ghost # Note: Using p_m_ghost based on copied densities
+            U[3, n_phys + n_ghost:] = v_c_ghost + p_c_ghost # Note: Using p_c_ghost based on copied densities
+
+            # --- NEW DEBUG PRINT: CPU Right Wall Ghost State (Commented out) ---
+            # # Check if t_current is available and within the desired range
+            # if params.device == 'cpu' and t_current >= 0 and t_current < 1.0: # Print only for first second if time is available
+            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
+            # elif params.device == 'cpu' and t_current < 0: # Print always if time is not available
+            #      print(f"DEBUG CPU BC (Right Wall Reflection): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
+            # # -------------------------------------------------
+            # --- DEBUG PRINT: CPU Right Wall (Commented out) ---
+            # if params.device == 'cpu' and t_current < 61.0:
+            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
+            # # ----------------------------------
 
     # Note: No return value, U_or_d_U is modified in-place.
 
