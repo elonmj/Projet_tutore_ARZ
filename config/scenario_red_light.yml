@@ -32,7 +32,7 @@ boundary_conditions:
     type: time_dependent
     # Schedule: [t_start_sec, t_end_sec, type_str, state_list_or_None]
     schedule:
-      - [0.0, 60.0, 'wall']      # Red light phase (0s to 60s)
+      - [0.0, 60.0, 'wall_capped_reflection'] # Use the new capped BC
       - [60.0, 1.0e9, 'outflow'] # Green light phase (60s onwards)
 
 simulation:

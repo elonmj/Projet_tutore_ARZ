@@ -13,7 +13,9 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
                                       inflow_L_0, inflow_L_1, inflow_L_2, inflow_L_3,
                                       inflow_R_0, inflow_R_1, inflow_R_2, inflow_R_3,
                                       # Add physics parameters needed for wall BC pressure calc
-                                      alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c):
+                                      alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c,
+                                      # Placeholder for future capped BC parameters if needed separately
+                                      rho_cap_factor): # Added for potential future use, needed for consistency now
     """
     CUDA kernel to apply boundary conditions directly on the GPU device array d_U.
 
@@ -84,18 +86,82 @@ def _apply_boundary_conditions_kernel(d_U, n_ghost, n_phys,
             d_U[1, right_ghost_idx] = d_U[1, src_idx]
             d_U[2, right_ghost_idx] = d_U[2, src_idx]
             d_U[3, right_ghost_idx] = d_U[3, src_idx]
-        elif right_type_code == 3: # Wall (Zero Velocity: rho_ghost=rho_phys, w_ghost=0)
+        elif right_type_code == 3: # Wall (Reflection Boundary Condition - Mirroring CPU)
             last_phys_idx = n_phys + n_ghost - 1
             # Get state from last physical cell
             rho_m_phys = d_U[0, last_phys_idx]
-            # w_m_phys   = d_U[1, last_phys_idx] # Not needed
+            w_m_phys   = d_U[1, last_phys_idx]
             rho_c_phys = d_U[2, last_phys_idx]
-            # w_c_phys   = d_U[3, last_phys_idx] # Not needed
-            # Set ghost cell state
-            d_U[0, right_ghost_idx] = rho_m_phys # Copy density
-            d_U[1, right_ghost_idx] = 0.0        # Set zero momentum density
-            d_U[2, right_ghost_idx] = rho_c_phys # Copy density
-            d_U[3, right_ghost_idx] = 0.0        # Set zero momentum density
+            w_c_phys   = d_U[3, last_phys_idx]
+
+            # Calculate pressure at physical cell state (using CUDA helper)
+            p_m_phys, p_c_phys = physics._calculate_pressure_cuda(
+                rho_m_phys, rho_c_phys, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+            )
+
+            # Calculate physical velocities (using CUDA helper)
+            v_m_phys, v_c_phys = physics._calculate_physical_velocity_cuda(
+                w_m_phys, w_c_phys, p_m_phys, p_c_phys
+            )
+
+            # Set ghost cell state (reflection)
+            # Copy density
+            d_U[0, right_ghost_idx] = rho_m_phys
+            d_U[2, right_ghost_idx] = rho_c_phys
+
+            # Set ghost velocity to negative of physical velocity
+            v_m_ghost = -v_m_phys
+            v_c_ghost = -v_c_phys
+
+            # Recalculate momentum density in ghost cell: w = v + P(rho_eff)
+            # Need pressure in ghost cell based on copied densities
+            p_m_ghost, p_c_ghost = physics._calculate_pressure_cuda(
+                rho_m_phys, rho_c_phys, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+            )
+
+            d_U[1, right_ghost_idx] = v_m_ghost + p_m_ghost
+            d_U[3, right_ghost_idx] = v_c_ghost + p_c_ghost
+        elif right_type_code == 4: # Wall (Capped Reflection Boundary Condition)
+            last_phys_idx = n_phys + n_ghost - 1
+            # Get state from last physical cell
+            rho_m_phys = d_U[0, last_phys_idx]
+            w_m_phys   = d_U[1, last_phys_idx]
+            rho_c_phys = d_U[2, last_phys_idx]
+            w_c_phys   = d_U[3, last_phys_idx]
+
+            # Calculate pressure at physical cell state (using CUDA helper)
+            p_m_phys, p_c_phys = physics._calculate_pressure_cuda(
+                rho_m_phys, rho_c_phys, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+            )
+
+            # Calculate physical velocities (using CUDA helper)
+            v_m_phys, v_c_phys = physics._calculate_physical_velocity_cuda(
+                w_m_phys, w_c_phys, p_m_phys, p_c_phys
+            )
+
+            # --- Capping Logic ---
+            rho_cap = rho_jam * rho_cap_factor
+            rho_m_ghost_capped = min(rho_m_phys, rho_cap)
+            rho_c_ghost_capped = min(rho_c_phys, rho_cap)
+            # --- End Capping Logic ---
+
+            # Set ghost cell state (reflection using capped densities for pressure)
+            # Copy density (use capped for consistency, although original phys could also be argued)
+            d_U[0, right_ghost_idx] = rho_m_ghost_capped
+            d_U[2, right_ghost_idx] = rho_c_ghost_capped
+
+            # Set ghost velocity to negative of physical velocity
+            v_m_ghost = -v_m_phys
+            v_c_ghost = -v_c_phys
+
+            # Recalculate momentum density in ghost cell: w = v + P(rho_eff_capped)
+            # Need pressure in ghost cell based on CAPPED densities
+            p_m_ghost_capped, p_c_ghost_capped = physics._calculate_pressure_cuda(
+                rho_m_ghost_capped, rho_c_ghost_capped, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c
+            )
+
+            d_U[1, right_ghost_idx] = v_m_ghost + p_m_ghost_capped
+            d_U[3, right_ghost_idx] = v_c_ghost + p_c_ghost_capped
 
 # --- Main Function ---
 
@@ -140,7 +206,7 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
     left_type_str = left_bc.get('type', 'outflow').lower()
     right_type_str = right_bc.get('type', 'outflow').lower()
 
-    type_map = {'inflow': 0, 'outflow': 1, 'periodic': 2, 'wall': 3} # Added wall
+    type_map = {'inflow': 0, 'outflow': 1, 'periodic': 2, 'wall': 3, 'wall_capped_reflection': 4} # Added wall types
     left_type_code = type_map.get(left_type_str)
     right_type_code = type_map.get(right_type_str)
 
@@ -212,7 +278,9 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             # Pass pressure parameters needed by wall BC
             float64(params.alpha), float64(params.rho_jam), float64(params.epsilon),
             float64(params.K_m), float64(params.gamma_m),
-            float64(params.K_c), float64(params.gamma_c)
+            float64(params.K_c), float64(params.gamma_c),
+            # Pass rho_cap_factor (even if not used by all BCs yet)
+            float64(params.rho_cap_factor if hasattr(params, 'rho_cap_factor') else 0.99) # Default if not set
         )
         # No explicit sync needed here, subsequent kernels will sync
 
@@ -304,8 +372,51 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             # # -------------------------------------------------
             # --- DEBUG PRINT: CPU Right Wall (Commented out) ---
             # if params.device == 'cpu' and t_current < 61.0:
-            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
+            # print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
             # # ----------------------------------
+       elif right_type_code == 4: # Wall (Capped Reflection Boundary Condition)
+           last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
+           rho_m_phys = last_physical_cell_state[0]
+           w_m_phys   = last_physical_cell_state[1]
+           rho_c_phys = last_physical_cell_state[2]
+           w_c_phys   = last_physical_cell_state[3]
+
+           # Calculate pressure (CPU version)
+           p_m_phys, p_c_phys = physics.calculate_pressure(
+               rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
+               params.K_m, params.gamma_m, params.K_c, params.gamma_c
+           )
+
+           # Calculate physical velocities (CPU version)
+           v_m_phys, v_c_phys = physics.calculate_physical_velocity(
+               w_m_phys, w_c_phys, p_m_phys, p_c_phys
+           )
+
+           # --- Capping Logic ---
+           rho_cap_factor = getattr(params, 'rho_cap_factor', 0.99) # Get factor or default
+           rho_cap = params.rho_jam * rho_cap_factor
+           rho_m_ghost_capped = min(rho_m_phys, rho_cap)
+           rho_c_ghost_capped = min(rho_c_phys, rho_cap)
+           # --- End Capping Logic ---
+
+           # Set ghost cell state (reflection using capped densities for pressure)
+           # Copy density (use capped for consistency)
+           U[0, n_phys + n_ghost:] = rho_m_ghost_capped
+           U[2, n_phys + n_ghost:] = rho_c_ghost_capped
+
+           # Set ghost velocity to negative of physical velocity
+           v_m_ghost = -v_m_phys
+           v_c_ghost = -v_c_phys
+
+           # Recalculate momentum density in ghost cell: w = v + P(rho_eff_capped)
+           # Need pressure in ghost cell based on CAPPED densities
+           p_m_ghost_capped, p_c_ghost_capped = physics.calculate_pressure(
+               rho_m_ghost_capped, rho_c_ghost_capped, params.alpha, params.rho_jam, params.epsilon,
+               params.K_m, params.gamma_m, params.K_c, params.gamma_c
+           )
+
+           U[1, n_phys + n_ghost:] = v_m_ghost + p_m_ghost_capped
+           U[3, n_phys + n_ghost:] = v_c_ghost + p_c_ghost_capped
 
     # Note: No return value, U_or_d_U is modified in-place.
 
