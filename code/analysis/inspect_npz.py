@@ -142,6 +142,39 @@ def inspect_simulation_data(npz_path):
     print(f"Spatial points: {len(x_centers)} (from {x_centers[0]:.2f}m to {x_centers[-1]:.2f}m)")
     dx = x_centers[1] - x_centers[0] # Calculate dx for location finding
 
+    # --- Load rho_jam for comparison ---
+    rho_jam_veh_m = None
+    if params_key in data:
+        try:
+            params_dict = data[params_key].item()
+            if isinstance(params_dict, dict) and 'rho_jam_veh_km' in params_dict:
+                rho_jam_veh_km = params_dict['rho_jam_veh_km']
+                # Conversion factor (assuming KM_TO_M is 1000)
+                VEH_KM_TO_VEH_M = 1.0 / 1000.0
+                rho_jam_veh_m = rho_jam_veh_km * VEH_KM_TO_VEH_M
+                print(f"Loaded rho_jam = {rho_jam_veh_m:.4f} veh/m (from {rho_jam_veh_km} veh/km)")
+            else:
+                print(f"Warning: Could not find 'rho_jam_veh_km' in '{params_key}'.")
+        except Exception as e:
+            print(f"Warning: Error loading rho_jam from '{params_key}': {e}")
+    if rho_jam_veh_m is None:
+        print("Warning: Could not load rho_jam. Using default 0.25 veh/m for checks.")
+        rho_jam_veh_m = 0.25 # Default value if loading fails
+
+    # --- Maximum Density Check ---
+    max_rho_m = np.max(U_out[:, 0, :])
+    max_rho_c = np.max(U_out[:, 2, :])
+    print("\n--- Maximum Density Check ---")
+    print(f"Max rho_m observed: {max_rho_m:.4f} veh/m")
+    print(f"Max rho_c observed: {max_rho_c:.4f} veh/m")
+    print(f"Jam density (rho_jam): {rho_jam_veh_m:.4f} veh/m")
+    if max_rho_m > rho_jam_veh_m:
+        print(f"WARNING: Max rho_m ({max_rho_m:.4f}) exceeds rho_jam ({rho_jam_veh_m:.4f})!")
+    if max_rho_c > rho_jam_veh_m:
+        print(f"WARNING: Max rho_c ({max_rho_c:.4f}) exceeds rho_jam ({rho_jam_veh_m:.4f})!")
+    # ---------------------------
+
+
     # --- Points to inspect ---
     times_to_check = [30.0, 60.0] # Seconds
     # Locations relative to boundary (xmax = x_centers[-1] + dx/2)
