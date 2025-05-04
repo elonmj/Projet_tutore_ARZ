@@ -90,3 +90,44 @@ The key functional changes involved iterative refinement of the right 'wall' bou
 2. Second attempt: `w=0` (stable but physically inaccurate - no queue).
 3. Third attempt: Reflection boundary condition (unstable - CFL error).
 4. Fourth attempt: **Capped Reflection boundary condition** (stable - CFL error resolved, physical accuracy pending plot analysis).
+
+# Suite
+
+**Initial Problem:** The simulation for the red light scenario (`config/scenario_red_light.yml`) using the `wall_capped_reflection` boundary condition showed unrealistic behavior. The traffic density piled up excessively right at the boundary (x=1000m) during the red light phase (0-60s), but this high-density region (shockwave) did not propagate upstream into the incoming traffic as expected physically. Instead, the upstream traffic remained largely unaffected.
+
+**Hypotheses & Investigation Plan:** (`red_light_fix_plan.md`)
+1.  **Numerical Diffusion:** The first-order scheme might be too diffusive at N=200, smearing out the shock. -> **Test 1: Increase N to 400.**
+2.  **Weak Pressure:** The pressure term (controlled by K_m, K_c) might be too weak to propagate the disturbance upstream effectively. -> **Test 2: Increase K_m/K_c back to 10/15 km/h (original values before reduction).**
+3.  **Boundary Condition:** The `wall_capped_reflection` BC, while preventing instability, might be artificially preventing the shock formation/propagation. -> **Test 3: Revert to the original unstable `wall` BC.**
+4.  **Relaxation Time:** The relaxation times (`tau_m`, `tau_c`) might be too long, preventing the flow from quickly adjusting to the boundary and forming the shock. -> **Test 4: Significantly reduce `tau_m`/`tau_c`.**
+
+**Test Results:**
+
+*   **Test 1 (N=400, K=5/7.5, capped BC):**
+    *   Ran simulation with `config/scenario_red_light_N400.yml`.
+    *   Output: `results/red_light_test_N400/20250504_110835.npz`.
+    *   Analysis (`inspect_npz.py`): Density remained high only near the boundary; upstream densities stayed low at t=30s and t=60s.
+    *   **Conclusion:** Increasing resolution did NOT fix the issue.
+
+*   **Test 2 (N=200, K=10/15, capped BC):**
+    *   Ran simulation with `config/scenario_red_light_K10_15.yml`.
+    *   Output: `results/red_light_test_K10_15/20250504_113214.npz`.
+    *   Analysis (`inspect_npz.py`): Density became extremely high near the boundary, but upstream densities stayed low at t=30s and t=60s.
+    *   **Conclusion:** Increasing pressure did NOT fix the issue.
+
+*   **Test 3 (N=200, K=5/7.5, original 'wall' BC):**
+    *   Ran simulation with `config/scenario_red_light_original_wall.yml`.
+    *   Output: Simulation failed with CFL error (`max_abs_lambda` ~ 1.0e3 m/s) around t=16s.
+    *   **Conclusion:** The original `wall` BC is unstable with this model/scheme, confirming the need for the capped version.
+
+*   **Test 4 (N=200, K=5/7.5, capped BC, tau=0.1s):**
+    *   Ran simulation with `config/scenario_red_light_low_tau.yml`.
+    *   Output: `results/red_light_test_low_tau/20250504_115415.npz`.
+    *   Analysis (`inspect_npz.py`):
+        *   t=30s: High density near boundary AND 100m upstream; low density 200m upstream.
+        *   t=60s: High density near boundary, 100m upstream, AND 200m upstream.
+    *   **Conclusion:** Reducing relaxation times to 0.1s **successfully enabled shockwave propagation**.
+
+**Final Diagnosis:** The primary reason for the lack of shockwave propagation was the excessively long relaxation times (`tau_m=5.0s`, `tau_c=10.0s`) used in the original configuration. These long times prevented the flow variables (especially velocity) from adjusting quickly enough near the boundary to establish the conditions necessary for the shockwave to form and propagate upstream against the incoming flow, particularly when combined with the stabilizing `wall_capped_reflection` boundary condition. Reducing `tau` allows the system to react faster, leading to physically realistic shock propagation.
+
+**Resolution:** Use the configuration with reduced relaxation times (`tau_m_sec: 0.1`, `tau_c_sec: 0.1`) for realistic red light scenario simulations. The file `config/scenario_red_light_low_tau.yml` represents this working configuration.
