@@ -374,49 +374,49 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             # if params.device == 'cpu' and t_current < 61.0:
             # print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
             # # ----------------------------------
-       elif right_type_code == 4: # Wall (Capped Reflection Boundary Condition)
-           last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
-           rho_m_phys = last_physical_cell_state[0]
-           w_m_phys   = last_physical_cell_state[1]
-           rho_c_phys = last_physical_cell_state[2]
-           w_c_phys   = last_physical_cell_state[3]
+        elif right_type_code == 4: # Wall (Capped Reflection Boundary Condition)
+            last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
+            rho_m_phys = last_physical_cell_state[0]
+            w_m_phys   = last_physical_cell_state[1]
+            rho_c_phys = last_physical_cell_state[2]
+            w_c_phys   = last_physical_cell_state[3]
 
-           # Calculate pressure (CPU version)
-           p_m_phys, p_c_phys = physics.calculate_pressure(
-               rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
-               params.K_m, params.gamma_m, params.K_c, params.gamma_c
-           )
+            # Calculate pressure (CPU version)
+            p_m_phys, p_c_phys = physics.calculate_pressure(
+                rho_m_phys, rho_c_phys, params.alpha, params.rho_jam, params.epsilon,
+                params.K_m, params.gamma_m, params.K_c, params.gamma_c
+            )
 
-           # Calculate physical velocities (CPU version)
-           v_m_phys, v_c_phys = physics.calculate_physical_velocity(
-               w_m_phys, w_c_phys, p_m_phys, p_c_phys
-           )
+            # Calculate physical velocities (CPU version)
+            v_m_phys, v_c_phys = physics.calculate_physical_velocity(
+                w_m_phys, w_c_phys, p_m_phys, p_c_phys
+            )
 
-           # --- Capping Logic ---
-           rho_cap_factor = getattr(params, 'rho_cap_factor', 0.99) # Get factor or default
-           rho_cap = params.rho_jam * rho_cap_factor
-           rho_m_ghost_capped = min(rho_m_phys, rho_cap)
-           rho_c_ghost_capped = min(rho_c_phys, rho_cap)
-           # --- End Capping Logic ---
+            # --- Capping Logic ---
+            rho_cap_factor = getattr(params, 'rho_cap_factor', 0.99) # Get factor or default
+            rho_cap = params.rho_jam * rho_cap_factor
+            rho_m_ghost_capped = min(rho_m_phys, rho_cap)
+            rho_c_ghost_capped = min(rho_c_phys, rho_cap)
+            # --- End Capping Logic ---
 
-           # Set ghost cell state (reflection using capped densities for pressure)
-           # Copy density (use capped for consistency)
-           U[0, n_phys + n_ghost:] = rho_m_ghost_capped
-           U[2, n_phys + n_ghost:] = rho_c_ghost_capped
+            # Set ghost cell state (reflection using capped densities for pressure)
+            # Copy density (use capped for consistency)
+            U[0, n_phys + n_ghost:] = rho_m_ghost_capped
+            U[2, n_phys + n_ghost:] = rho_c_ghost_capped
 
-           # Set ghost velocity to negative of physical velocity
-           v_m_ghost = -v_m_phys
-           v_c_ghost = -v_c_phys
+            # Set ghost velocity to negative of physical velocity
+            v_m_ghost = -v_m_phys
+            v_c_ghost = -v_c_phys
 
-           # Recalculate momentum density in ghost cell: w = v + P(rho_eff_capped)
-           # Need pressure in ghost cell based on CAPPED densities
-           p_m_ghost_capped, p_c_ghost_capped = physics.calculate_pressure(
-               rho_m_ghost_capped, rho_c_ghost_capped, params.alpha, params.rho_jam, params.epsilon,
-               params.K_m, params.gamma_m, params.K_c, params.gamma_c
-           )
+            # Recalculate momentum density in ghost cell: w = v + P(rho_eff_capped)
+            # Need pressure in ghost cell based on CAPPED densities
+            p_m_ghost_capped, p_c_ghost_capped = physics.calculate_pressure(
+                rho_m_ghost_capped, rho_c_ghost_capped, params.alpha, params.rho_jam, params.epsilon,
+                params.K_m, params.gamma_m, params.K_c, params.gamma_c
+            )
 
-           U[1, n_phys + n_ghost:] = v_m_ghost + p_m_ghost_capped
-           U[3, n_phys + n_ghost:] = v_c_ghost + p_c_ghost_capped
+            U[1, n_phys + n_ghost:] = v_m_ghost + p_m_ghost_capped
+            U[3, n_phys + n_ghost:] = v_c_ghost + p_c_ghost_capped
 
     # Note: No return value, U_or_d_U is modified in-place.
 
