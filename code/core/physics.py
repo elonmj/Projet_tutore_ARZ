@@ -55,9 +55,9 @@ def calculate_pressure(rho_m: np.ndarray, rho_c: np.ndarray,
     rho_total = rho_m + rho_c
 
     # Avoid division by zero or issues near rho_jam
-    # Calculate normalized densities, ensuring they don't exceed 1
-    norm_rho_eff_m = np.minimum(rho_eff_m / rho_jam, 1.0 - epsilon)
-    norm_rho_total = np.minimum(rho_total / rho_jam, 1.0 - epsilon)
+    # Calculate normalized densities.
+    norm_rho_eff_m = rho_eff_m / rho_jam
+    norm_rho_total = rho_total / rho_jam
 
     # Ensure base of power is non-negative
     norm_rho_eff_m = np.maximum(norm_rho_eff_m, 0.0)
@@ -87,9 +87,9 @@ def _calculate_pressure_cuda(rho_m_i, rho_c_i, alpha, rho_jam, epsilon, K_m, gam
     rho_eff_m_i = rho_m_i + alpha * rho_c_i
     rho_total_i = rho_m_i + rho_c_i
 
-    # Avoid division by zero or issues near rho_jam
-    norm_rho_eff_m_i = min(rho_eff_m_i / rho_jam, 1.0 - epsilon)
-    norm_rho_total_i = min(rho_total_i / rho_jam, 1.0 - epsilon)
+    # Calculate normalized densities.
+    norm_rho_eff_m_i = rho_eff_m_i / rho_jam
+    norm_rho_total_i = rho_total_i / rho_jam
 
     # Ensure base of power is non-negative
     norm_rho_eff_m_i = max(norm_rho_eff_m_i, 0.0)
@@ -285,8 +285,8 @@ def _calculate_pressure_derivative(rho_val, K, gamma, rho_jam, epsilon):
     if rho_val <= epsilon:
         return 0.0 # Derivative is zero at zero density
 
-    # Ensure normalized density is slightly less than 1 for calculation
-    norm_rho = min(rho_val / rho_jam, 1.0 - epsilon)
+    # Calculate normalized density (without capping)
+    norm_rho = rho_val / rho_jam
     # Derivative of K * (x/rho_jam)^gamma = K * gamma * x^(gamma-1) / rho_jam^gamma
     derivative = K * gamma * (norm_rho**(gamma - 1.0)) / rho_jam
     return max(derivative, 0.0) # Ensure non-negative derivative
@@ -344,8 +344,8 @@ def _calculate_pressure_derivative_cuda(rho_val, K, gamma, rho_jam, epsilon):
     if rho_val <= epsilon:
         return 0.0 # Derivative is zero at zero density
 
-    # Ensure normalized density is slightly less than 1 for calculation
-    norm_rho = min(rho_val / rho_jam, 1.0 - epsilon)
+    # Calculate normalized density (without capping)
+    norm_rho = rho_val / rho_jam
     # Derivative of K * (x/rho_jam)^gamma = K * gamma * x^(gamma-1) / rho_jam^gamma
     # Use math.pow for CUDA device code
     derivative = K * gamma * (math.pow(norm_rho, gamma - 1.0)) / rho_jam
