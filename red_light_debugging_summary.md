@@ -61,3 +61,32 @@ The key functional changes involved iterative refinement of the right 'wall' bou
 3. Third attempt: **Reflection boundary condition** (`rho_ghost = rho_phys`, `v_ghost = -v_phys`, recalculate `w_ghost`) (also unstable - CFL error).
 
 Debug prints were added and subsequently commented out in both files. The underlying instability causing the CFL error with wall-like boundary conditions remains unresolved.
+6.  **Fourth Attempt: Capped Reflection Boundary Condition:**
+    *   **Problem:** The standard reflection boundary condition (Attempt 3) was unstable due to non-physical densities (`rho >> rho_jam`) near the boundary causing exploding pressure derivatives (`P'`) and characteristic speeds (`lambda`), leading to CFL violation.
+    *   **Hypothesis:** Prevent the instability by capping the density used in the ghost cell calculation, specifically for the pressure term `P(rho_ghost)`, at or near `rho_jam`. This avoids evaluating pressure at non-physical densities while retaining the core reflection idea (`v_ghost = -v_phys`).
+    *   **Modification 1 (Code Consistency):** Ensured the 'wall' type (code 3) consistently used the standard (unstable) reflection logic in both CPU and GPU implementations in `code/numerics/boundary_conditions.py`.
+    *   **Modification 2 (New BC Type):** Added a new boundary condition type `wall_capped_reflection` (mapped to code 4) in `code/numerics/boundary_conditions.py`.
+    *   **Modification 3 (Capped Logic):** Implemented the logic for `wall_capped_reflection` in both CPU and GPU sections:
+        *   Retrieve physical state (`rho_phys`, `v_phys`).
+        *   Define a density cap: `rho_cap = rho_jam * rho_cap_factor` (using `rho_cap_factor = 0.99` by default).
+        *   Calculate capped ghost densities: `rho_ghost_capped = min(rho_phys, rho_cap)`.
+        *   Set ghost velocities: `v_ghost = -v_phys`.
+        *   Calculate ghost momenta `w_ghost = v_ghost + P(rho_ghost_capped)` using the *capped* densities for the pressure calculation.
+    *   **Modification 4 (Configuration):** Updated `config/scenario_red_light.yml` to use `type: wall_capped_reflection` for the right boundary during the 0-60s interval.
+    *   **Result:** The simulation for the `red_light` scenario now runs to completion (t=180s) without CFL errors. The numerical instability has been resolved.
+    *   **Next Step:** Analyze the generated plots to verify if this stable boundary condition produces the expected physical behavior (i.e., formation of a realistic traffic queue).
+
+## Summary of Code Changes (Updated)
+
+The primary code changes were in `code/numerics/boundary_conditions.py` to:
+1.  Make the 'wall' (code 3) BC consistently use reflection logic.
+2.  Add and implement the new `wall_capped_reflection` (code 4) BC logic for both CPU and GPU.
+3.  Update the `type_map` and kernel arguments.
+
+The `config/scenario_red_light.yml` was updated to use `wall_capped_reflection`.
+
+The key functional changes involved iterative refinement of the right 'wall' boundary condition:
+1. Initial attempt: `w=p` (unstable - CFL error).
+2. Second attempt: `w=0` (stable but physically inaccurate - no queue).
+3. Third attempt: Reflection boundary condition (unstable - CFL error).
+4. Fourth attempt: **Capped Reflection boundary condition** (stable - CFL error resolved, physical accuracy pending plot analysis).

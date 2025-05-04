@@ -1,0 +1,12 @@
+# Configuration for the "Red Light / Congestion" scenario with N=400
+# Test 1: Assess Numerical Diffusion
+
+scenario_name: red_light_test_N400 # Unique name for output
+
+# Inherit everything from the standard red_light scenario
+inherits: config/scenario_red_light.yml
+
+# Override only the grid size
+grid:
+  N: 400
+  # xmin, xmax, num_ghost_cells will be inherited
