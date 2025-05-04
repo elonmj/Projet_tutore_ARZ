@@ -1,0 +1,49 @@
+# Configuration for the "Red Light / Congestion" scenario with K=10/15 km/h
+# Test 2: Assess Pressure Parameter Influence
+# Inherits only from base, includes all other settings explicitly.
+
+scenario_name: red_light_test_K10_15 # Unique name for output
+
+# Inherit base parameters (alpha, rho_jam, gammas, taus, Vmax, etc.)
+inherits: config/config_base.yml
+
+# Explicitly define sections usually from scenario_red_light.yml
+grid:
+  N: 200            # N=200 for this test
+  xmin: 0.0
+  xmax: 1000.0      # meters
+  # num_ghost_cells should be inherited from base
+
+road:
+  quality_type: uniform
+  quality_value: 1 # Good quality road
+
+initial_conditions:
+  type: uniform_equilibrium
+  # Densities in veh/km (will be converted internally)
+  rho_m: 100.0       # 75% motorcycles
+  rho_c: 33.33      # 25% cars (approx) -> Total ~133.33 veh/km
+  R_val: 1          # Equilibrium calculated for R=1
+
+boundary_conditions:
+  left:
+    type: inflow
+    # State will be automatically populated by the runner from the
+    # calculated initial equilibrium state.
+    state: null # Placeholder, runner will overwrite if IC is uniform_equilibrium
+  right:
+    type: time_dependent
+    # Schedule: [t_start_sec, t_end_sec, type_str, state_list_or_None]
+    schedule:
+      - [0.0, 60.0, 'wall_capped_reflection'] # Use the capped BC
+      - [60.0, 1.0e9, 'outflow'] # Green light phase (60s onwards)
+
+simulation:
+  t_final_sec: 180.0 # Simulate for 3 minutes
+  output_dt_sec: 1.0 # Output every second
+
+# Override the pressure parameters from base
+pressure:
+  K_m_kmh: 10.0 # km/h (Original higher value)
+  K_c_kmh: 15.0 # km/h (Original higher value)
+  # gamma_m, gamma_c will be inherited from base if not specified here
