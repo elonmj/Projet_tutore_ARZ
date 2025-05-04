@@ -3,10 +3,40 @@
 
 scenario_name: red_light_test_N400 # Unique name for output
 
-# Inherit everything from the standard red_light scenario
-inherits: config/scenario_red_light.yml
+# Base parameters are still inherited from config_base.yml
+inherits: config/config_base.yml
 
-# Override only the grid size
+# Explicitly define all other sections, overriding N in grid
 grid:
-  N: 400
-  # xmin, xmax, num_ghost_cells will be inherited
+  N: 400            # Overridden value
+  xmin: 0.0
+  xmax: 1000.0      # meters
+  # num_ghost_cells should be inherited from base
+
+road:
+  quality_type: uniform
+  quality_value: 1 # Good quality road
+
+initial_conditions:
+  type: uniform_equilibrium
+  # Densities in veh/km (will be converted internally)
+  rho_m: 100.0       # 75% motorcycles
+  rho_c: 33.33      # 25% cars (approx) -> Total ~133.33 veh/km
+  R_val: 1          # Equilibrium calculated for R=1
+
+boundary_conditions:
+  left:
+    type: inflow
+    # State will be automatically populated by the runner from the
+    # calculated initial equilibrium state.
+    state: null # Placeholder, runner will overwrite if IC is uniform_equilibrium
+  right:
+    type: time_dependent
+    # Schedule: [t_start_sec, t_end_sec, type_str, state_list_or_None]
+    schedule:
+      - [0.0, 60.0, 'wall_capped_reflection'] # Use the capped BC
+      - [60.0, 1.0e9, 'outflow'] # Green light phase (60s onwards)
+
+simulation:
+  t_final_sec: 180.0 # Simulate for 3 minutes
+  output_dt_sec: 1.0 # Output every second

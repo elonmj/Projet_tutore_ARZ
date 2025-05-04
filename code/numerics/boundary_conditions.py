@@ -428,10 +428,10 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
 #     N_total = N_phys + 2 * n_ghost
 #     dummy_grid = Grid1D(N=N_phys, xmin=0, xmax=100, num_ghost_cells=n_ghost)
 #     dummy_params = ModelParameters() # Need to load or set boundary_conditions
-# --- DEBUG PRINT: CPU Right Wall ---
-            if params.device == 'cpu' and params.t_current < 61.0:
-                 print(f"DEBUG CPU BC @ t={params.t_current:.4f} (Right Wall): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
-            # ----------------------------------
+# --- DEBUG PRINT: CPU Right Wall (Commented Out) ---
+            # if params.device == 'cpu' and t_current < 61.0: # Use t_current variable, not params.t_current
+            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
+            # # ----------------------------------
 #
 #     # --- Test Case 1: Inflow Left, Outflow Right ---
 #     print("--- Test Case 1: Inflow Left, Outflow Right ---")
