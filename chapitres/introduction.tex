@@ -37,7 +37,7 @@ Face à la complexité du trafic béninois, les modèles macroscopiques classiqu
     \item Elles négligent l'\textbf{impact de la qualité variable de l'infrastructure} sur le comportement du flux.
 \end{itemize}
 
-Pour surmonter ces limitations, les modèles macroscopiques de **second ordre** ont été développés. Ils introduisent une équation dynamique supplémentaire, typiquement pour la vitesse, permettant de modéliser l'inertie du flux et les états hors équilibre \cite{GrokRevMotivation}. Parmi eux, le modèle **Aw-Rascle-Zhang (ARZ)** \cite{AwRascle2000, Zhang2002} se distingue par ses propriétés mathématiques avantageuses et sa capacité à représenter de manière plus réaliste la dynamique du trafic \cite{MITMathematicsTraffic}. Ses principaux atouts incluent :
+Pour surmonter ces limitations, les modèles macroscopiques de **second ordre** ont été développés. Ils introduisent une équation dynamique supplémentaire, typiquement pour la vitesse, permettant de modéliser l'inertie du flux et les états hors équilibre. Parmi eux, le modèle **Aw-Rascle-Zhang (ARZ)** \cite{AwKlarMaterneRascle2000, Zhang2002} se distingue par ses propriétés mathématiques avantageuses et sa capacité à représenter de manière plus réaliste la dynamique du trafic \cite{MITMathematicsTraffic}. Ses principaux atouts incluent :
 \begin{itemize}
     \item Le respect de l'\textbf{anisotropie} (les conducteurs réagissent à ce qui se passe devant eux).
     \item La capacité à modéliser l'\textbf{hystérésis} et les \textbf{oscillations stop-and-go}.
@@ -61,7 +61,6 @@ Pour atteindre ce but, les \textbf{objectifs spécifiques} suivants sont défini
     \item Développer et implémenter une méthode numérique robuste (basée sur les volumes finis) pour résoudre le système d'équations aux dérivées partielles du modèle ARZ étendu.
     \item Calibrer les paramètres du modèle en utilisant des données de trafic réelles ou réalistes représentatives du contexte béninois.
     \item Valider le modèle étendu en vérifiant ses propriétés numériques et sa capacité à reproduire qualitativement et quantitativement les phénomènes de trafic observés au Bénin.
-    \item Comparer les performances du modèle ARZ étendu avec celles d'une extension similaire basée sur le modèle LWR pour évaluer les avantages de l'approche de second ordre.
     \item Analyser les résultats des simulations pour mieux comprendre la dynamique du trafic au Bénin et évaluer la sensibilité du modèle à ses paramètres clés.
 \end{enumerate}
 
@@ -74,7 +73,6 @@ Cette étude cherche à répondre aux questions de recherche suivantes :
     \item Comment le cadre théorique du modèle ARZ peut-il être étendu de manière cohérente pour intégrer l'hétérogénéité extrême du trafic béninois et les comportements spécifiques observés des motocyclettes (gap-filling, interweaving, creeping) ?
     \item Quelles paramétrisations des fonctions clés du modèle ARZ (vitesse d'équilibre, fonction de pression, temps de relaxation) permettent de refléter l'influence de la qualité variable de l'infrastructure routière au Bénin ?
     \item Quelle méthode numérique basée sur les volumes finis est la plus appropriée pour résoudre le système ARZ multi-classes étendu, en garantissant la stabilité et la précision ?
-    \item Dans quelle mesure le modèle ARZ étendu et calibré parvient-il à reproduire quantitativement et qualitativement les dynamiques de trafic observées au Bénin, et comment ses performances se comparent-elles à celles d'un modèle LWR étendu ?
 \end{enumerate}
 
 % Section 1.5: Significance and Scope
@@ -98,13 +96,13 @@ Ce mémoire est structuré de manière à guider le lecteur depuis les concepts 
 
     \item Le \textbf{Chapitre \ref{chap:specificites_benin}} décrit en détail les caractéristiques spécifiques du contexte béninois : contexte socio-économique, infrastructure routière, composition du parc de véhicules, et analyse qualitative des comportements de trafic observés, notamment ceux des motos. Il discute également de la disponibilité et des limitations des données locales.
 
-    \item Le \textbf{Chapitre \ref{chap:formulation_modele_arz}} développe la formulation mathématique de l'extension multi-classes du modèle ARZ proposée pour le Bénin. Il détaille l'intégration des effets de l'infrastructure et des termes spécifiques modélisant le gap-filling, l'interweaving et le creeping des motos.
+    \item Le \textbf{Chapitre \ref{chap:formulation_modele}} développe la formulation mathématique de l'extension multi-classes du modèle ARZ proposée pour le Bénin. Il détaille l'intégration des effets de l'infrastructure et des termes spécifiques modélisant le gap-filling, l'interweaving et le creeping des motos.
 
     \item Le \textbf{Chapitre \ref{chap:analyse_numerique}} aborde l'analyse mathématique préliminaire du modèle étendu (propriétés hyperboliques) et présente en détail le schéma numérique basé sur les volumes finis choisi pour sa résolution, y compris le traitement des termes sources et des conditions aux limites.
 
-    \item Le \textbf{Chapitre \ref{chap:resultats}} expose les résultats de la calibration des paramètres du modèle, sa validation numérique et phénoménologique à travers divers scénarios de simulation. Il inclut une comparaison quantitative et qualitative avec un modèle LWR étendu et une analyse de sensibilité.
+    \item Le \textbf{Chapitre \ref{chap:simulations_analyse}} expose les résultats de la calibration des paramètres du modèle, sa validation numérique et phénoménologique à travers divers scénarios de simulation. Il inclut une analyse de sensibilité.
 
-    \item Le \textbf{Chapitre \ref{chap:discussion}} interprète les résultats obtenus, évalue les performances (forces et limites) du modèle ARZ étendu dans le contexte béninois, discute de sa pertinence par rapport au modèle LWR, et explore les implications potentielles pour la gestion du trafic au Bénin ainsi que les pistes pour de futures recherches.
+    \item Le \textbf{Chapitre \ref{chap:discussion}} interprète les résultats obtenus, évalue les performances (forces et limites) du modèle ARZ étendu dans le contexte béninois, et explore les implications potentielles pour la gestion du trafic au Bénin ainsi que les pistes pour de futures recherches.
 
     \item Le \textbf{Chapitre \ref{chap:conclusion}} résume les travaux effectués, rappelle les principales conclusions et contributions du travail, reconnaît ses limitations et offre des remarques finales.
 \end{itemize}

@@ -139,24 +139,3 @@ class Grid1D:
         return (f"Grid1D(N={self.N_physical}, xmin={self.xmin}, xmax={self.xmax}, "
                 f"dx={self.dx:.4f}, ghost={self.num_ghost_cells}, "
                 f"N_total={self.N_total}, R loaded={'Yes' if self.road_quality is not None else 'No'})")
-
-# Example Usage
-# if __name__ == '__main__':
-#     try:
-#         grid = Grid1D(N=10, xmin=0.0, xmax=100.0, num_ghost_cells=2)
-#         print(grid)
-#         print("Physical Cell Centers:", grid.cell_centers(include_ghost=False))
-#         print("Total Cell Centers:", grid.cell_centers(include_ghost=True))
-#         print("Physical Interfaces:", grid.cell_interfaces(include_ghost=False))
-#         print("Total Interfaces:", grid.cell_interfaces(include_ghost=True))
-#
-#         # Example loading road quality
-#         road_q = np.random.randint(1, 4, size=grid.N_physical)
-#         grid.load_road_quality(road_q)
-#         print(grid)
-#         print("Road Quality for cell 5:", grid.get_road_quality_for_cell(5))
-#
-#     except ValueError as e:
-#         print(f"Error creating grid: {e}")
-#     except IndexError as e:
-#         print(f"Error accessing grid data: {e}")

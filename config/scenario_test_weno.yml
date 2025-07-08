@@ -1,0 +1,37 @@
+# Test WENO: Configuration de base modifiée pour WENO5 + SSP-RK3
+
+# Hérite de config_base.yml mais force les schémas WENO
+spatial_scheme: 'weno5'
+time_scheme: 'ssprk3'
+ghost_cells: 3  # Requis pour WENO5
+
+# Paramètres de test
+scenario_name: test_weno_integration
+
+# Grid Parameters
+N: 50          # Grille petite pour test rapide
+xmin: 0.0
+xmax: 5.0      # Domaine court
+
+# Simulation Time Parameters (SI units: s)
+t_final: 0.1   # Très court pour test de base
+output_dt: 0.01
+
+# Initial Conditions - État uniforme simple
+initial_conditions:
+  type: uniform_equilibrium
+  rho_m: 30.0   # 30 veh/km
+  rho_c: 20.0   # 20 veh/km
+  R_val: 3      # Route résidentielle
+
+# Road Quality Definition
+road_quality:
+  type: uniform
+  R_uniform: 3
+
+# Boundary Conditions
+boundary_conditions:
+  left:
+    type: periodic
+  right:
+    type: periodic

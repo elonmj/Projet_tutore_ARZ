@@ -166,10 +166,6 @@ class SimulationRunner:
                 # Decide how to handle this - maybe disable the check?
                 self.mass_check_config = None # Disable check if initial calc fails
 
-        # --- Mass Conservation Check Initialization (uses CPU data) ---
-        # (Moved _initialize_boundary_conditions call earlier)
-
-
     def _load_road_quality(self):
         """ Loads road quality data based on the definition in params. """
         # Check if 'road' config exists and is a dictionary
@@ -585,51 +581,3 @@ class SimulationRunner:
                     print(f"Error saving mass conservation data: {e}")
 
         return self.times, self.states
-
-# Example Usage (for testing purposes)
-# if __name__ == '__main__':
-#     # Create a dummy scenario config file
-#     scenario_dict = {
-#         'scenario_name': 'test_run',
-#         'N': 50,
-#         'xmin': 0.0,
-#         'xmax': 1000.0,
-#         't_final': 10.0, # seconds
-#         'output_dt': 1.0, # seconds
-#         'road_quality_definition': 3, # Uniform road quality 3
-#         'initial_conditions': {
-#             'type': 'riemann',
-#             'U_L': [20/1000, 25, 10/1000, 22], # rho_m, w_m, rho_c, w_c (SI units)
-#             'U_R': [80/1000, 8, 40/1000, 6],
-#             'split_pos': 500.0
-#         },
-#         'boundary_conditions': {
-#             'left': {'type': 'inflow', 'state': [20/1000, 25, 10/1000, 22]},
-#             'right': {'type': 'outflow'}
-#         }
-#     }
-#     scenario_file = 'config/scenario_test_runner.yml'
-#     base_file = 'config/config_base.yml' # Assumes this exists
-#     os.makedirs('config', exist_ok=True)
-#     with open(scenario_file, 'w') as f:
-#         yaml.dump(scenario_dict, f)
-#
-#     try:
-#         runner = SimulationRunner(scenario_config_path=scenario_file, base_config_path=base_file)
-#         times, states = runner.run()
-#
-#         print(f"\nSimulation completed. Stored {len(times)} time points.")
-#         print(f"Final time: {times[-1]:.4f}")
-#         print(f"Final state shape (physical): {states[-1].shape}")
-#
-#         # Clean up dummy file
-#         # os.remove(scenario_file)
-#
-#     except FileNotFoundError as e:
-#         print(f"Error: Missing configuration file: {e}")
-#     except ValueError as e:
-#         print(f"Error during simulation setup or run: {e}")
-#     except Exception as e:
-#         print(f"An unexpected error occurred: {e}")
-#         import traceback
-#         traceback.print_exc()

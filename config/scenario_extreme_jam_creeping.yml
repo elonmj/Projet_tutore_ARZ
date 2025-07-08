@@ -1,0 +1,43 @@
+# Configuration for the "Extreme Jam (Creeping)" scenario
+# Tests the V_creeping effect: v_m > 0 when v_c ~ 0 at very high density
+
+scenario_name: extreme_jam_creeping_test
+
+# Inherit base parameters
+inherits: config/config_base.yml
+
+grid:
+  N: 200
+  xmin: 0.0
+  xmax: 1000.0      # meters
+
+road:
+  quality_type: uniform
+  quality_value: 3    # Local roads (R=3) - lower speeds to enhance congestion
+
+initial_conditions:
+  type: uniform_equilibrium
+  # Very high densities to approach jamming (rho_jam = 250 veh/km)
+  rho_m: 180.0       # 75% motorcycles at very high density
+  rho_c: 60.0        # 25% cars - Total = 240 veh/km (96% of rho_jam)
+  R_val: 3           # Equilibrium calculated for R=3 (local roads)
+
+boundary_conditions:
+  left:
+    type: inflow
+    # State will be calculated from initial equilibrium
+    state: null       # Will be populated by runner
+  right:
+    type: wall_capped_reflection  # Complete blockage to maintain extreme jam
+
+simulation:
+  t_final_sec: 300.0  # 5 minutes to observe steady-state creeping behavior
+  output_dt_sec: 2.0  # Output every 2 seconds
+
+# Override relaxation times to be short for responsive behavior
+relaxation:
+  tau_m_sec: 0.5      # Short for motos (responsive)
+  tau_c_sec: 1.0      # Slightly longer for cars
+
+# Override CFL for stability with high density
+cfl_number: 0.3       # Conservative for extreme density scenario

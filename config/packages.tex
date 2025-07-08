@@ -6,11 +6,11 @@
 
 % --- Language and Babel ---
 \usepackage[english,french,shorthands=off]{babel} % Support for French and English, disable French shorthands to avoid conflicts
-\usepackage{csquotes}               % Context-sensitive quotation marks (recommended with biblatex)
+% \usepackage{csquotes}               % Context-sensitive quotation marks (recommended with biblatex)
 
 % --- Mathematics ---
 \usepackage{amsmath}                % AMS math enhancements
-\usepackage{amssymb}                % AMS symbols
+% \usepackage{amssymb}                % AMS symbols
 % \usepackage{amsthm}                 % Theorem environments (Replaced by ntheorem)
 \usepackage{mathtools}              % Further math enhancements (e.g., \coloneqq)
 \usepackage{bm}                     % Bold math symbols (\bm{})
@@ -28,13 +28,13 @@
 \usepackage{fancyhdr}               % Custom headers and footers (configured in layout.tex)
 \usepackage{enumitem}               % Customize lists (configured in typography.tex)
 \usepackage[framemethod=TikZ]{mdframed} % Framed boxes, needed for ntheorem style
-\usepackage[amsmath,thmmarks,hyperref]{ntheorem} % Theorem environments (configured in theorems.tex) - amsmath needed for compatibility
 \usepackage{etoolbox}               % Programming tools (used for spacing around environments)
+\usepackage[amsmath,thmmarks,hyperref]{ntheorem} % Theorem environments (configured in theorems.tex) - amsmath needed for compatibility
 
 % --- References and Links ---
 \usepackage[
     backend=biber,              % Use biber backend (more powerful than bibtex)
-    style=alphabetic,              % Citation style (e.g., numeric, authoryear, alphabetic) - Choose based on requirements
+    style=numeric,              % Citation style (e.g., numeric, authoryear, alphabetic) - Choose based on requirements
     sorting=ynt,                % Sorting order (year,name, title)
     citestyle=alphabetic,     % Compact numeric citations (e.g., [1-3])
     maxbibnames=99,             % Show all authors in bibliography
@@ -42,6 +42,20 @@
     giveninits=true,            % Use initials for given names
     uniquename=init            % Disambiguate authors with same last name using initials
 ]{biblatex}                 % Modern bibliography management
+
+
+
+% --- References and Links ---
+% \usepackage[
+%     backend=biber,              % Use biber backend (more powerful than bibtex)
+%     style=numeric,              % Citation style (e.g., numeric, authoryear, alphabetic)
+%     sorting=ydnt,               % Sorting order (name, year, title)
+%     citestyle=authoryear,       % Compact numeric citations (e.g., [1-3])
+%     maxbibnames=99,             % Show all authors in bibliography
+%     maxcitenames=2,             % Show max 2 authors in citation before using 'et al.'
+%     giveninits=true,            % Use initials for given names
+%     uniquename=init             % Disambiguate authors with same last name using initials
+% ]{biblatex}                     % Modern bibliography management
 \usepackage[colorlinks=true, linkcolor=blue, citecolor=green, urlcolor=magenta]{hyperref} % Clickable links and references
 \usepackage[capitalise,noabbrev]{cleveref} % Smarter cross-referencing (\cref{}, \Cref{}) - Must be loaded AFTER hyperref and ntheorem
 
@@ -51,16 +65,16 @@
 \pgfplotsset{ % Apply style from benintraffic.sty
     compat=newest,
     every axis/.append style={
-        line width=0.5pt,
-        tick style={color=midgray, line width=0.5pt} % midgray needs to be defined in colors.tex
-    }
+            line width=0.5pt,
+            tick style={color=midgray, line width=0.5pt} % midgray needs to be defined in colors.tex
+        }
 }
 \usetikzlibrary{arrows.meta}      % For newer arrow tip styles if needed
 
 % --- Utilities ---
-\usepackage{lipsum}                 % Generate dummy text (for testing layout)
-\usepackage{todonotes}              % Add TODO notes in the margin
-\usepackage{import}                 % Allows importing files from other directories (\subimport, \import)
+% \usepackage{lipsum}                 % Generate dummy text (for testing layout)
+% \usepackage{todonotes}              % Add TODO notes in the margin
+% \usepackage{import}                 % Allows importing files from other directories (\subimport, \import)
 
 % --- Glossary ---
 

@@ -1,0 +1,82 @@
+\chapter{Discussion et Perspectives}
+\label{chap:discussion}
+
+Ce chapitre discute les principaux résultats obtenus de la modélisation et des simulations numériques du trafic routier au Bénin à l'aide du modèle ARZ multi-classes étendu. Nous interprétons les observations à la lumière des caractéristiques spécifiques du trafic local, particulièrement la prédominance des Zémidjans et l'hétérogénéité des infrastructures. Nous évaluons ensuite les forces et faiblesses du modèle développé dans son état actuel, justifions le choix de l'approche ARZ par rapport aux modèles de premier ordre, et esquissons les implications potentielles pour la gestion du trafic au Bénin ainsi que les directions pour de futures recherches.
+
+\section{Interprétation des Résultats : Dynamique du Trafic Béninois selon le Modèle ARZ}
+\label{sec:interpretation_resultats}
+
+L'application du modèle ARZ étendu, bien que basée sur des paramètres estimés faute de données de calibration locales, a permis de révéler et de reproduire qualitativement plusieurs aspects fondamentaux de la dynamique du trafic observée au Bénin :
+
+\begin{itemize}
+    \item \textbf{Impact Fort de l'Infrastructure Hétérogène et Avantage Moto :} La simulation du scénario "Route Dégradée" (Section \ref{subsubsec:scenario_degraded_road}) a clairement validé l'hypothèse d'un impact différentiel de la qualité de la chaussée (\(R(x)\)) sur les différentes classes de véhicules. Conformément aux observations terrain au Bénin où les Zémidjans naviguent plus aisément sur des voies dégradées, le modèle prédit une chute de vitesse (\(v_i\)) nettement plus importante pour les voitures (\(c\)) que pour les motos (\(m\)) lors du passage sur une section de type piste (R=4). Cette différence est directement liée à la paramétrisation distincte de \(V_{max,m}(R)\) et \(V_{max,c}(R)\). La formation d'une onde de choc stable à la transition R=1 \(\to\) R=4 souligne également comment les discontinuités fréquentes dans l'état du réseau béninois peuvent agir comme des goulots d'étranglement localisés, générant des congestions même en l'absence de demande excessive.
+    \item \textbf{Rôle Structurant des Comportements Moto en Congestion :} Le scénario "Feu Rouge / Congestion" (Section \ref{subsubsec:scenario_red_light}) a mis en évidence le rôle déterminant des comportements spécifiques des motos dans la dynamique de file d'attente. Lorsque le trafic est bloqué (0-60s), le modèle reproduit le phénomène de \textit{creeping} : les voitures sont quasiment à l'arrêt (\(v_c \approx 0\)), tandis que les motos maintiennent une faible vitesse résiduelle (\(v_m \approx V_{creeping} = 5\) km/h). Cette capacité, omniprésente dans les embouteillages de Cotonou, est rendue possible dans le modèle par la combinaison de \(V_{creeping} > 0\) et du paramètre \(\alpha < 1\) qui réduit la pression perçue par les motos et leur permet d'exploiter l'espace même à très haute densité globale. La dynamique de redémarrage (t>60s), bien que non analysée en détail ici, est également influencée par le temps de relaxation plus court (\(\tau_m < \tau_c\)) attribué aux motos.
+    \item \textbf{Pertinence de la Dynamique de Second Ordre :} Le débogage du scénario "Feu Rouge" a montré qu'une propagation réaliste de l'onde de choc nécessitait des temps de relaxation (\(\tau_i\)) très courts (0.1s). Des valeurs plus longues, bien que potentiellement plus stables, échouaient à transmettre l'information du blocage vers l'amont de manière efficace. Cela suggère que la dynamique de relaxation (temps d'adaptation non instantané), caractéristique des modèles de second ordre, joue un rôle non négligeable dans la formation rapide des congestions dans ce trafic mixte très réactif, justifiant le choix d'une approche ARZ par rapport à un modèle LWR.
+    \item \textbf{Sensibilité du Modèle comme Levier de Calibration Futur :} Le parcours de stabilisation des simulations (cf. \texttt{development\_summary.md}) a montré la sensibilité du modèle ARZ aux paramètres de pression (\(K_i\)) et aux conditions aux limites. Loin d'être seulement une difficulté, cette sensibilité est aussi une force : elle indique que le modèle réagit de manière distincte aux variations de ces éléments. Une future calibration basée sur des données réelles pourrait donc exploiter cette sensibilité pour ajuster finement les paramètres (\(K_i, \alpha, \tau_i, V_{creeping}\), etc.) afin de faire correspondre précisément les simulations à la dynamique observée spécifiquement au Bénin.
+\end{itemize}
+En conclusion, le modèle ARZ étendu offre un cadre théorique et numérique capable de capturer, au moins qualitativement, des interactions et des comportements (moto-infrastructure, moto-voiture en congestion, relaxation) qui sont essentiels pour décrire la complexité du trafic routier béninois, dominé par les deux-roues motorisés.
+
+\section{Évaluation de la Performance du Modèle}
+\label{sec:evaluation_performance}
+
+L'évaluation de la performance du modèle ARZ multi-classes développé doit tenir compte de ses points forts intrinsèques mais aussi de ses limites actuelles, principalement dues au manque de données de validation quantitative.
+
+\textbf{Points Forts :}
+\begin{itemize}
+    \item \textbf{Pertinence Phénoménologique :} Le principal atout est sa capacité démontrée à intégrer et reproduire qualitativement les phénomènes spécifiques au trafic béninois (impact différentiel de \(R(x)\), creeping des motos en congestion, formation de chocs/raréfactions) grâce à l'approche ARZ multi-classes et aux extensions proposées (\(\alpha, V_{creeping}, V_{max,i}(R)\)...).
+    \item \textbf{Base Théorique (Second Ordre) :} Intègre nativement la dynamique hors-équilibre (relaxation via \(\tau_i\)) et l'anticipation (pression via \(p_i\)), offrant une description plus riche que les modèles de premier ordre.
+    \item \textbf{Implémentation Validée Numériquement :} Le code Python développé a passé avec succès les tests de validation numérique de base (convergence ordre 1 attendu, conservation de masse, positivité), assurant la correction fondamentale du schéma FVM/CU/Splitting implémenté.
+    \item \textbf{Flexibilité et Extensibilité :} Le modèle et l'architecture du code sont conçus pour pouvoir être étendus (ajout de classes, fonctions plus complexes, réseau).
+\end{itemize}
+
+\textbf{Limites et Points Faibles :}
+\begin{itemize}
+    \item \textbf{Absence de Calibration/Validation Quantitative (Limite Majeure) :} L'utilisation de paramètres estimés limite fortement la capacité prédictive quantitative du modèle. Les résultats actuels sont qualitatifs et leur correspondance exacte avec les débits, vitesses ou temps de parcours réels au Bénin est inconnue. C'est la limitation principale de ce travail dans son état actuel.
+    \item \textbf{Sensibilité et Stabilité Numérique :} Le modèle a montré une sensibilité aux paramètres (\(K_i\)) et aux CL, nécessitant un débogage approfondi. Le besoin de \(\tau_i\) très courts pour certains scénarios pose question sur la robustesse générale ou la justesse physique de ces valeurs extrêmes.
+    \item \textbf{Artefact Numérique (Dépassement \(\rho_m\)) :} Le schéma du premier ordre, surtout avec \(\tau\) faible, génère un dépassement non physique de la densité moto (\(\rho_m > \rho_{jam}\)) au front du choc dans le scénario "Feu Rouge". Bien que localisé, cet artefact limite la précision dans les régimes de chocs forts.
+    \item \textbf{Simplifications du Modèle Physique :} Le caractère unidimensionnel, l'agrégation des "autres véhicules", la représentation simplifiée de l'infrastructure (indice \(R\)), et l'absence de modèle d'intersection testé sont des simplifications par rapport à la réalité complexe du trafic.
+\end{itemize}
+Le modèle constitue donc une base prometteuse mais nécessite impérativement une confrontation à des données réelles pour affiner ses paramètres et valider sa capacité prédictive quantitative.
+
+% \section{Comparaison Qualitative ARZ vs. LWR pour le Contexte Béninois}
+% \label{sec:comparaison_arz_lwr}
+% *(Section maintenue mais focalisée sur la justification conceptuelle et les résultats observés)*
+
+% Le choix d'une approche basée sur ARZ plutôt que sur le modèle plus simple de LWR a été une décision centrale de cette thèse. Bien qu'un modèle LWR multi-classes (LWR-MC) puisse être étendu pour inclure des \(V_{e,i}(R)\) distinctes et un \(V_{creeping}\) \cite{WongWong2002}, il resterait fondamentalement limité par son hypothèse d'équilibre instantané.
+
+% Notre étude, même qualitative, illustre les avantages de l'ARZ pour le contexte béninois :
+% \begin{itemize}
+%     \item \textbf{Dynamique de Congestion plus Riche :} Le scénario "Feu Rouge" a montré non seulement la formation du bouchon mais aussi le comportement différentiel *à l'intérieur* de celui-ci (\(v_c \approx 0, v_m \approx V_{creeping}\)) et la dynamique de redémarrage via une onde de raréfaction. Un LWR-MC modéliserait l'arrêt et le redémarrage comme des transitions instantanées basées uniquement sur la densité, sans capturer les effets de relaxation (\(\tau_i\)) ou de pression (\(p_i\)) qui rendent la dynamique ARZ plus réaliste, notamment pour différencier l'agilité des motos au redémarrage.
+%     \item \textbf{Modélisation des Interactions Fines :} L'introduction du paramètre \(\alpha\) dans la fonction de pression \(p_m\) (permise par la structure ARZ) offre un mécanisme explicite pour modéliser comment les motos perçoivent différemment l'espace occupé par les voitures (gap-filling), un aspect difficile à intégrer aussi directement dans la seule fonction \(V_{e,m}\) d'un LWR-MC.
+%     \item \textbf{Potentiel pour Phénomènes Complexes :} Bien que non exploré en détail ici, seul l'ARZ possède la structure mathématique (second ordre, non-linéarité de \(p_i\) et \(V_{e,i}\)) capable de générer intrinsèquement des phénomènes comme les ondes stop-and-go ou l'hystérésis, souvent observés dans le trafic réel congestionné.
+% \end{itemize}
+% Le coût de cette richesse descriptive est la complexité accrue et la sensibilité numérique observée. Cependant, pour une compréhension fine de la dynamique du trafic mixte et réactif du Bénin, les capacités supplémentaires offertes par l'ARZ semblent justifier l'effort de modélisation et de débogage par rapport aux limitations intrinsèques d'une approche LWR.
+
+\section{Implications Potentielles pour la Gestion du Trafic au Bénin}
+\label{sec:implications_gestion}
+
+Malgré son stade de développement actuel (non calibré quantitativement), le modèle ARZ étendu et les simulations réalisées offrent des éclairages qualitatifs pertinents pour les gestionnaires et planificateurs des transports au Bénin :
+
+\begin{itemize}
+    \item \textbf{Quantifier l'Impact de l'Infrastructure :} Le scénario "Route Dégradée" illustre comment le modèle pourrait, *une fois calibré*, être utilisé pour évaluer l'impact d'une amélioration de revêtement (passage de R=3/4 à R=1/2) non seulement sur les vitesses mais aussi sur la capacité et la formation de congestions. Par exemple, on pourrait simuler l'effet de l'asphaltage d'un tronçon critique et estimer la réduction du temps de parcours ou l'augmentation du débit maximal, fournissant des arguments quantitatifs pour prioriser les investissements (en lien avec les objectifs d'infrastructure du PAG).
+    \item \textbf{Adapter la Régulation au Trafic Mixte :} La simulation du "Feu Rouge" montre l'importance du comportement moto (\(V_{creeping}, \alpha, \tau_m\)) dans la dynamique des files d'attente. Cela implique que les méthodes classiques de dimensionnement des carrefours (calcul des temps de vert, capacité des ronds-points) basées sur des véhicules standards pourraient être inadaptées. Le modèle pourrait aider à tester des stratégies de régulation qui tiennent compte de cette forte proportion de motos (ex: phases de feux spécifiques, zones de stockage avancées).
+    \item \textbf{Comprendre la Congestion "Réelle" :} La capacité à simuler le creeping suggère que la congestion au Bénin n'est peut-être pas un arrêt total mais un écoulement très lent et hétérogène. Mieux modéliser cet état pourrait affiner les estimations de l'impact réel de la congestion sur l'économie ou l'environnement.
+    \item \textbf{Tester des Scénarios d'Aménagement :} À terme, le modèle pourrait simuler l'impact de modifications locales (ajout d'une voie, création d'un rond-point) sur un segment ou un petit réseau, en fournissant une vision plus réaliste que les modèles statiques grâce à la prise en compte de la dynamique ARZ et du comportement moto.
+\end{itemize}
+Ces implications soulignent le potentiel d'un outil de simulation adapté au contexte local, même si son développement complet nécessite encore des étapes de validation importantes.
+
+\section{Directions pour les Recherches Futures}
+\label{sec:recherches_futures}
+
+Ce travail constitue une première étape ; de nombreuses directions peuvent être explorées pour l'améliorer et l'exploiter :
+
+\begin{itemize}
+    \item \textbf{Priorité Absolue : Calibration et Validation Quantitative :} Collecter des données réelles (vitesses, débits, densités par classe via caméras/analyse vidéo) sur différents types de routes et conditions de trafic au Bénin pour calibrer rigoureusement les paramètres (\(\alpha, V_{creeping}, K_i, \gamma_i, \tau_i\)) et valider quantitativement les prédictions du modèle.
+    \item \textbf{Amélioration Numérique (Ordre Supérieur et Chocs) :} Implémenter un schéma d'ordre supérieur (MUSCL+SSP-RK) pour réduire la diffusion et mieux capturer les fronts de choc. Investiguer l'artefact de dépassement de densité \(\rho_m > \rho_{jam}\) et le résoudre, potentiellement en explorant des fonctions de pression alternatives ou des techniques de limitation physique.
+    \item \textbf{Modélisation et Simulation Réseau :} Implémenter un modèle d'intersection robuste (basé sur Section \ref{sec:modeling_intersections} et les données OSM `traffic`) et étendre les simulations à des réseaux représentatifs de villes béninoises (utilisant OSM `places`, `roads`, `oneway`).
+    \item \textbf{Analyse de Sensibilité Approfondie :} Réaliser l'analyse de sensibilité paramétrique prévue  pour quantifier l'impact des paramètres estimés sur les résultats.
+    \item \textbf{Affinement des Fonctions Physiques :} Explorer des formes fonctionnelles plus élaborées pour \(P_i, g_i, \tau_i\), potentiellement basées sur des micro-simulations ou des données comportementales plus fines.
+    % \item \textbf{Validation Croisée et Comparaison :} Une fois le modèle ARZ calibré, le comparer quantitativement à un modèle LWR-MC également calibré sur les mêmes données pour évaluer objectivement les gains de performance vs la complexité.
+\end{itemize}
+Ces développements permettraient de transformer le modèle actuel en un outil prédictif fiable pour l'aide à la décision en matière de transport au Bénin.
+

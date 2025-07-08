@@ -1,0 +1,39 @@
+# Test de convergence simplifié avec le scénario sine_wave
+scenario_name: convergence_test_simple
+
+# Force WENO5 + SSP-RK3
+spatial_scheme: 'weno5'
+time_scheme: 'ssprk3'
+ghost_cells: 3
+
+# Grid Parameters
+N: 50
+xmin: 0.0
+xmax: 10.0
+
+# Simulation Time (très court)
+t_final: 0.02
+output_dt: 0.02
+
+# Initial Conditions - Perturbation sinusoïdale
+initial_conditions:
+  type: sine_wave_perturbation
+  R_val: 3
+  background_state:
+    rho_m: 30.0e-3  # 30 veh/km
+    rho_c: 20.0e-3  # 20 veh/km
+  perturbation:
+    amplitude: 5.0e-3  # 5 veh/km
+    wave_number: 1
+
+# Road Quality
+road_quality:
+  type: uniform
+  R_uniform: 3
+
+# Boundary Conditions
+boundary_conditions:
+  left:
+    type: periodic
+  right:
+    type: periodic

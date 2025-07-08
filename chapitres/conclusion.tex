@@ -1,0 +1,31 @@
+\chapter{Conclusion}
+\label{chap:conclusion}
+
+Ce mémoire s'est attaché à relever le défi de la modélisation macroscopique du trafic routier dans le contexte spécifique et complexe du Bénin, marqué par la prédominance des motocyclettes, l'hétérogénéité infrastructurelle et des comportements de conduite uniques.
+
+\section{Résumé de la Recherche}
+\label{sec:resume_recherche}
+
+Constatant les limites des modèles de premier ordre, ce travail a proposé, développé et analysé une \textbf{extension multi-classes du modèle de second ordre d'Aw-Rascle-Zhang (ARZ)}. L'objectif était de fournir un cadre mathématique capturant la dynamique hors-équilibre et les interactions spécifiques au trafic mixte béninois. Le modèle ARZ a été adapté pour intégrer explicitement l'impact différentiel de la **qualité de la route** (\(R(x)\)), les effets de **gap-filling/interweaving** (\(\alpha\)), le **creeping** (\(V_{creeping}\)) des motos, et des **temps de relaxation** (\(\tau_i\)) distincts.
+
+Après analyse des propriétés mathématiques (hyperbolicité, structure caractéristique), un schéma numérique \textbf{FVM/Central-Upwind/Strang Splitting} a été implémenté en Python, avec des optimisations CPU/GPU. Face au manque de données quantitatives locales, une stratégie d'\textbf{estimation de paramètres plausible} a été adoptée, combinant données OSM, littérature, observations et hypothèses physiques. La validation s'est concentrée sur les aspects \textbf{numériques} (convergence, conservation, positivité) et \textbf{phénoménologiques qualitatifs} via des scénarios tests ciblés ("Route Dégradée", "Feu Rouge"). Un important travail de \textbf{débogage et de stabilisation} a été nécessaire et documenté pour obtenir des simulations physiquement cohérentes.
+
+\section{Principales Conclusions et Contributions}
+\label{sec:conclusions_contributions}
+
+Les contributions majeures de cette recherche sont :
+\begin{enumerate}
+    \item La \textbf{formulation d'un modèle ARZ multi-classes étendu} spécifiquement conçu pour intégrer les caractéristiques clés du trafic béninois (motos, infrastructure, comportements).
+    \item La \textbf{démonstration qualitative de la pertinence de ce modèle :} les simulations (après corrections) ont réussi à reproduire des phénomènes essentiels non capturés par des modèles plus simples, tels que l'impact différentiel de l'état de la route, la formation et la propagation de chocs de congestion, et surtout le comportement de creeping différentiel où les motos avancent pendant que les voitures sont arrêtées.
+    \item Une \textbf{implémentation numérique fonctionnelle et robuste} (Python, FVM/CU/Splitting, CPU/GPU), dont la correction numérique de base a été validée.
+    \item La \textbf{documentation détaillée du processus de débogage et de stabilisation}, fournissant des apprentissages méthodologiques sur la sensibilité des modèles de second ordre et l'importance de la cohérence entre paramètres, conditions aux limites et implémentation numérique.
+    \item L'\textbf{identification des paramètres clés} (\(\alpha, V_{creeping}, \tau_i, K_i\)...) gouvernant la dynamique spécifique du trafic mixte et la mise en évidence de la nécessité absolue de leur calibration future.
+\end{enumerate}
+Ce travail fournit ainsi une base théorique et numérique solide et adaptée pour de futures études quantitatives du trafic au Bénin.
+
+\section{Limites et Remarques Finales}
+\label{sec:limites_remarques}
+
+La principale limite de cette étude réside dans l'\textbf{absence de calibration et de validation quantitatives} faute de données de trafic réelles disponibles pour le Bénin. Les paramètres utilisés sont des estimations plausibles mais leur exactitude n'est pas garantie, limitant la portée prédictive actuelle du modèle à une analyse qualitative. De plus, l'implémentation numérique du premier ordre présente une diffusion notable et un artefact de dépassement de densité pour les motos dans les chocs forts avec relaxation rapide. Enfin, le modèle reste unidimensionnel et n'inclut pas de représentation des intersections ou des réseaux.
+
+Néanmoins, ce mémoire démontre le potentiel des modèles macroscopiques de second ordre, spécifiquement étendus, pour capturer la complexité unique du trafic dans les villes d'Afrique de l'Ouest dominées par les deux-roues. En fournissant un cadre conceptuel et une implémentation numérique validée phénoménologiquement, il ouvre la voie à des recherches futures indispensables – notamment la collecte de données et la calibration – qui permettront de transformer ce modèle en un outil puissant pour l'analyse, la prévision et l'aide à la décision pour une mobilité plus efficace et durable au Bénin.

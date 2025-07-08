@@ -278,18 +278,25 @@ def _calculate_physical_velocity_cuda(w_m_i, w_c_i, p_m_i, p_c_i):
 # other kernels.
 
 
-def _calculate_pressure_derivative(rho_val, K, gamma, rho_jam, epsilon):
-    """ Helper to calculate dP/d(rho_eff) or dP/d(rho_total). """
+@njit
+def _calculate_pressure_derivative(rho_vals, K, gamma, rho_jam, epsilon):
+    """ Helper to calculate dP/d(rho_eff) or dP/d(rho_total) for an array of densities. """
     if rho_jam <= 0 or gamma <= 0:
-        return 0.0 # Or raise error
-    if rho_val <= epsilon:
-        return 0.0 # Derivative is zero at zero density
+        return np.zeros_like(rho_vals)
 
-    # Calculate normalized density (without capping)
-    norm_rho = rho_val / rho_jam
-    # Derivative of K * (x/rho_jam)^gamma = K * gamma * x^(gamma-1) / rho_jam^gamma
-    derivative = K * gamma * (norm_rho**(gamma - 1.0)) / rho_jam
-    return max(derivative, 0.0) # Ensure non-negative derivative
+    # Ensure non-negative before processing
+    rho_vals_safe = np.maximum(rho_vals, 0.0)
+
+    # Calculate normalized density
+    norm_rho = rho_vals_safe / rho_jam
+
+    # Derivative calculation
+    derivative = (K * gamma / rho_jam) * (norm_rho**(gamma - 1.0))
+
+    # Set derivative to zero where density is close to zero
+    derivative = np.where(rho_vals_safe <= epsilon, 0.0, derivative)
+
+    return np.maximum(derivative, 0.0) # Ensure non-negative derivative
 
 def calculate_eigenvalues(rho_m: np.ndarray, v_m: np.ndarray, rho_c: np.ndarray, v_c: np.ndarray, params: ModelParameters) -> list[np.ndarray]:
     """
@@ -318,12 +325,8 @@ def calculate_eigenvalues(rho_m: np.ndarray, v_m: np.ndarray, rho_c: np.ndarray,
 
     # Calculate pressure derivatives dP/d(arg) where arg is rho_eff_m or rho_total
     # Need to handle scalar vs array inputs if vectorizing
-    if isinstance(rho_m, np.ndarray):
-        P_prime_m = np.array([_calculate_pressure_derivative(r_eff, params.K_m, params.gamma_m, params.rho_jam, params.epsilon) for r_eff in rho_eff_m])
-        P_prime_c = np.array([_calculate_pressure_derivative(r_tot, params.K_c, params.gamma_c, params.rho_jam, params.epsilon) for r_tot in rho_total])
-    else: # Scalar case
-        P_prime_m = _calculate_pressure_derivative(rho_eff_m, params.K_m, params.gamma_m, params.rho_jam, params.epsilon)
-        P_prime_c = _calculate_pressure_derivative(rho_total, params.K_c, params.gamma_c, params.rho_jam, params.epsilon)
+    P_prime_m = _calculate_pressure_derivative(rho_eff_m, params.K_m, params.gamma_m, params.rho_jam, params.epsilon)
+    P_prime_c = _calculate_pressure_derivative(rho_total, params.K_c, params.gamma_c, params.rho_jam, params.epsilon)
 
 
     lambda1 = v_m

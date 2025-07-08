@@ -1,0 +1,76 @@
+# Configuration pour les tests GPU du modèle ARZ
+# Phase 4 : Implémentation GPU CUDA
+
+# Paramètres généraux
+model_type: "ARZ"
+dimension: 1
+num_classes: 2
+
+# Configuration spatiale pour tests GPU
+spatial:
+  N: 200
+  L: 10.0
+  ghost_cells: 3
+  boundary_conditions: "periodic"
+
+# Configuration temporelle 
+temporal:
+  T_final: 1.0
+  CFL: 0.4
+  time_scheme: "ssp_rk3"  # Pour tests GPU
+
+# Configuration numérique
+numerics:
+  spatial_scheme: "weno5"  # Pour tests GPU
+  epsilon_weno: 1.0e-6
+  riemann_solver: "hll"
+  
+# Configuration GPU spécifique
+gpu:
+  enabled: true
+  device_id: 0
+  threads_per_block: 256
+  use_shared_memory: true
+  validation_tolerance:
+    rtol: 1.0e-12
+    atol: 1.0e-14
+
+# Paramètres ARZ
+physical:
+  rho_max: [2.0, 1.5]  # Densités maximales par classe
+  V_max: [60.0, 40.0]  # Vitesses libres par classe [km/h]
+  tau: [0.5, 0.8]      # Temps de relaxation par classe [s]
+  p: [2.0, 1.8]        # Exposants de pression
+  gamma: 0.1           # Paramètre d'anticipation
+
+# Conditions initiales pour tests
+initial_conditions:
+  type: "sine_wave_perturbation"
+  background_density: [0.5, 0.3]
+  amplitude: 0.1
+  wavelength: 2.0
+
+# Configuration des tests
+testing:
+  validation_cases:
+    - smooth_sine
+    - discontinuity  
+    - steep_gradient
+    - high_frequency
+    - large_problem
+  
+  benchmark_sizes: [100, 200, 500, 1000, 2000]
+  benchmark_runs: 10
+  
+  performance_targets:
+    min_speedup_naive: 1.5      # Speedup minimum attendu version naïve
+    min_speedup_optimized: 3.0   # Speedup minimum attendu version optimisée
+    max_error_tolerance: 1.0e-12 # Erreur maximale acceptable vs CPU
+
+# Sortie et visualisation
+output:
+  save_results: true
+  plot_performance: true
+  results_dir: "results/gpu_validation"
+  figure_format: "png"
+  figure_dpi: 300

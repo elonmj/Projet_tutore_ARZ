@@ -94,19 +94,19 @@ def run_convergence_set(base_config_path: str, scenario_config_path: str,
             print(f"\nError during N = {N_val}: Configuration file not found.")
             print(e)
             # Decide whether to continue with other N values or stop
-            # continue
+            continue
             sys.exit(1)
         except (ValueError, TypeError, KeyError, AttributeError, NotImplementedError) as e:
             print(f"\nError during N = {N_val}: Invalid configuration or simulation parameter.")
             print(e)
-            # continue
+            continue
             sys.exit(1)
         except Exception as e:
             print(f"\nAn unexpected error occurred during N = {N_val}:")
             print(e)
             import traceback
             traceback.print_exc()
-            # continue
+            continue
             sys.exit(1)
 
     print("-" * 60)

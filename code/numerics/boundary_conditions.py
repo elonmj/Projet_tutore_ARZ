@@ -324,10 +324,6 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
         elif right_type_code == 2: # Periodic
             U[:, n_phys + n_ghost:] = U[:, n_ghost:n_ghost + n_ghost]
         elif right_type_code == 3: # Wall (Reflection Boundary Condition)
-            # --- DEBUG PRINT: CPU Right Wall (Commented out) ---
-            # if params.device == 'cpu' and t_current < 61.0: # Assuming t_current is accessible or passed
-            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): BEFORE - Phys Cell {n_phys + n_ghost - 1}: {U[:, n_phys + n_ghost - 1]}")
-            # # ----------------------------------
             last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
             rho_m_phys = last_physical_cell_state[0]
             w_m_phys   = last_physical_cell_state[1]
@@ -363,17 +359,6 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[1, n_phys + n_ghost:] = v_m_ghost + p_m_ghost # Note: Using p_m_ghost based on copied densities
             U[3, n_phys + n_ghost:] = v_c_ghost + p_c_ghost # Note: Using p_c_ghost based on copied densities
 
-            # --- NEW DEBUG PRINT: CPU Right Wall Ghost State (Commented out) ---
-            # # Check if t_current is available and within the desired range
-            # if params.device == 'cpu' and t_current >= 0 and t_current < 1.0: # Print only for first second if time is available
-            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
-            # elif params.device == 'cpu' and t_current < 0: # Print always if time is not available
-            #      print(f"DEBUG CPU BC (Right Wall Reflection): Ghost Cells State Set To: {U[:, n_phys + n_ghost:]}")
-            # # -------------------------------------------------
-            # --- DEBUG PRINT: CPU Right Wall (Commented out) ---
-            # if params.device == 'cpu' and t_current < 61.0:
-            # print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall Reflection): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
-            # # ----------------------------------
         elif right_type_code == 4: # Wall (Capped Reflection Boundary Condition)
             last_physical_cell_state = U[:, n_phys + n_ghost - 1] # Shape (4,)
             rho_m_phys = last_physical_cell_state[0]
@@ -419,47 +404,3 @@ def apply_boundary_conditions(U_or_d_U, grid: Grid1D, params: ModelParameters, c
             U[3, n_phys + n_ghost:] = v_c_ghost + p_c_ghost_capped
 
     # Note: No return value, U_or_d_U is modified in-place.
-
-# Example Usage (for testing purposes)
-# if __name__ == '__main__':
-#     # Setup dummy grid and params
-#     N_phys = 10
-#     n_ghost = 2
-#     N_total = N_phys + 2 * n_ghost
-#     dummy_grid = Grid1D(N=N_phys, xmin=0, xmax=100, num_ghost_cells=n_ghost)
-#     dummy_params = ModelParameters() # Need to load or set boundary_conditions
-# --- DEBUG PRINT: CPU Right Wall (Commented Out) ---
-            # if params.device == 'cpu' and t_current < 61.0: # Use t_current variable, not params.t_current
-            #      print(f"DEBUG CPU BC @ t={t_current:.4f} (Right Wall): AFTER - Ghost Cells {n_phys + n_ghost}: {U[:, n_phys + n_ghost:]}")
-            # # ----------------------------------
-#
-#     # --- Test Case 1: Inflow Left, Outflow Right ---
-#     print("--- Test Case 1: Inflow Left, Outflow Right ---")
-#     U = np.random.rand(4, N_total) * 10
-#     U[:, n_ghost] = np.array([10, 1, 5, 0.5]) # First physical cell
-#     U[:, n_phys + n_ghost - 1] = np.array([2, 0.2, 20, 1.0]) # Last physical cell
-#     print("U before BC:\n", U[:, 0:n_ghost+1], "...", U[:, n_phys+n_ghost-1:])
-#
-#     inflow_st = [50, 2, 10, 1] # Example inflow state
-#     dummy_params.boundary_conditions = {
-#         'left': {'type': 'inflow', 'state': inflow_st},
-#         'right': {'type': 'outflow'}
-#     }
-#     apply_boundary_conditions(U, dummy_grid, dummy_params)
-#     print("U after BC:\n", U[:, 0:n_ghost+1], "...", U[:, n_phys+n_ghost-1:])
-#     assert np.allclose(U[:, 0:n_ghost], np.array(inflow_st).reshape(-1, 1))
-#     assert np.allclose(U[:, n_phys + n_ghost:], U[:, n_phys + n_ghost - 1 : n_phys + n_ghost])
-#
-#     # --- Test Case 2: Periodic ---
-#     print("\n--- Test Case 2: Periodic ---")
-#     U = np.arange(4 * N_total).reshape(4, N_total) # Fill with distinct values
-#     print("U before BC:\n", U[:, 0:n_ghost+1], "...", U[:, n_phys:n_phys+n_ghost], "...", U[:, n_phys+n_ghost-1:])
-#
-#     dummy_params.boundary_conditions = {
-#         'left': {'type': 'periodic'},
-#         'right': {'type': 'periodic'}
-#     }
-#     apply_boundary_conditions(U, dummy_grid, dummy_params)
-#     print("U after BC:\n", U[:, 0:n_ghost+1], "...", U[:, n_phys:n_phys+n_ghost], "...", U[:, n_phys+n_ghost-1:])
-#     assert np.allclose(U[:, 0:n_ghost], U[:, n_phys:n_phys + n_ghost])
-#     assert np.allclose(U[:, n_phys + n_ghost:], U[:, n_ghost:n_ghost + n_ghost])

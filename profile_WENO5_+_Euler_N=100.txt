@@ -1,0 +1,30 @@
+Profil de performance: WENO5 + Euler (N=100)
+==================================================
+         6939327 function calls (6665804 primitive calls) in 27.272 seconds
+
+   Ordered by: internal time
+   List reduced from 2799 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    15743    4.155    0.000    5.398    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\llvmlite\binding\ffi.py:195(__call__)
+    40280    1.439    0.000    2.963    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\numerics\time_integration.py:111(_ode_rhs)
+    40281    1.341    0.000    1.341    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\core\physics.py:118(calculate_equilibrium_speed)
+    10832    1.257    0.000    1.270    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:108(_winapi_test)
+    10832    1.207    0.000    1.222    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:170(GetConsoleMode)
+     5724    0.945    0.000    3.598    0.001 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\rk.py:14(rk_step)
+       11    0.789    0.072    0.789    0.072 {method 'acquire' of '_thread.lock' objects}
+186073/30988    0.771    0.000    1.182    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\ir.py:321(_rec_list_vars)
+  1166587    0.645    0.000    0.801    0.000 {built-in method builtins.isinstance}
+     5416    0.581    0.000    0.581    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:177(SetConsoleMode)
+     5724    0.301    0.000    4.193    0.001 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\rk.py:111(_step_impl)
+   117466    0.275    0.000    0.627    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\event.py:243(notify)
+94039/47803    0.240    0.000    0.765    0.000 {method 'format' of 'str' objects}
+215377/215000    0.206    0.000    0.437    0.000 {built-in method builtins.getattr}
+    36862    0.197    0.000    0.839    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\event.py:209(broadcast)
+    10832    0.196    0.000    1.568    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:114(winapi_test)
+    14628    0.176    0.000    0.320    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numpy\linalg\linalg.py:2383(norm)
+     2968    0.162    0.000    0.674    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\common.py:68(select_initial_step)
+    92767    0.138    0.000    0.229    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\targetconfig.py:111(getter)
+  1132/54    0.133    0.000   20.369    0.377 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\compiler_machinery.py:267(_runPass)
+
+

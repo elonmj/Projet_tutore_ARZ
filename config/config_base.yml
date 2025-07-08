@@ -22,7 +22,11 @@ flux_composition:
 
 # Numerical Parameters
 cfl_number: 0.5 # Reduced from 0.8 to attempt stabilization
-ghost_cells: 2
+ghost_cells: 3
+# Spatial scheme selection: 'first_order' or 'weno5'
+spatial_scheme: 'first_order' # Options: 'first_order', 'weno5'
+# Temporal integration scheme for hyperbolic step: 'euler' or 'ssprk3'
+time_scheme: 'euler' # Options: 'euler', 'ssprk3'
 # ODE Solver options for Strang Splitting
 ode_solver: 'RK45' # Default, e.g., 'LSODA', 'Radau', 'BDF' for stiff
 ode_rtol: 1.0e-6

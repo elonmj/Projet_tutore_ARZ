@@ -201,11 +201,8 @@ def calculate_cfl_dt(U_or_d_U_physical, grid: Grid1D, params: ModelParameters) -
         all_eigenvalues_list = physics.calculate_eigenvalues(rho_m_calc, v_m, rho_c_calc, v_c, params)
 
         # Find the maximum absolute eigenvalue
-        max_abs_lambda = 0.0
-        for lambda_k_array in all_eigenvalues_list:
-            current_max = np.max(np.abs(np.asarray(lambda_k_array)))
-            if current_max > max_abs_lambda:
-                max_abs_lambda = current_max
+        # Convert list of arrays into a single 2D array and find the global max absolute value
+        max_abs_lambda = np.max(np.abs(np.asarray(all_eigenvalues_list)))
 
         # --- DEBUGGING: Check for extreme values, find location, and raise error ---
         if max_abs_lambda > 1000.0: # Threshold for unusually large wave speed (adjust if needed)
@@ -249,58 +246,3 @@ def calculate_cfl_dt(U_or_d_U_physical, grid: Grid1D, params: ModelParameters) -
         dt = params.cfl_number * grid.dx / max_abs_lambda
 
     return dt
-
-# Example Usage (for testing purposes)
-# if __name__ == '__main__':
-#     # Setup dummy grid and params
-#     N_phys = 10
-#     n_ghost = 2
-#     dummy_grid = Grid1D(N=N_phys, xmin=0, xmax=100, num_ghost_cells=n_ghost)
-#     dummy_params = ModelParameters()
-#     # Load base config to get necessary parameters (alpha, K, gamma, rho_jam, cfl_number, epsilon)
-#     try:
-#         # Adjust path as needed
-#         base_config_file = '../../config/config_base.yml'
-#         dummy_params.load_from_yaml(base_config_file)
-#     except FileNotFoundError:
-#         print("Error: config_base.yml not found. Using default parameters for test.")
-#         # Set some defaults manually if file not found
-#         dummy_params.alpha = 0.4
-#         dummy_params.rho_jam = 250.0 / 1000.0
-#         dummy_params.K_m = 10.0 * 1000/3600
-#         dummy_params.K_c = 15.0 * 1000/3600
-#         dummy_params.gamma_m = 1.5
-#         dummy_params.gamma_c = 2.0
-#         dummy_params.cfl_number = 0.8
-#         dummy_params.epsilon = 1e-10
-#
-#     # Create some dummy physical state data (ensure realistic values)
-#     # Example: uniform flow
-#     rho_m_phys = np.full(N_phys, 50.0 / 1000.0) # 50 veh/km
-#     rho_c_phys = np.full(N_phys, 25.0 / 1000.0) # 25 veh/km
-#     # Assume equilibrium velocity for w calculation (requires R_local)
-#     R_local_phys = np.full(N_phys, 3) # Assume road type 3
-#     Ve_m, Ve_c = physics.calculate_equilibrium_speed(rho_m_phys, rho_c_phys, R_local_phys, dummy_params)
-#     p_m, p_c = physics.calculate_pressure(rho_m_phys, rho_c_phys, dummy_params)
-#     w_m_phys = Ve_m + p_m
-#     w_c_phys = Ve_c + p_c
-#
-#     U_phys = np.array([rho_m_phys, w_m_phys, rho_c_phys, w_c_phys])
-#
-#     try:
-#         dt_cfl = calculate_cfl_dt(U_phys, dummy_grid, dummy_params)
-#         print(f"Calculated CFL dt: {dt_cfl:.6f} seconds")
-#
-#         # Verify dt is positive
-#         assert dt_cfl > 0
-#
-#         # Example with zero velocity/density (should give large dt)
-#         U_zero = np.zeros((4, N_phys))
-#         dt_zero = calculate_cfl_dt(U_zero, dummy_grid, dummy_params)
-#         print(f"Calculated CFL dt for zero state: {dt_zero:.6f} seconds")
-#         assert dt_zero > 0 # Check it doesn't crash and returns positive
-#
-#     except ValueError as e:
-#         print(f"Error calculating CFL dt: {e}")
-#     except Exception as e:
-#         print(f"An unexpected error occurred: {e}")

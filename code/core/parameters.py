@@ -42,6 +42,9 @@ class ModelParameters:
         # Numerical Parameters
         self.cfl_number: float = None
         self.ghost_cells: int = None
+        self.num_ghost_cells: int = None  # Alias for compatibility
+        self.spatial_scheme: str = None  # 'first_order' or 'weno5'
+        self.time_scheme: str = None     # 'euler' or 'ssprk3'
         self.ode_solver: str = None
         self.ode_rtol: float = None
         self.ode_atol: float = None
@@ -110,6 +113,9 @@ class ModelParameters:
         # --- Assign Numerical Parameters ---
         self.cfl_number = float(config['cfl_number'])
         self.ghost_cells = int(config['ghost_cells'])
+        self.num_ghost_cells = self.ghost_cells  # Alias for compatibility
+        self.spatial_scheme = str(config.get('spatial_scheme', 'first_order'))  # Default to 'first_order' if not present
+        self.time_scheme = str(config.get('time_scheme', 'euler'))     # Default to 'euler' if not present
         self.ode_solver = str(config['ode_solver'])
         self.ode_rtol = float(config['ode_rtol'])
         self.ode_atol = float(config['ode_atol'])
