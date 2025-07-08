@@ -1,0 +1,19 @@
+RAPPORT DE VALIDATION GPU - MODÈLE ARZ MULTI-CLASSES
+============================================================
+
+Date: 2025-07-08 10:47:12
+Environnement: Kaggle GPU
+
+PHASES TESTÉES:
+- Phase 4 Tâche 4.1: Kernels WENO5 GPU (naïf et optimisé)
+- Phase 4 Tâche 4.2: Intégrateur SSP-RK3 GPU
+- Comparaison performances CPU vs GPU
+- Validation précision numérique
+
+FICHIERS GÉNÉRÉS:
+- results_cpu_reference
+- results_gpu_degraded_road
+- results_gpu_reference
+- results_gpu_mass_conservation
+
+RAPPORT GÉNÉRÉ LE: 20250708_104712
