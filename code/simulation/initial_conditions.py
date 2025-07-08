@@ -162,7 +162,7 @@ def sine_wave_perturbation(grid: Grid1D, params: ModelParameters,
         raise ValueError("Background densities must be non-negative.")
 
     # 1. Calculate the uniform equilibrium background state
-    U_background = uniform_state_from_equilibrium(grid, rho_m_bg, rho_c_bg, R_val, params)
+    U_background, eq_state_vector = uniform_state_from_equilibrium(grid, rho_m_bg, rho_c_bg, R_val, params)
 
     # 2. Get cell centers (including ghost cells for consistency, though BCs will handle them)
     cell_centers = grid.cell_centers(include_ghost=True)
@@ -184,53 +184,3 @@ def sine_wave_perturbation(grid: Grid1D, params: ModelParameters,
 
 
 # Add more initial condition functions as needed (e.g., sine wave, specific traffic jam profile)
-
-# Example Usage (for testing purposes)
-# if __name__ == '__main__':
-#     # Setup dummy grid and params
-#     N_phys = 100
-#     n_ghost = 2
-#     dummy_grid = Grid1D(N=N_phys, xmin=0, xmax=1000, num_ghost_cells=n_ghost)
-#     dummy_params = ModelParameters() # Need to load or set parameters if using equilibrium ICs
-#     try:
-#         base_config_file = '../../config/config_base.yml' # Adjust path
-#         dummy_params.load_from_yaml(base_config_file)
-#     except FileNotFoundError:
-#         print("Config not found, using dummy params for IC tests.")
-#         dummy_params.rho_jam = 250/1000; dummy_params.epsilon = 1e-10; # Minimal needed for some ICs
-
-#     # --- Test Uniform State ---
-#     print("--- Testing Uniform State ---")
-#     U_uni = uniform_state(dummy_grid, 50/1000, 20, 25/1000, 15)
-#     print("Shape:", U_uni.shape)
-#     print("First few columns:\n", U_uni[:, 0:5])
-#     assert U_uni.shape == (4, dummy_grid.N_total)
-#     assert np.allclose(U_uni[0,:], 50/1000)
-
-#     # --- Test Riemann Problem ---
-#     print("\n--- Testing Riemann Problem ---")
-#     UL = [50/1000, 20, 10/1000, 18]
-#     UR = [100/1000, 5, 50/1000, 4]
-#     split = 500.0
-#     U_rp = riemann_problem(dummy_grid, UL, UR, split)
-#     print("Shape:", U_rp.shape)
-#     # Check values around the split point
-#     centers = dummy_grid.cell_centers(include_ghost=True)
-#     idx_left = np.where(centers < split)[0][-1]
-#     idx_right = np.where(centers >= split)[0][0]
-#     print(f"State left of split ({centers[idx_left]:.1f}):", U_rp[:, idx_left])
-#     print(f"State right of split ({centers[idx_right]:.1f}):", U_rp[:, idx_right])
-#     assert np.allclose(U_rp[:, idx_left], UL)
-#     assert np.allclose(U_rp[:, idx_right], UR)
-
-#     # --- Test Density Hump ---
-#     print("\n--- Testing Density Hump ---")
-#     U_hump = density_hump(dummy_grid, rho_m_bg=10/1000, w_m_bg=25, rho_c_bg=5/1000, w_c_bg=22,
-#                           hump_center=500, hump_width=100, hump_rho_m_max=80/1000, hump_rho_c_max=40/1000)
-#     print("Shape:", U_hump.shape)
-#     center_idx = np.argmin(np.abs(centers - 500))
-#     print(f"State near center ({centers[center_idx]:.1f}):", U_hump[:, center_idx])
-#     print(f"State far left ({centers[n_ghost]:.1f}):", U_hump[:, n_ghost])
-#     assert U_hump[0, center_idx] > 10/1000 # Check hump is present
-#     assert np.isclose(U_hump[0, n_ghost], 10/1000) # Check background far away
-#     assert np.allclose(U_hump[1,:], 25) # Check w is uniform

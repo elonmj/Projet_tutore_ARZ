@@ -1,0 +1,371 @@
+\documentclass[10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage[export]{adjustbox}
+\graphicspath{ {./images/} }
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[version=4]{mhchem}
+\usepackage{stmaryrd}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\renewcommand{\headrulewidth}{1pt}
+\renewcommand{\footrulewidth}{1pt}
+\fancyhead[]{}
+\fancyfoot[L]{ENSGMM III}
+\fancyfoot[R]{Systèmes d'information}
+\makeatletter
+\usepackage[backend=bibtex]{biblatex}
+\addbibresource{References}
+\hypersetup{colorlinks=true, linkcolor=blue, filecolor=magenta, urlcolor=cyan,}
+\urlstyle{same}
+\makeatletter
+\def\@ecole{école}
+\newcommand{\ecole}[1]{
+  \def\@ecole{#1}
+}
+
+\author{Josaphat Elonm AHOUANYE}
+\title{Alibi : un sytème de modélisation et simulation du trafic routier à Cotonou pour l'optimisation des paramètres de gestion du trafic}
+\ecole{\textbf{ECOLE NATIONALE SUPERIEURE DE GENIE MATHEMATIQUE ET MODELISATION
+(ENSGMM)}}
+
+
+\begin{document}
+
+%%Page de garde
+
+\begin{titlepage}
+  \centering
+  \includegraphics[width=0.15\textwidth]{logo_unstim.jpeg} 
+  \hfill
+  \includegraphics[width=0.15\textwidth]{logo_gmm.jpeg}
+  
+  \vspace{0.5cm}
+   {\large \textbf{REPUBLIQUE DU BENIN}}
+  \vspace{0.5cm}
+  
+  \vspace{0.5cm}
+   {\large \textbf{MINISTERE DE L'ENSEIGNEMENT SUPERIEUR ET DE LA RECHERCHE SCIENTIFIQUE}}
+  \vspace{0.5cm}
+  \vspace{0.5cm}
+  
+ {\large \textbf{UNIVERSITE NATIONALE DES SCIENCES TECHNOLOGIES ET INGENIERIE MATHEMATIQUE(UNSTIM)}}\\
+ \vspace{0.5cm}
+ 
+ 
+    \vspace{0.5cm}
+    	{\large \@ecole}\\
+    	\vspace{0.5cm}
+    	\vspace{0.5cm}
+    	{\large\textbf{Protocole de recherches}}\\
+    	\vspace{0.5cm}
+    	\vspace{0.5cm}
+    	{\large \textbf{Niveau} : ING-GMM3}\\
+       \vspace{0.5cm}
+       \vspace{0.5cm}
+       
+		\hrule
+		\vspace{1cm}
+       {\Large \color[rgb]{0,0,1} \bfseries{\@title}} \\
+        \vspace{1cm}
+        \hrule
+        
+	\vspace{1cm}
+	
+	\begin{minipage}{0.4\textwidth}
+      \begin{flushleft} 
+        \textbf{Realisé par :}
+	\begin{enumerate}
+	\item AHOUANYE Elonm
+	\end{enumerate}
+      \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.5\textwidth}
+      \begin{flushright}
+        \textbf{Supervisé par :}\\\vspace{0.5cm} 
+      \end{flushright}
+    \end{minipage}
+
+    \vfill
+	
+	\textbf{Année académique : 2022 - 2023}
+	
+  \end{titlepage}
+ \newpage
+\tableofcontents
+\newpage
+\section{Introduction}
+Dans le continent africain où l'urbanisation progressive s'accélère, le trafic routier est devenu un défi majeur pour les grandes villes de notre pays le Bénin. Ce phénomène ne se limite pas à une simple perte de temps pour les automobilistes ; il engendre des conséquences plus larges et préoccupantes. L'augmentation de la consommation de carburant et des émissions polluantes qui en résulte a un impact négatif significatif sur l'environnement et la santé publique. De plus, le stress et la frustration des conducteurs, exacerbés par les embouteillages chroniques, peuvent compromettre la sécurité routière. Face à ces enjeux, des solutions innovantes basées sur la modélisation mathématique et l'intelligence artificielle émergent, promettant une gestion plus efficace et durable du trafic urbain.
+	
+
+
+\section{Contexte et justification}
+
+Pour relever le défi du trafic routier, des approches scientifiques avancées offrent des perspectives prometteuses. Les modèles mathématiques constituent la pierre angulaire de cette approche, permettant de comprendre et de prédire les flux de circulation en prenant en compte une multitude de facteurs tels que la densité du trafic, la vitesse des véhicules, les feux de signalisation et les comportements des conducteurs.\cite{TIPE}
+Sur cette base théorique, la simulation numérique offre un outil puissant pour visualiser et analyser le comportement du trafic dans des conditions réalistes. Cette méthode permet non seulement d'identifier les problèmes actuels, mais aussi de tester diverses stratégies d'optimisation dans un environnement virtuel sûr et contrôlé.
+L'intelligence artificielle (IA) vient compléter cette approche en apportant une capacité d'adaptation et d'optimisation en temps réel. En utilisant des algorithmes de machine learning et des données de trafic actualisées, il devient possible d'ajuster dynamiquement des paramètres cruciaux, tels que le timing des feux tricolores, pour fluidifier la circulation et réduire les temps d'attente.
+Dans ce contexte, le rôle de l'ingénieur en modélisation et simulation est crucial. Il s'agit de collecter des données routières spécifiques à une ville béninoise, de modéliser son trafic de manière précise, et d'appliquer des méthodes d'IA pour optimiser la gestion de la circulation. Cette approche sur mesure est essentielle pour garantir que les solutions développées répondent aux défis particuliers de chaque environnement urbain.
+
+\section{Problématique}
+Face aux limites évidentes des méthodes traditionnelles de régulation du trafic routier au Bénin, caractérisées par des temps d'attente excessifs, des congestions fréquentes et une augmentation des risques d'accidents, comment l'application de modèles mathématiques avancés, couplée à des techniques de simulation numérique et d'intelligence artificielle, peut-elle contribuer à optimiser la gestion du trafic urbain ? Plus spécifiquement, dans quelle mesure ces approches innovantes peuvent-elles être adaptées et implémentées pour améliorer significativement la fluidité de la circulation, réduire les temps de trajet, et accroître la sécurité routière dans les villes béninoises, tout en prenant en compte les spécificités locales du réseau routier et des comportements de conduite ?
+\begin{enumerate}
+  \setcounter{enumi}{3}
+  \item Questions de recherche
+\end{enumerate}
+A travers cette étude, nous essayerons d'apporter une réponse aux questions suivantes:
+
+$\rightarrow$ Quels sont les facteurs spécifiques au contexte béninois qui influencent le plus significativement les flux de trafic urbain, et comment peuvent-ils être intégrés dans un modèle mathématique adapté ?
+
+$\rightarrow$ Dans quelle mesure la simulation numérique basée sur des données réelles du trafic béninois peut-elle prédire efficacement les points de congestion et les variations de flux de circulation ?
+
+$\rightarrow$ Comment les algorithmes d'apprentissage automatique peuvent-ils être utilisés pour optimiser dynamiquement le timing des feux de signalisation afin de réduire les temps d'attente et améliorer la fluidité du trafic ?
+
+$\rightarrow$ Quels indicateurs de performance peuvent être utilisés pour évaluer l'efficacité des solutions proposées en termes de réduction des embouteillages, d'amélioration de la sécurité routière et de diminution de l'impact environnemental ?
+
+$\rightarrow$ Quelles sont les principales barrières techniques, économiques ou sociales à l'implémentation de ces solutions innovantes dans le contexte béninois, et comment peuvent-elles être surmontées ?
+
+\section{Objectifs}
+\subsection{Objectif général}
+Développer et mettre en œuvre un système intégré de gestion du trafic routier, basé sur la modélisation mathématique, la simulation numérique et l'intelligence artificielle, afin de réduire de 30\% les temps de trajet, diminuer de 20\% les émissions de gaz à effet de serre liées au trafic, et améliorer la sécurité routière de 25\% dans les grandes villes du Bénin d'ici 2025. 
+
+\subsection{Objectifs spécifiques}
+De façon spécifique, il s'agira d'atteindre les optimisations suivantes:
+
+
+\begin{enumerate}
+    \item \textbf{Efficacité du trafic:}
+    Optimiser le timing des feux de circulation dans 5 carrefours clés pour réduire les temps d'attente de 40\% aux heures de pointe
+
+    \item \textbf{Réduction de l'impact environnemental:}
+    Mettre en place un système de gestion dynamique du trafic qui réduira la consommation de carburant d'au moins 15\% sur les axes principaux.
+
+    \item \textbf{Sécurité routière:}
+    Identifier et réaménager les 10 zones les plus accidentogènes de la ville pour réduire le nombre d'accidents de 30\%.
+    
+\end{enumerate}
+
+\section{Hypothèses de recherche}
+
+H1 : Un modèle mathématique intégrant les spécificités du trafic routier béninois tels que les comportements de conduite locaux, la présence de véhicules à deux-roues, et les variations saisonnières permettra une représentation plus précise des flux de circulation que les modèles génériques standard.
+
+H2 : Une simulation numérique basée sur le modèle adapté au contexte béninois prédira les conditions de trafic avec une marge d'erreur inférieure à 15\% par rapport aux données réelles observées.
+
+H3 : L'utilisation d'algorithmes d'apprentissage automatique pour l'optimisation dynamique des feux de signalisation réduira les temps d'attente aux intersections d'au moins 25\% par rapport aux méthodes de régulation statiques actuellement en place.
+
+H4 : L'implémentation du système intégré de gestion du trafic (modélisation, simulation et IA) diminuera les temps de trajet moyens de 30\% sur les axes principaux des grandes villes béninoises aux heures de pointe.
+
+H5 : L'optimisation du trafic routier basée sur le système développé entraînera une réduction des émissions de gaz à effet de serre liées au transport d'au moins 20\% dans les zones d'application.
+
+H6 : La mise en œuvre des stratégies de gestion du trafic issues de la modélisation et de la simulation contribuera à une diminution d'au moins 25\% du nombre d'accidents aux intersections équipées du nouveau système.
+
+H7 : Le système développé sera capable de s'adapter efficacement (avec une dégradation des performances inférieure à 10\%) à des événements imprévus tels que des travaux routiers, des accidents, ou des pics de trafic liés à des événements spéciaux.
+
+
+\section{Revue de littérature}
+Les modèles mathématiques sont essentiels pour comprendre les dynamiques du trafic. Le modèle de Lighthill-Whitham-Richards (LWR) est l'un des plus connus dans ce domaine.\cite{LWR} Il considère le flot de véhicules comme un milieu continu et permet de prédire les comportements de circulation en fonction de la densité des véhicules et du temps. D'autres études mettent en avant l'importance des équations aux dérivées partielles (EDP) pour modéliser les phénomènes de congestion et de fluidité du trafic\cite{EDP}, en reliant la densité des véhicules à leur vitesse sur des tronçons de route spécifiques.
+
+La simulation numérique est un outil puissant pour tester et visualiser les modèles mathématiques dans des conditions réalistes. Des méthodes telles que la méthode des volumes finis sont souvent utilisées pour résoudre les équations de transport non linéaires, permettant ainsi d'analyser les effets de différentes stratégies de gestion du trafic, comme le timing des feux de signalisation. Ces simulations peuvent également aider à identifier les points de congestion et à évaluer l'impact de divers aménagements routiers avant leur mise en œuvre.
+
+L'intégration de l'intelligence artificielle (IA) dans la gestion du trafic permet d'optimiser les systèmes de circulation en temps réel. Parmi les techniques d'IA, le renforcement learning (RL) se distingue par sa capacité à apprendre des stratégies optimales à partir d'interactions avec l'environnement.\cite{Tan2022} En appliquant le RL à la gestion du trafic, les systèmes peuvent ajuster en temps réel les paramètres de contrôle, comme le timing des feux de signalisation, en réponse à des conditions de circulation changeantes. Cette approche permet non seulement de s'adapter aux fluctuations de la demande, mais aussi de traiter la complexité inhérente aux systèmes de trafic urbain. Le RL est particulièrement efficace pour optimiser plusieurs objectifs simultanément, tels que la réduction des temps de trajet, la diminution des accidents et l'amélioration de la qualité de l'air.
+
+Malgré les avancées, plusieurs défis subsistent dans l'application de ces technologies au Bénin. Il est crucial d'adapter les modèles mathématiques aux spécificités locales, notamment les comportements de conduite et les infrastructures routières existantes. De plus, des barrières techniques, économiques et sociales peuvent freiner l'implémentation de solutions innovantes. La validation des modèles et des solutions proposées par des tests sur le terrain est essentielle pour assurer leur efficacité dans le contexte béninois.
+
+
+\section{Matériels et Méthodes}
+
+\subsection{Présentation des données}
+
+\subsubsection{Données satellitaires}
+\begin{itemize}
+    \item \textbf{Source :} API fournissant des données de trafic basées sur l'imagerie satellitaire ou encore agrégées à partir des déplacements des utilisateurs Android (Google Maps)
+    \item \textbf{Fréquence de collecte :} Toutes les 15 minutes
+    \item \textbf{Couverture :} Principales artères des grandes villes du Bénin
+    \item \textbf{Variables :} Densité de trafic, vitesse moyenne, identification des embouteillages
+\end{itemize}
+
+\subsubsection{Données complémentaires}
+\begin{itemize}
+    \item Données des capteurs de trafic au sol si disponibles
+    \item Données historiques de trafic des autorités locales(si existantes)
+    \item Informations sur la configuration des routes et des intersections(API Google Maps Roads)
+    \item Données météorologiques
+    \item Calendrier des événements locaux pouvant impacter le trafic
+\end{itemize}
+
+\subsection{Méthodologie}
+
+\subsubsection{Modélisation du trafic}
+\begin{itemize}
+    \item \textbf{Modèle macroscopique :} Utilisation du modèle LWR (Lighthill-Whitham-Richards) adapté au contexte béninois
+    \item \textbf{Modèle microscopique :} Simulation basée sur les agents pour capturer les comportements individuels des véhicules
+    \item \textbf{Intégration de méthodes de machine learning pour affiner les prédictions :}
+    \begin{itemize}
+        \item Réseau de neurones récurrents (RNN) pour la prédiction à court terme des flux de trafic
+        \item Random Forest pour la classification des états de trafic
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Simulation numérique}
+\begin{itemize}
+    \item Utilisation du logiciel SUMO (Simulation of Urban MObility) pour la microsimulation
+    \item Développement d'un module Python personnalisé pour intégrer les modèles mathématiques et de ML
+    \item Calibration de la simulation à l'aide des données satellitaires et complémentaires
+\end{itemize}
+
+\subsubsection{Optimisation par Reinforcement Learning}
+\begin{itemize}
+    \item \textbf{Algorithme :} Deep Q-Network (DQN) pour l'optimisation des feux de signalisation
+    \item \textbf{État :} Représentation du trafic actuel (densité, vitesse, longueur des files d'attente)
+    \item \textbf{Actions :} Ajustement des durées des phases des feux de signalisation
+    \item \textbf{Récompense :} Fonction multi-objectif prenant en compte le temps de trajet, les émissions et la sécurité
+\end{itemize}
+
+\subsubsection{Validation et évaluation}
+\begin{itemize}
+    \item Comparaison des prédictions du modèle avec les données réelles
+    \item Simulation de scénarios de trafic variés pour tester la robustesse du système
+    \item Évaluation des performances en termes de réduction des temps de trajet, des émissions et des accidents
+\end{itemize}
+
+\subsection{Matériel}
+
+\subsubsection{Infrastructure informatique}
+\begin{itemize}
+    \item \textbf{Serveur de calcul haute performance :} 64 cœurs CPU, 256 Go RAM, GPU NVIDIA Tesla V100
+    \item \textbf{Stockage :} Système de stockage distribué de 20 To pour les données brutes et les résultats de simulation
+\end{itemize}
+
+\subsubsection{Logiciels}
+\begin{itemize}
+    \item \textbf{Environnement de développement :} Python
+    \item \textbf{Bibliothèques :} TensorFlow, PyTorch, scikit-learn, pandas, numpy
+    \item \textbf{Simulation :} SUMO (Simulation of Urban MObility)
+    \item \textbf{Visualisation :} Matplotlib, Seaborn, Plotly
+    \item \textbf{Gestion de version :} Git
+\end{itemize}
+
+\subsubsection{API et sources de données}
+\begin{itemize}
+    \item API de données satellitaires (TomTom Traffic API, API Google  Maps Roads)
+    \item API météorologique locale
+    \item Capteurs : Installation de boucles magnétiques à chaque sens de circulation(elles peuvent être simplement posées sur la chaussée)
+    \item Accès aux bases de données de trafic des autorités béninoises si il en existe
+\end{itemize}
+
+
+Voici le code LaTeX pour le chronogramme prévisionnel de travail, les résultats attendus, et la valorisation des résultats :
+
+
+\section{Chronogramme prévisionnel de travail}
+
+\subsection{Phase 1}
+\begin{enumerate}
+    \item Mois 1: Revue de littérature approfondie et définition précise du cadre méthodologique
+    \item Mois 2 : Collecte et prétraitement des données initiales
+    \begin{itemize}
+        \item Installation des boucles magnétiques( pas obligatoires)
+        \item Configuration des API (données satellitaires, météorologiques)
+        \item Nettoyage et structuration des données
+    \end{itemize}
+    \item Mois 3 : Développement du modèle macroscopique (LWR adapté)
+    \item Mois 4 : Implémentation du modèle microscopique dans SUMO
+\end{enumerate}
+
+\subsection{Phase 2}
+\begin{enumerate}
+    \item Mois 5 : Intégration des méthodes de machine learning (RNN, Random Forest)
+    \item Mois 6 : Développement de l'algorithme de Reinforcement Learning (DQN)
+    \item Mois 7: Calibration et validation initiale des modèles
+    \item Mois 8 : Optimisation et tests de performance
+\end{enumerate}
+
+\subsection{Phase 3}
+\begin{enumerate}
+    \item Mois 9 : Simulation de scénarios variés et analyse des résultats
+    \item Mois 10 :  Ajustements finaux et validation complète du système
+    \item Mois 11 : Rédaction du manuscrit de thèse
+    \item Mois 12 : Finalisation du manuscrit et préparation de la soutenance
+\end{enumerate}
+
+\section{Résultats attendus}
+
+\subsection{Résultats scientifiques}
+\begin{enumerate}
+    \item Un modèle hybride (mathématique + ML) de trafic adapté au contexte béninois
+    \begin{itemize}
+        \item Précision de prédiction : erreur moyenne < 10\% sur les flux de trafic
+        \item Capacité à capturer les spécificités locales (ex: forte présence de deux-roues)
+    \end{itemize}
+    \item Un algorithme de RL optimisé pour la gestion des feux de signalisation
+    \begin{itemize}
+        \item Réduction des temps d'attente aux intersections de 25\% minimum
+        \item Adaptation dynamique aux variations de trafic imprévues
+    \end{itemize}
+    \item Une méthodologie intégrée de simulation et d'optimisation du trafic urbain
+    \begin{itemize}
+        \item Capable de simuler des scénarios complexes (ex: événements spéciaux, travaux)
+        \item Temps de calcul réduit de 30\% par rapport aux approches traditionnelles
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Résultats pratiques}
+\begin{enumerate}
+    \item Réduction des temps de trajet
+    \begin{itemize}
+        \item Diminution moyenne de 30\% des temps de parcours sur les axes principaux
+        \item Amélioration de 20\% de la régularité des temps de trajet
+    \end{itemize}
+    \item Amélioration de la qualité de l'air
+    \begin{itemize}
+        \item Réduction de 20\% des émissions de CO\textsubscript{2} liées au trafic dans les zones étudiées
+        \item Diminution de 15\% des concentrations de particules fines (PM2.5) aux heures de pointe
+    \end{itemize}
+    \item Augmentation de la sécurité routière
+    \begin{itemize}
+        \item Réduction de 25\% du nombre d'accidents aux intersections équipées
+        \item Diminution de 20\% des incidents impliquant des piétons ou des deux-roues
+    \end{itemize}
+\end{enumerate}
+
+\section{Valorisation des résultats}
+
+\begin{enumerate}
+    \item Publications scientifiques
+    \begin{itemize}
+        \item 2-3 articles dans des revues internationales à comité de lecture (ex: \textit{Transportation Research Part C}, \textit{IEEE Transactions on Intelligent Transportation Systems})
+    \end{itemize}
+    \item Transfert technologique
+    \begin{itemize}
+        \item Développement d'un logiciel open-source pour la simulation et l'optimisation du trafic adapté aux villes africaines
+        \item Rédaction d'un guide méthodologique pour l'implémentation du système dans d'autres villes
+    \end{itemize}
+    \item Partenariats et applications pratiques
+    \begin{itemize}
+        \item Collaboration avec les autorités locales pour un projet pilote dans une grande ville béninoise
+        \item Présentation des résultats aux ministères des Transports et de l'Environnement
+    \end{itemize}
+    \item Diffusion grand public
+    \begin{itemize}
+        \item Création d'une page web interactive présentant les résultats du projet
+        \item Organisation d'un workshop pour les professionnels du transport urbain en Afrique de l'Ouest
+    \end{itemize}
+    \item Formation
+    \begin{itemize}
+        \item Développement d'un module de cours sur l'optimisation du trafic urbain pour les étudiants en génie civil
+        \item Organisation de sessions de formation pour les ingénieurs des collectivités locales
+    \end{itemize}
+\end{enumerate}
+
+
+\printbibliography[heading=bibintoc,title = {Références}]
+\nocite{*}
+
+
+
+
+
+
+\end{document}

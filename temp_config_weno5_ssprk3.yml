@@ -1,0 +1,36 @@
+boundary_conditions:
+  type: periodic
+equilibrium_speed:
+  V_creeping: 0.1
+  rho_jam_eq: 180.0
+  v_max_c_cat1: 12.0
+  v_max_c_cat2: 10.0
+  v_max_c_cat3: 8.0
+  v_max_m_cat1: 15.0
+  v_max_m_cat2: 12.0
+  v_max_m_cat3: 10.0
+model:
+  alpha: 0.6
+  epsilon: 1.0e-08
+  rho_jam: 200.0
+momentum:
+  tau_relax_c: 1.5
+  tau_relax_m: 1.0
+pressure:
+  K_c: 15.0
+  K_m: 10.0
+  gamma_c: 2.0
+  gamma_m: 2.0
+simulation:
+  L: 10.0
+  N: 100
+  T: 0.01
+  device: cpu
+  dt: 0.001
+  num_ghost_cells: 3
+solver:
+  ode_atol: 1.0e-08
+  ode_rtol: 1.0e-06
+  ode_solver: RK45
+spatial_scheme: weno5
+time_scheme: ssprk3

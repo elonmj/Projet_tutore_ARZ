@@ -1,0 +1,319 @@
+\chapter{Mathematical Analysis and Numerical Implementation}
+\label{chap:analyse_numerique}
+
+% Introduction au chapitre
+Après avoir formulé le modèle ARZ multi-classes étendu pour le trafic routier au Bénin (Chapitre \ref{chap:formulation_modele}), ce chapitre se consacre à son analyse mathématique fondamentale et à la description de la méthode numérique choisie pour sa résolution. Comprendre les propriétés mathématiques du système d'EDP est essentiel pour assurer la \textbf{validité de la modélisation} – c'est-à-dire sa capacité à décrire de manière cohérente les phénomènes de propagation – et pour sélectionner un schéma numérique \textbf{stable et précis} pour les simulations. L'analyse portera sur l'hyperbolicité, la structure des ondes (via l'analyse caractéristique) et la stabilité linéaire. Ensuite, nous détaillerons le schéma numérique basé sur la méthode des volumes finis, y compris le traitement des termes sources et des dépendances spatiales. Enfin, nous aborderons brièvement les aspects de l'implémentation pratique.
+
+\section{Mathematical Properties of the Extended Model}
+\label{sec:math_properties}
+
+Le modèle étendu (Section \ref{sec:complete_model_equations}) est un système de quatre équations aux dérivées partielles du premier ordre, non linéaires et couplées, pour le vecteur d'état \( U = (\rho_m, w_m, \rho_c, w_c)^T \). Il peut s'écrire sous forme quasi-linéaire :
+\begin{equation}
+    \label{eq:quasi_linear_form}
+    \frac{\partial U}{\partial t} + A(U) \frac{\partial U}{\partial x} = S(U, x)
+\end{equation}
+où \( A(U) \) est la matrice Jacobienne du système et \( S(U, x) \) est le vecteur des termes sources (relaxation et potentiels effets liés à la dépendance spatiale de \( R(x) \) dans \( V_{e,i} \)). L'analyse des propriétés mathématiques se concentre sur la matrice \( A(U) \) et ses caractéristiques propres (valeurs et vecteurs propres).
+
+\subsection{Hyperbolicity}
+\label{subsec:hyperbolicity}
+
+\textbf{Définition et Importance :} Un système de la forme (\ref{eq:quasi_linear_form}) est dit \textbf{hyperbolique} si, pour tout état \( U \) pertinent, la matrice Jacobienne \( A(U) \) est diagonalisable et possède un ensemble complet de \textbf{valeurs propres réelles}. Il est dit \textbf{strictement hyperbolique} si ces valeurs propres réelles sont également distinctes. L'hyperbolicité est une propriété mathématique fondamentale car elle garantit que le problème de Cauchy (problème aux valeurs initiales) est localement bien posé, permettant ainsi des \textbf{simulations numériques fiables} à partir d'un état initial donné. De plus, elle assure que l'information se propage à des vitesses finies et réelles, données par les valeurs propres (vitesses caractéristiques), ce qui est \textbf{conforme à la physique} des écoulements de trafic où les effets ne peuvent se transmettre instantanément \cite{LeVeque2002}. Vérifier cette propriété est donc une première étape essentielle pour valider la structure mathématique du modèle.
+
+\textbf{Analyse du Système Étendu :} Pour déterminer la matrice Jacobienne \( A(U) \), nous réécrivons le système (\ref{eq:full_system_rho_w_i}) [...] (calculs inchangés menant à) :
+\[
+A(U) =
+\begin{pmatrix}
+ v_m - \rho_m P'_m(\rho_{eff,m}) & \rho_m & - \rho_m \alpha P'_m(\rho_{eff,m}) & 0 \\
+ 0 & v_m & 0 & 0 \\
+ - \rho_c P'_c(\rho) & 0 & v_c - \rho_c P'_c(\rho) & \rho_c \\
+ 0 & 0 & 0 & v_c
+\end{pmatrix}
+\]
+
+\textbf{Condition d'Hyperbolicité :} La matrice \( A(U) \) est bloc triangulaire inférieure. Ses valeurs propres sont donc les valeurs propres des blocs diagonaux \( 2 \times 2 \) : \( \lambda_1 = v_m \), \( \lambda_2 = v_m - \rho_m P'_m(\rho_{eff,m}) \), \( \lambda_3 = v_c \), \( \lambda_4 = v_c - \rho_c P'_c(\rho) \). Le système possède donc \textbf{quatre valeurs propres réelles}. La condition usuelle pour la validité des modèles ARZ, reflétant le fait que les conducteurs réagissent négativement à une augmentation de densité, est que \( P'_m > 0 \) et \( P'_c > 0 \) pour les densités considérées. Sous ces conditions physiques standards, qui devront être assurées par le choix des fonctions \( P_m \) et \( P_c \) lors de la calibration, le système est \textbf{hyperbolique} (potentiellement non strictement). [...] (Discussion sur la perte de stricte hyperbolicité inchangée). Le fait crucial est que, sous ces conditions physiques, le système est bien hyperbolique, confirmant sa \textbf{capacité fondamentale à modéliser la propagation d'ondes} dans le trafic. La dépendance spatiale de \( R(x) \) dans les termes sources \( S(U, x) \) ne modifie pas l'hyperbolicité du système, qui est une propriété de la partie homogène.
+
+\subsection{Eigenvalues and Characteristic Speeds}
+\label{subsec:eigenvalues}
+
+Les quatre valeurs propres (vitesses caractéristiques) réelles du système, dont l'existence a été garantie par l'analyse d'hyperbolicité, sont explicitement :
+\begin{align}
+    \label{eq:lambda1_rev}
+    \lambda_1 &= v_m = w_m - P_m(\rho_{eff,m}) \\
+    \label{eq:lambda2_rev}
+    \lambda_2 &= v_m - \rho_m P'_m(\rho_{eff,m}) \\
+    \label{eq:lambda3_rev}
+    \lambda_3 &= v_c = w_c - P_c(\rho) \\
+    \label{eq:lambda4_rev}
+    \lambda_4 &= v_c - \rho_c P'_c(\rho)
+\end{align}
+
+\textbf{Interprétation Physique et Utilité :} Ces valeurs propres ne sont pas seulement des objets mathématiques ; elles représentent les \textbf{vitesses auxquelles les différentes informations ou perturbations se propagent} à travers le trafic modélisé.
+\begin{itemize}
+    \item \( \lambda_1 \) et \( \lambda_3 \) correspondent à la vitesse de déplacement des véhicules (\( v_m \) et \( v_c \)) et gouvernent la propagation des changements liés aux caractéristiques individuelles des conducteurs (représentées par \( w_i \)).
+    \item \( \lambda_2 \) et \( \lambda_4 \) sont les vitesses des ondes cinématiques, indiquant la vitesse à laquelle les perturbations de densité et de congestion se propagent (vers l'arrière par rapport aux véhicules si \( P'_i > 0 \)).
+\end{itemize}
+Connaître ces vitesses, qui dépendent de l'état local \( U \), est fondamental pour \textbf{comprendre la dynamique simulée} (par exemple, à quelle vitesse une onde de choc va remonter) et est \textbf{indispensable pour la conception de schémas numériques stables}. En particulier, la vitesse maximale en valeur absolue parmi ces quatre valeurs propres (\( \max_k |\lambda_k| \)) détermine la condition de stabilité de Courant-Friedrichs-Lewy (CFL) qui lie le pas de temps au pas d'espace (Section \ref{sec:numerical_scheme}).
+
+\subsection{Characteristic Analysis (Wave Structure)}
+\label{subsec:characteristic_analysis}
+
+L'analyse caractéristique va au-delà des vitesses de propagation en examinant la \textbf{nature des ondes} associées à chaque valeur propre \(\lambda_k\). Elle détermine si un champ est \textbf{linéairement dégénéré (LD)} (produisant des discontinuités de contact qui se propagent sans se déformer) ou \textbf{genuinement non linéaire (GNL)} (permettant la formation d'ondes de choc ou de raréfaction) en calculant \( \nabla_U \lambda_k \cdot r_k \), où \( r_k \) est le k-ième vecteur propre à droite \cite{LeVeque2002}. Savoir si le modèle peut générer ces différents types d'ondes est crucial pour évaluer sa \textbf{capacité à reproduire des phénomènes physiques clés} du trafic.
+
+\textbf{Analyse du Système Étendu :} Par analogie directe avec le modèle ARZ standard et les analyses de modèles multi-classes similaires \cite{AwKlarMaterneRascle2000, BenzoniGavageColombo2003, FanWork2015}, et en supposant des fonctions de pression non linéaires (\( P''_m \neq 0, P''_c \neq 0 \)), nous nous attendons à la structure suivante :
+\begin{itemize}
+    \item Les champs associés aux valeurs propres \( \lambda_1 = v_m \) et \( \lambda_3 = v_c \) sont \textbf{linéairement dégénérés (LD)}. Ils transportent les informations sur \( w_m \) et \( w_c \), et correspondent physiquement au déplacement des différentes classes de véhicules.
+    \item Les champs associés aux valeurs propres \( \lambda_2 = v_m - \rho_m P'_m \) et \( \lambda_4 = v_c - \rho_c P'_c \) sont \textbf{genuinement non linéaires (GNL)}.
+\end{itemize}
+Cette structure (2 champs LD, 2 champs GNL) est fondamentale. La présence des champs GNL \textbf{confirme mathématiquement que le modèle est capable de générer spontanément les ondes de choc} (formation de fronts de congestion nets) et les \textbf{ondes de raréfaction} (dissipation progressive de la congestion), qui sont des caractéristiques omniprésentes et essentielles du trafic réel que le modèle doit pouvoir reproduire pour être réaliste.
+
+% Conclusion de la section
+En conclusion, l'analyse mathématique montre que le modèle ARZ multi-classes étendu, sous des hypothèses physiques raisonnables sur les fonctions de pression, est un \textbf{système hyperbolique} bien posé. Ses quatre vitesses caractéristiques réelles, qui gouvernent la propagation de l'information, ont été identifiées. De plus, la structure des champs caractéristiques (2 LD, 2 GNL) confirme la capacité intrinsèque du modèle à reproduire la phénoménologie essentielle des ondes de trafic, notamment les chocs et les raréfactions. Ces propriétés mathématiques valident la pertinence du modèle et fournissent les informations nécessaires pour aborder sa résolution numérique de manière appropriée.
+
+
+\section{Riemann Problem Structure (Conceptual)}
+\label{sec:riemann_problem}
+
+% Définition du Problème de Riemann et son rôle
+Le \textbf{problème de Riemann} est un problème de Cauchy fondamental pour les systèmes hyperboliques comme le nôtre (\ref{eq:quasi_linear_form}). Il consiste à étudier l'évolution d'une condition initiale spécifique composée de deux états constants, \( U_L \) (état à gauche) et \( U_R \) (état à droite), séparés par une discontinuité unique à la position \( x = 0 \) :
+\begin{equation}
+    \label{eq:riemann_initial_data}
+    U(x, 0) =
+    \begin{cases}
+        U_L & \text{si } x < 0 \\
+        U_R & \text{si } x > 0
+    \end{cases}
+\end{equation}
+où \( U = (\rho_m, w_m, \rho_c, w_c)^T \). L'étude de ce problème est cruciale car elle révèle la \textbf{réponse élémentaire du modèle à une interaction locale entre différents états de flux}. La solution, \( U(x, t) \), décrit comment cette discontinuité initiale se résout en une structure d'ondes se propageant depuis l'origine dans le plan \( (x, t) \), offrant ainsi un aperçu fondamental du comportement dynamique intrinsèque du système d'équations.
+
+% Structure Générale de la Solution
+Pour les systèmes hyperboliques, la solution du problème de Riemann est \textbf{auto-similaire}, c'est-à-dire qu'elle ne dépend que du rapport \( \xi = x/t \). La solution \( U(x,t) = \tilde{U}(x/t) \) consiste en un ensemble d'ondes (chocs, raréfactions, discontinuités de contact) séparant des régions où l'état \( U \) est constant \cite{LeVeque2002}. Ces ondes émanent de l'origine \( (x=0, t=0) \). Décrire cette structure permet de comprendre comment le modèle gère les transitions abruptes qui peuvent apparaître naturellement dans le trafic (par exemple, un peloton de véhicules rapides rencontrant une zone de congestion).
+
+% Structure Spécifique pour le Modèle Étendu (basée sur 5.1)
+L'analyse mathématique de la Section \ref{sec:math_properties} (hyperbolicité, 4 valeurs propres réelles, 2 champs LD, 2 champs GNL) dicte la composition attendue de la solution du problème de Riemann pour notre modèle spécifique :
+\begin{itemize}
+    \item Elle connectera l'état gauche \( U_L \) à l'état droit \( U_R \) via \textbf{quatre ondes} correspondant aux quatre familles caractéristiques.
+    \item Ces quatre ondes apparaîtront dans le plan \( (x, t) \) ordonnées selon leurs vitesses de propagation respectives (\(\lambda_k\)).
+    \item Les deux ondes associées aux champs LD (\(\lambda_1 = v_m\) et \(\lambda_3 = v_c\)) seront des \textbf{discontinuités de contact}, permettant le transport de certaines informations (liées à \(w_m, w_c\)) sans diffusion.
+    \item Les deux ondes associées aux champs GNL (\(\lambda_2 = v_m - \rho_m P'_m\) et \(\lambda_4 = v_c - \rho_c P'_c\)) peuvent être soit des \textbf{ondes de choc} (discontinuités abruptes) soit des \textbf{ondes de raréfaction} (transitions continues), selon la relation entre \(U_L\) et \(U_R\). C'est par ces ondes que le modèle représente la formation et la dissipation des congestions.
+\end{itemize}
+Ainsi, comprendre cette structure nous permet de vérifier si le modèle, au niveau le plus fondamental, peut générer les types d'interactions (chocs frontaux, queues de congestion, zones de détente) observés dans le trafic réel. La séquence complète d'ondes relie \( U_L \) à \( U_R \) via trois états intermédiaires constants.
+
+\textbf{Exemple d'Ordre Possible (Conceptuel) :} Si, pour un couple \( (U_L, U_R) \) donné, les vitesses caractéristiques se trouvent ordonnées comme \( \lambda_2 < \lambda_4 < \lambda_1 < \lambda_3 \), la structure observée dans le plan \( (x, t) \) serait (de gauche à droite) :
+\( U_L \xrightarrow{\text{2-onde (GNL)}} U_{m1} \xrightarrow{\text{4-onde (GNL)}} U_{m2} \xrightarrow{\text{1-onde (LD)}} U_{m3} \xrightarrow{\text{3-onde (LD)}} U_R \)
+où chaque "k-onde" est soit un choc, soit une raréfaction si k=2 ou 4, et une discontinuité de contact si k=1 ou 3. L'ordre exact des vitesses caractéristiques dépendra cependant de l'état spécifique du trafic (\(\rho_m, w_m, \rho_c, w_c\)).
+
+% Importance de la Structure du Problème de Riemann
+Comprendre cette structure d'ondes, même conceptuellement, est donc essentiel pour plusieurs raisons interdépendantes :
+\begin{enumerate}
+    \item \textbf{Validation Fondamentale du Modèle :} Examiner la solution du problème de Riemann pour des cas \(U_L, U_R\) typiques permet de vérifier si le modèle réagit de manière physiquement plausible aux interactions élémentaires (par exemple, un choc se forme-t-il correctement lorsqu'un flux rapide rencontre un flux lent ?).
+    \item \textbf{Fondement des Schémas Numériques Robustes :} La solution du problème de Riemann est la pierre angulaire des \textbf{schémas de Godunov} et des méthodes des volumes finis modernes \cite{LeVeque2002}. Ces schémas sont conçus pour capturer correctement les discontinuités (chocs) et les ondes complexes en décomposant l'interaction globale en une série de problèmes de Riemann locaux à chaque interface de cellule. Connaître la structure attendue (nombre d'ondes, vitesses, types) est indispensable pour concevoir ou choisir un \textbf{solveur de Riemann approché} (comme HLL, HLLC, Roe) qui sera utilisé pour calculer les flux numériques de manière stable et précise, même en présence de fortes discontinuités \cite{MammarEtAl2009}. L'étude conceptuelle ici prépare donc directement le terrain pour la Section \ref{sec:numerical_scheme}.
+\end{enumerate}
+
+% Complexité de la Résolution Exacte
+Il est important de souligner que la résolution \textit{analytique ou exacte} du problème de Riemann pour ce système spécifique 4x4, avec des fonctions de pression et de vitesse d'équilibre potentiellement complexes et couplées, est \textbf{extrêmement difficile}, voire impossible sans simplifications majeures. L'objectif de cette section est donc de décrire la \textit{structure qualitative} attendue de la solution, basée sur l'analyse des propriétés mathématiques, plutôt que de fournir une solution explicite. Cette compréhension conceptuelle est suffisante pour valider la pertinence du modèle et guider le développement numérique.
+
+
+\section{Linear Stability Analysis}
+\label{sec:linear_stability}
+
+% Introduction à l'Analyse de Stabilité Linéaire (LSA)
+L'analyse de stabilité linéaire (LSA) est un outil mathématique standard utilisé pour étudier le comportement d'un système dynamique, comme notre modèle de trafic (\ref{eq:quasi_linear_form}), au voisinage d'un état d'équilibre constant et uniforme. Son objectif est de déterminer si de petites perturbations autour de cet état d'équilibre vont s'amplifier (indiquant une instabilité) ou s'atténuer (indiquant une stabilité). Ceci est crucial pour comprendre si l'état d'équilibre uniforme (un flux de trafic régulier et constant) est physiquement réalisable ou s'il est susceptible de dégénérer spontanément en structures plus complexes (comme les ondes stop-and-go) en raison d'instabilités intrinsèques au modèle \cite{LeVeque2002}. Dans notre contexte, nous souhaitons particulièrement explorer si les termes d'interaction spécifiques aux motos (liés au gap-filling, à l'entrelacement, au creeping, via \(\alpha\), \(V_{creeping}\), \(\tau_m\)) pourraient introduire de nouvelles sources d'instabilité par rapport aux modèles ARZ plus standards.
+
+% État d'Équilibre Uniforme
+Considérons un état d'équilibre uniforme \( U_0 = (\rho_{m0}, w_{m0}, \rho_{c0}, w_{c0})^T \) où les densités \( \rho_{m0}, \rho_{c0} \) sont constantes dans l'espace et le temps. Pour que \( U_0 \) soit un équilibre, les dérivées spatiales et temporelles doivent être nulles, ce qui implique que le terme source \( S(U, x) \) dans (\ref{eq:quasi_linear_form}) doit être nul à \( U_0 \). En supposant un revêtement uniforme \( R(x) = R_0 \), cela signifie que les vitesses doivent être égales aux vitesses d'équilibre :
+\begin{equation}
+    v_{i0} = V_{e,i}(\rho_{m0}, \rho_{c0}, R_0) \quad \text{pour } i = m, c
+\end{equation}
+où \( v_{i0} = w_{i0} - p_i(\rho_{m0}, \rho_{c0}) \). Un état d'équilibre est donc défini par des densités constantes \( \rho_{m0}, \rho_{c0} \) et les vitesses et variables lagrangiennes correspondantes qui annulent le terme de relaxation.
+
+% Linéarisation autour de l'Équilibre
+Nous étudions l'évolution d'une petite perturbation \( \delta U(x, t) \) autour de cet état d'équilibre : \( U(x, t) = U_0 + \delta U(x, t) \). En substituant dans le système complet (\ref{eq:quasi_linear_form}) et en ne conservant que les termes du premier ordre en \( \delta U \), nous obtenons le système linéarisé pour la perturbation :
+\begin{equation}
+    \label{eq:linearized_system}
+    \frac{\partial \delta U}{\partial t} + A(U_0) \frac{\partial \delta U}{\partial x} = J_S(U_0) \cdot \delta U
+\end{equation}
+où \( A(U_0) \) est la matrice Jacobienne de la partie flux (calculée en Section \ref{subsec:hyperbolicity}) évaluée à l'équilibre \( U_0 \), et \( J_S(U_0) = \nabla_U S(U_0) \) est la matrice Jacobienne du terme source \( S = (0, S_m, 0, S_c)^T \) avec \( S_i = \frac{1}{\tau_i}(V_{e,i} - (w_i - p_i)) \), évaluée à l'équilibre \( U_0 \).
+
+Calculons \( J_S(U_0) \). Sachant qu'à l'équilibre \( V_{e,i} - v_i = 0 \) et en supposant pour l'instant que \( \tau_i \) est constant pour simplifier (la dépendance à \( \rho \) pourrait être incluse mais complique le calcul), les dérivées partielles des composantes non nulles de \( S \) sont :
+\begin{itemize}
+    \item \( \frac{\partial S_i}{\partial \rho_j} = \frac{1}{\tau_i} \left( \frac{\partial V_{e,i}}{\partial \rho_j} + \frac{\partial p_i}{\partial \rho_j} \right) \) (évalué à \( U_0 \)) pour \( j = m, c \).
+    \item \( \frac{\partial S_i}{\partial w_i} = \frac{1}{\tau_i} (-1) = -1/\tau_i \).
+    \item \( \frac{\partial S_i}{\partial w_k} = 0 \) si \( k \neq i \).
+\end{itemize}
+La matrice Jacobienne du terme source à l'équilibre est donc :
+\[
+J_S(U_0) =
+\begin{pmatrix}
+ 0 & 0 & 0 & 0 \\
+ \frac{1}{\tau_m}(\frac{\partial V_{e,m}}{\partial \rho_m} + \frac{\partial p_m}{\partial \rho_m}) & -1/\tau_m & \frac{1}{\tau_m}(\frac{\partial V_{e,m}}{\partial \rho_c} + \frac{\partial p_m}{\partial \rho_c}) & 0 \\
+ 0 & 0 & 0 & 0 \\
+ \frac{1}{\tau_c}(\frac{\partial V_{e,c}}{\partial \rho_m} + \frac{\partial p_c}{\partial \rho_m}) & 0 & \frac{1}{\tau_c}(\frac{\partial V_{e,c}}{\partial \rho_c} + \frac{\partial p_c}{\partial \rho_c}) & -1/\tau_c
+\end{pmatrix}_{U=U_0}
+\]
+Les dérivées partielles de \( V_{e,i} \) et \( p_i \) dépendent des formes spécifiques choisies et incluent les effets des paramètres \( \alpha \) et \( V_{creeping} \).
+
+% Analyse de Stabilité (Modes de Fourier)
+Nous cherchons des solutions en ondes planes pour la perturbation \( \delta U(x, t) = \hat{U} e^{i(kx - \omega t)} \), où \( k \) est le nombre d'onde (réel) et \( \omega = \omega_R + i \omega_I \) est la fréquence complexe. La substitution dans (\ref{eq:linearized_system}) conduit au système algébrique suivant pour l'amplitude \( \hat{U} \):
+\begin{equation}
+    \label{eq:eigenvalue_problem_lsa}
+    (-i\omega I + ik A_0 - J_{S0}) \hat{U} = 0
+\end{equation}
+où \( A_0 = A(U_0) \) et \( J_{S0} = J_S(U_0) \). Ce système admet des solutions non triviales \( \hat{U} \) si et seulement si la matrice \( M(k) = J_{S0} - ik A_0 \) est singulière, c'est-à-dire si \( -i\omega \) est une valeur propre de \( M(k) \). L'analyse de stabilité consiste à déterminer le signe de la partie imaginaire de la fréquence, \( \omega_I = \text{Re}(-i\omega) \), pour chaque nombre d'onde \( k \).
+\begin{itemize}
+    \item Si \( \omega_I(k) < 0 \) pour tout \( k \neq 0 \), toutes les perturbations s'atténuent et l'équilibre \( U_0 \) est linéairement stable.
+    \item Si \( \omega_I(k) > 0 \) pour au moins une valeur de \( k \), certaines perturbations s'amplifient exponentiellement (\( e^{-\omega_I t} \)) et l'équilibre est linéairement instable.
+\end{itemize}
+
+% Discussion des Instabilités Potentielles
+La résolution analytique complète du problème aux valeurs propres 4x4 pour \( M(k) \) est généralement très complexe. Cependant, l'analyse de stabilité linéaire nous permet d'identifier les conditions sous lesquelles des instabilités pourraient émerger.
+\begin{enumerate}
+    \item \textbf{Instabilité de type ARZ (Convective) :} Les modèles ARZ (même à une classe) peuvent présenter une instabilité pour des perturbations de grande longueur d'onde (petit \( k \)) si le temps de relaxation \( \tau \) est trop grand par rapport à la sensibilité de la vitesse d'équilibre à la densité. Cette instabilité est liée à un retard excessif dans l'adaptation des conducteurs et peut conduire à la formation spontanée d'ondes stop-and-go ("phantom jams"). La condition de stabilité usuelle pour éviter cela (pour un modèle à une classe) est souvent de la forme \( \tau < \frac{1}{|\partial V_e / \partial \rho|} \) ou une condition similaire impliquant \(p'\) \cite{AwKlarMaterneRascle2000, BellettiEtAl2016}. Dans notre modèle multi-classes, des conditions similaires s'appliqueraient potentiellement pour \( \tau_m \) et \( \tau_c \) en relation avec les dérivées de \( V_{e,m}, V_{e,c}, p_m, p_c \).
+    \item \textbf{Instabilités dues aux Interactions Multi-Classes :} La question clé ici est de savoir si le \textit{couplage} spécifique entre motos et voitures, introduit par \( \alpha \) dans \(p_m\), par la différence marquée entre \(V_{e,m}\) et \(V_{e,c}\) (notamment via \(V_{creeping}\)), et par les temps de relaxation différents (\(\tau_m, \tau_c\)), peut créer de \textit{nouvelles} instabilités. Par exemple :
+        \begin{itemize}
+            \item Un fort découplage via un \(\alpha\) très petit pourrait-il, en conjonction avec certains \(\tau_i\), mener à des oscillations relatives entre les classes ?
+            \item La présence de \( V_{creeping} > 0 \) modifie-t-elle fondamentalement la stabilité à haute densité ?
+            \item Une forte différence entre \(\tau_m\) et \(\tau_c\) peut-elle induire des instabilités spécifiques au mélange ?
+        \end{itemize}
+\end{enumerate}
+L'analyse de stabilité linéaire, en examinant les valeurs propres de \( M(k) \) (potentiellement numériquement pour différentes valeurs de \( k \) et de paramètres du modèle), permettrait de répondre à ces questions et d'identifier les régimes de paramètres (valeurs de \(\rho_{m0}, \rho_{c0}, \alpha, V_{creeping}, \tau_m, \tau_c\), etc.) qui sont potentiellement instables. Cela peut guider la calibration et alerter sur les situations où les simulations numériques pourraient être particulièrement sensibles ou nécessiter des schémas très robustes.
+
+% Conclusion
+L'analyse de stabilité linéaire fournit donc un cadre pour évaluer la robustesse des équilibres uniformes du modèle étendu. Elle permet d'explorer si les interactions spécifiques introduites pour capturer le comportement des motos au Bénin génèrent des instabilités au-delà de celles connues pour les modèles ARZ standards. Bien qu'une analyse analytique complète soit difficile, l'étude des conditions limites et l'analyse numérique des valeurs propres de \( M(k) \) peuvent révéler des informations cruciales sur la dynamique intrinsèque du modèle et les régimes de paramètres critiques.
+
+\section{Numerical Scheme}
+\label{sec:numerical_scheme}
+
+% Introduction et Choix de la Méthode Générale
+La résolution numérique du système d'EDP hyperboliques non linéaires et couplées (\ref{eq:full_system_rho_w_i}) est essentielle pour réaliser des simulations et analyser le comportement du modèle ARZ multi-classes étendu. Le choix d'une méthode numérique appropriée est guidé par plusieurs exigences clés : la capacité à gérer les non-linéarités, à capturer les discontinuités (ondes de choc) de manière stable et précise, à préserver les lois de conservation fondamentales (masse), à traiter efficacement les termes sources de relaxation (potentiellement raides), et à intégrer les dépendances spatiales des paramètres.
+
+Pour répondre à ces exigences, particulièrement la conservation et la gestion des chocs, la \textbf{méthode des volumes finis (FVM)} est retenue. Contrairement aux méthodes par différences finies qui approximent les dérivées, la FVM discrétise la forme intégrale des lois de conservation, garantissant ainsi la conservation des quantités (\(\rho_m, \rho_c\) dans notre cas) au niveau discret, une propriété physique essentielle. De plus, les FVM basées sur les solveurs de Riemann sont spécifiquement conçues pour gérer les discontinuités sans introduire d'oscillations non physiques significatives, ce qui est crucial pour simuler la formation de fronts de congestion \cite{LeVeque2002, Toro2009}.
+
+\subsection{Finite Volume Formulation}
+\label{subsec:fvm_formulation}
+
+Le domaine spatial \( x \) est discrétisé en cellules \( C_j = [x_{j-1/2}, x_{j+1/2}] \) de largeur \( \Delta x \). La variable d'état principale est la moyenne cellulaire \( U_j(t) = \frac{1}{\Delta x} \int_{C_j} U(x, t) dx \), où \( U = (\rho_m, w_m, \rho_c, w_c)^T \). L'intégration du système (\ref{eq:quasi_linear_form}) sur \( C_j \) conduit à l'équation différentielle ordinaire (EDO) exacte pour la moyenne :
+\begin{equation}
+    \label{eq:semi_discrete_fvm_exact}
+    \frac{dU_j(t)}{dt} + \frac{1}{\Delta x} \left( F(U(x_{j+1/2}, t)) - F(U(x_{j-1/2}, t)) \right) = S_j(t)
+\end{equation}
+où \( F(U) \) est le flux physique et \( S_j(t) \) le terme source moyenné. La FVM approxime cette EDO par :
+\begin{equation}
+    \label{eq:semi_discrete_fvm_approx_rev}
+    \frac{dU_j}{dt} = -\frac{1}{\Delta x} \left( F_{j+1/2} - F_{j-1/2} \right) + S(U_j, x_j)
+\end{equation}
+où \( F_{j+1/2} = \mathcal{F}(U_j, U_{j+1}) \) est le \textbf{flux numérique} à l'interface, et le terme source est approximé par sa valeur au centre de la cellule en utilisant la moyenne \( U_j \). Le cœur de la méthode réside dans le choix de la fonction de flux \( \mathcal{F} \).
+
+\subsection{Approximate Riemann Solver: Central-Upwind Scheme}
+\label{subsec:riemann_solver}
+
+Le flux numérique \( F_{j+1/2} \) doit être une approximation consistante et stable du flux physique à l'interface, idéalement basée sur la solution du problème de Riemann local avec \( U_L = U_j \) et \( U_R = U_{j+1} \). Comme la résolution exacte du problème de Riemann pour notre système 4x4 est impraticable (Section \ref{sec:riemann_problem}), un \textbf{solveur de Riemann approché} est nécessaire.
+
+Parmi les nombreuses options (Godunov, Roe, HLL, HLLC, Osher, etc.), nous choisissons le schéma \textbf{Central-Upwind (CU)} de Kurganov et Tadmor \cite{KurganovTadmor2000} (voir aussi \cite{KurganovNoellePetrova2001} pour les systèmes). Ce choix est justifié par plusieurs avantages clés pour notre système :
+\begin{itemize}
+    \item \textbf{Robustesse :} Les schémas centraux sont généralement très robustes et moins sujets aux échecs ou à la violation de contraintes physiques (comme les densités positives) que certains schémas basés sur une linéarisation exacte (comme Roe), surtout face à des états proches du vide ou des ondes complexes \cite{KurganovTadmor2000}.
+    \item \textbf{Simplicité d'Implémentation :} Contrairement aux solveurs de type Godunov ou Roe, les schémas CU ne nécessitent pas la décomposition complète en valeurs et vecteurs propres du système Jacobien. Ils requièrent seulement des estimations des \textbf{vitesses d'onde locales maximales et minimales} (\( a_{j+1/2}^{\pm} \)), qui dépendent uniquement des valeurs propres \( \{\lambda_k\} \) du système (\ref{eq:lambda1_rev}-\ref{eq:lambda4_rev}), plus faciles à calculer. Ceci est un avantage considérable pour un système 4x4 couplé où les vecteurs propres peuvent être complexes.
+    \item \textbf{Adaptabilité :} Ils sont applicables à une large classe de systèmes hyperboliques, y compris ceux qui ne sont pas strictement hyperboliques ou qui ont des champs LD.
+    \item \textbf{Qualité de la Solution :} Bien qu'introduisant une certaine diffusion numérique (inhérente aux schémas centraux), ils sont significativement moins diffusifs que des schémas plus anciens comme Lax-Friedrichs et capturent bien les chocs et les contacts, offrant un bon compromis robustesse/précision pour de nombreuses applications \cite{KurganovTadmor2000}.
+\end{itemize}
+Le flux numérique CU, en supposant une forme conservative \( \frac{\partial U}{\partial t} + \frac{\partial \tilde{F}(U)}{\partial x} = \tilde{S}(U,x) \) pour l'application directe de la formule :
+\begin{equation}
+    \label{eq:cu_flux_final}
+    \tilde{F}_{j+1/2}^{CU} = \frac{a_{j+1/2}^+ \tilde{F}(U_j) - a_{j+1/2}^- \tilde{F}(U_{j+1})}{a_{j+1/2}^+ - a_{j+1/2}^-} + \frac{a_{j+1/2}^+ a_{j+1/2}^-}{a_{j+1/2}^+ - a_{j+1/2}^-} (U_{j+1} - U_j)
+\end{equation}
+où les vitesses d'onde locales \( a_{j+1/2}^{\pm} \) sont calculées à partir des valeurs propres \( \{\lambda_k\} \) (\ref{eq:lambda1_rev}-\ref{eq:lambda4_rev}) :
+\begin{align}
+    a_{j+1/2}^+ &= \max( \max_k\{\lambda_k(U_j)\}, \max_k\{\lambda_k(U_{j+1})\}, 0 ) \\
+    a_{j+1/2}^- &= \min( \min_k\{\lambda_k(U_j)\}, \min_k\{\lambda_k(U_{j+1})\}, 0 )
+\end{align}
+\textbf{Note sur la Forme Non-Conservative :} L'application rigoureuse de ce flux à notre système (\ref{eq:full_system_rho_w_i}), où l'équation pour \(w_i\) n'est pas sous forme conservative, nécessite une adaptation. Des techniques spécifiques existent pour les schémas centraux sur des systèmes non-conservatifs ou en utilisant des reconstructions de variables primitives \cite{KurganovPetrova2007}. Le principe de base (utilisation des vitesses \(a^\pm\) pour contrôler la diffusion et centrer le schéma) reste cependant le même.
+
+\subsection{Handling of Source Terms (Relaxation) via Strang Splitting}
+\label{subsec:source_terms}
+
+La présence des termes sources de relaxation \( S(U_j, x_j) \) dans (\ref{eq:semi_discrete_fvm_approx_rev}) introduit une difficulté supplémentaire si les temps de relaxation \( \tau_i \) sont petits par rapport au pas de temps \( \Delta t \) dicté par la condition CFL de la partie hyperbolique. Ce régime, dit raide (\textit{stiff}), peut rendre les schémas explicites standards instables ou imprécis pour la partie source.
+
+Pour gérer cette difficulté potentielle et séparer les échelles de temps, nous adoptons le \textbf{Strang Splitting} (fractionnement d'opérateurs symétrique) \cite{Strang1968}. Cette méthode est largement utilisée pour les lois de conservation avec termes sources \cite{LeVeque2002} car :
+\begin{itemize}
+    \item Elle \textbf{découple la résolution} de la partie hyperbolique (convection/propagation) de celle de la partie source (relaxation), permettant d'utiliser des méthodes numériques optimisées pour chaque partie.
+    \item Elle permet de gérer la \textbf{raideur} en résolvant l'EDO source avec une méthode adaptée (potentiellement implicite ou avec des pas de temps plus petits) sans que cela n'affecte la stabilité globale liée à la CFL de la partie hyperbolique.
+    \item Elle atteint une \textbf{précision globale du second ordre} en temps si les solveurs pour chaque étape sont au moins du second ordre (ou premier ordre global si les solveurs sont du premier ordre), ce qui est meilleur que le splitting de Godunov d'ordre 1.
+\end{itemize}
+L'évolution de \( U_j^n \) à \( U_j^{n+1} \) sur \( \Delta t \) se fait en trois étapes :
+\begin{enumerate}
+    \item \textbf{Étape ODE (demi-pas) :} Résoudre \( \frac{dU}{dt} = S(U, x_j) \) pour \( t \in [0, \Delta t / 2] \) avec \( U(0) = U_j^n \). Soit \( U_j^* \) la solution.
+    \item \textbf{Étape Hyperbolique (pas complet) :} Résoudre \( \frac{dU}{dt} = -\frac{1}{\Delta x} ( F_{j+1/2} - F_{j-1/2} ) \) pour \( t \in [0, \Delta t] \) avec \( U(0) = U_j^* \). Soit \( U_j^{**} \) la solution. (Utilise FVM+CU).
+    \item \textbf{Étape ODE (demi-pas) :} Résoudre \( \frac{dU}{dt} = S(U, x_j) \) pour \( t \in [0, \Delta t / 2] \) avec \( U(0) = U_j^{**} \). La solution est \( U_j^{n+1} \).
+\end{enumerate}
+Le système d'EDO à résoudre aux étapes 1 et 3 est \( \frac{d\rho_i}{dt} = 0 \), \( \frac{dw_i}{dt} = S_i(U, x_j) \).
+
+\subsection{Handling of Spatial Dependencies (R(x))}
+\label{subsec:spatial_dependencies}
+
+La dépendance spatiale \( R(x) \), qui affecte \( V_{e,i} \) dans le terme source \( S(U, x) \), est gérée de manière standard dans le cadre FVM. Lors des étapes de résolution de l'EDO source pour la cellule \( j \), on utilise la valeur locale \( R(x_j) \). Cette approche est simple, cohérente avec l'approximation par moyenne cellulaire, et permet de prendre en compte les variations spatiales de l'infrastructure via leur impact local sur la relaxation vers l'équilibre.
+
+\subsection{Temporal Discretization (Hyperbolic Step) and Stability (CFL)}
+\label{subsec:time_stepping}
+
+Pour l'avancement temporel de l'étape hyperbolique (étape 2 du splitting), des schémas explicites sont privilégiés pour leur simplicité et leur adéquation avec les FVM basées sur les solveurs de Riemann. Pour garantir la stabilité numérique, le pas de temps \( \Delta t \) doit impérativement satisfaire la condition \textbf{Courant-Friedrichs-Lewy (CFL)} \cite{CourantFriedrichsLewy1928}, qui assure que le domaine de dépendance numérique englobe le domaine de dépendance physique de l'EDP :
+\begin{equation}
+    \label{eq:cfl_condition_final}
+    \Delta t \le \nu \frac{\Delta x}{\max_{j} \{ a_{j+1/2}^+, |a_{j-1/2}^-| \}} \quad (\text{ou } \nu \frac{\Delta x}{\max_{j, k} |\lambda_k(U_j)|})
+\end{equation}
+où \( \nu \le 1 \) (souvent \( \nu \approx 0.5-0.9 \) en pratique pour la robustesse avec CU/splitting) est le nombre CFL. Le choix de \( \nu \) et la méthode temporelle (e.g., Euler avant pour ordre 1, Runge-Kutta type SSP pour ordre supérieur \cite{GottliebShuTadmor2001}) influencent la précision et la stabilité. Pour obtenir un schéma global d'ordre supérieur (en espace et en temps), des reconstructions spatiales (e.g., MUSCL \cite{vanLeer1979}) sont nécessaires en plus d'un intégrateur temporel d'ordre adéquat.
+
+% Conclusion de la section
+En synthèse, le schéma numérique sélectionné pour sa robustesse, sa précision et sa capacité à gérer les spécificités du modèle (chocs, sources, hétérogénéité) repose sur la \textbf{méthode des volumes finis}, un \textbf{solveur Central-Upwind} pour les flux, le \textbf{Strang Splitting} pour les termes sources, et une intégration temporelle explicite sous la contrainte de la \textbf{condition CFL}. Cette combinaison représente une approche moderne et bien fondée pour la simulation numérique du modèle ARZ multi-classes étendu proposé.
+
+\section{Implementation Details}
+\label{sec:implementation_details}
+
+Cette section décrit les aspects pratiques de la mise en œuvre du schéma numérique détaillé à la Section \ref{sec:numerical_scheme}, en précisant les outils logiciels utilisés, les choix algorithmiques spécifiques, et les stratégies adoptées pour surmonter les défis numériques potentiels. L'objectif est de fournir suffisamment d'informations pour assurer la reproductibilité et la compréhension de la manière dont les simulations numériques ont été réalisées.
+
+\subsection{Software Environment}
+\label{subsec:software}
+
+Le développement et les simulations numériques ont été réalisés en utilisant le langage de programmation \textbf{Python (version 3.x)}. Ce choix est motivé par son vaste écosystème scientifique, sa lisibilité, et sa capacité à permettre un prototypage rapide tout en offrant des performances acceptables pour des simulations de cette échelle grâce à des bibliothèques optimisées. Les bibliothèques principales suivantes ont été utilisées :
+\begin{itemize}
+    \item \textbf{NumPy} \cite{Harris2020Numpy}: Pour la gestion des tableaux multi-dimensionnels (représentant l'état \(U_j^n\) sur la grille), les opérations vectorisées efficaces, et les fonctions mathématiques de base.
+    \item \textbf{SciPy} \cite{Virtanen2020SciPy}: En particulier, le module `scipy.integrate` (spécifiquement la fonction `solve\_ivp`) a été utilisé pour la résolution numérique des systèmes d'EDO lors des étapes sources du Strang Splitting.
+    \item \textbf{Matplotlib} \cite{Hunter2007Matplotlib}: Pour la visualisation des résultats des simulations (profils de densité/vitesse, diagrammes espace-temps).
+\end{itemize}
+Une approche de développement \textbf{modulaire} a été suivie, séparant logiquement la définition du modèle physique (paramètres, fonctions \(p_i, V_{e,i}, \tau_i\)), le cœur du schéma numérique (calcul des flux, splitting, time stepping), la gestion des conditions aux limites, et le pilotage des simulations ainsi que l'analyse des résultats. Ceci a été facilité par une structure orientée objet de base (e.g., des classes pour représenter la grille, l'état, le solveur).
+
+\subsection{Core Algorithm Specifics}
+\label{subsec:algo_specifics}
+
+\begin{itemize}
+    \item \textbf{Discrétisation Spatiale et Données:} Une grille spatiale 1D uniforme a été utilisée, avec un pas \( \Delta x \) constant. L'état \( U_j^n = (\rho_{m,j}^n, w_{m,j}^n, \rho_{c,j}^n, w_{c,j}^n)^T \) est stocké dans un tableau NumPy de dimension (4, N), où N est le nombre de cellules. Le paramètre de qualité de route \( R(x) \) est stocké dans un tableau de dimension N, contenant la valeur \( R(x_j) \) au centre de chaque cellule.
+    \item \textbf{Calculs pour le Flux CU:} Les valeurs propres \( \lambda_k \) (\ref{eq:lambda1_rev}-\ref{eq:lambda4_rev}) ont été calculées analytiquement à partir des états \( U_j \) en supposant des formes analytiques (calibrées ultérieurement) pour les fonctions de pression \( P_m, P_c \), permettant le calcul analytique de leurs dérivées \( P'_m, P'_c \). Les vitesses d'onde \( a_{j+1/2}^\pm \) sont ensuite calculées par les formules de max/min.
+    \item \textbf{Gestion de la Forme Non-Conservative pour le Flux CU:} L'application du flux CU (\ref{eq:cu_flux_final}), conçu pour les formes conservatives, à notre système mixte a nécessité une attention particulière. L'approche adoptée a été d'utiliser une reconstruction des variables primitives \( (\rho_m, v_m, \rho_c, v_c)^T \) (constantes par morceaux pour un schéma du premier ordre) aux interfaces \( x_{j+1/2} \), puis d'évaluer le flux CU en utilisant ces variables reconstruites et les vitesses d'onde \( a^\pm \) calculées à partir des états moyens \( U_j, U_{j+1} \). D'autres approches comme les schémas "path-conservative" \cite{Pares2006PathConservative} existent mais sont plus complexes à implémenter. La méthode choisie est un compromis pragmatique.
+    \item \textbf{Solveur d'EDO pour le Splitting:} La fonction `scipy.integrate.solve\_ivp` a été utilisée. Pour les étapes initiales et la plupart des simulations, la méthode explicite par défaut 'RK45' (Runge-Kutta d'ordre 4(5)) a été employée, car elle est efficace et précise pour les problèmes non raides. Cependant, la possibilité de basculer vers une méthode adaptée aux problèmes raides comme 'LSODA' (qui commute automatiquement entre méthodes non-raides et raides) ou 'Radau'/'BDF' (méthodes implicites) a été prévue et utilisée si des signes de raideur (temps de calcul excessif du solveur EDO, instabilités) étaient détectés pour certains régimes de paramètres (notamment \(\tau_i\) très petits). Les tolérances relatives et absolues de `solve\_ivp` ont été réglées à des valeurs standard (e.g., \(10^{-6}\)) pour assurer la précision de la résolution de l'ODE.
+    \item \textbf{Ordre de Précision:} L'implémentation initiale et les simulations présentées dans cette thèse se concentrent sur un schéma global du \textbf{premier ordre} en espace et en temps. Cela implique une reconstruction constante par morceaux (valeurs moyennes \(U_j\)) pour le calcul des flux et l'utilisation d'un pas d'Euler avant (ou la structure du Strang Splitting qui est d'ordre supérieur mais dont l'étape hyperbolique est ici d'ordre 1) pour l'étape hyperbolique. Bien que plus diffusif, ce choix simplifie l'implémentation et la validation initiale. La montée en ordre (e.g., MUSCL \cite{vanLeer1979} avec limiteurs MinMod et SSP-RK2/3 \cite{GottliebShuTadmor2001}) est une perspective pour des travaux futurs visant une meilleure résolution des gradients.
+    \item \textbf{Conditions aux Limites (CL):} La technique des \textbf{cellules fantômes} (typiquement 1 ou 2 de chaque côté du domaine physique) a été utilisée pour implémenter les CL. Les CL essentielles pour nos scénarios sont :
+        \begin{itemize}
+            \item \textit{Entrée (Inflow):} L'état \( U \) est fixé dans les cellules fantômes en amont (\(j < 0\)) pour correspondre aux conditions d'entrée souhaitées (e.g., densité et vitesse/w données pour chaque classe).
+            \item \textit{Sortie (Outflow):} Extrapolation d'ordre zéro est utilisée : l'état des dernières cellules physiques est copié dans les cellules fantômes en aval (\(j \ge N\)), permettant aux ondes de quitter le domaine sans réflexion significative.
+        \end{itemize}
+    \item \textbf{Pas de Temps (\(\Delta t\)):} Le pas de temps est recalculé à chaque itération \( n \) en utilisant la condition CFL (\ref{eq:cfl_condition_final}). Le maximum des vitesses d'onde \( \max(a_{j+1/2}^+, |a_{j-1/2}^-|) \) est déterminé sur l'ensemble de la grille. Une valeur conservatrice pour le nombre CFL, typiquement \( \nu = 0.8 \), a été utilisée pour assurer la stabilité du schéma explicite, en particulier avec le solveur CU et le splitting.
+\end{itemize}
+
+\subsection{Handling Numerical Challenges}
+\label{subsec:challenges}
+
+Plusieurs défis numériques potentiels ont été anticipés et gérés dans l'implémentation :
+\begin{itemize}
+    \item \textbf{Positivité des Densités:} Bien que les schémas CU tendent à préserver la positivité, une vérification explicite \( \rho_{i,j}^{n+1} \ge 0 \) a été ajoutée. Si une densité devenait négative (ce qui peut arriver en cas de fortes raréfactions ou d'erreurs d'arrondi), elle était remise à une petite valeur plancher positive (\(\epsilon \approx 10^{-10}\)) pour éviter les erreurs mathématiques, tout en signalant l'occurrence.
+    \item \textbf{États Limites (\(\rho \approx 0, \rho \approx \rho_{jam}\)):} Pour éviter les divisions par zéro ou les valeurs infinies dans les calculs de pression \( P_i \) ou de vitesse \( g_i \) près de \(\rho=0\) ou \(\rho=\rho_{jam}\), des tests `if` ou l'ajout de petites quantités \(\epsilon\) aux dénominateurs ont été utilisés si nécessaire. Le choix de formes fonctionnelles \( P_i, g_i \) qui se comportent bien aux limites est également privilégié lors de la calibration.
+    \item \textbf{Raideur des Sources:} Comme mentionné, la flexibilité du solveur `solve\_ivp` a permis de gérer les cas où les termes de relaxation devenaient raides en utilisant des méthodes adaptées (e.g., 'LSODA').
+    \item \textbf{Instabilités/Oscillations:} Le choix d'un schéma du premier ordre avec le solveur CU a permis de minimiser les oscillations près des discontinuités, au prix d'une diffusion plus importante. L'utilisation d'un \(\nu\) CFL conservateur (0.8) a également contribué à la stabilité.
+    \item \textbf{Vérification et Validation du Code:} Des étapes de vérification rigoureuses ont été entreprises :
+        \begin{itemize}
+            \item Tests unitaires sur des fonctions clés (calcul de \( \lambda_k \), flux CU, etc.).
+            \item Vérification de la conservation discrète de la masse pour chaque classe sur des simulations longues.
+            \item Tests de convergence sur des problèmes avec solutions lisses connues (si disponibles pour des cas simplifiés du modèle) pour vérifier l'ordre de précision effectif du schéma.
+            \item Comparaison qualitative avec des solutions de problèmes de Riemann standards (e.g., formation de chocs, raréfactions) pour des versions simplifiées du modèle.
+        \end{itemize}
+\end{itemize}
+
+En conclusion, l'implémentation numérique du modèle ARZ multi-classes étendu a été réalisée en Python en utilisant une combinaison de méthodes FVM robustes (CU, Strang Splitting) et en portant une attention particulière aux défis numériques potentiels liés à la complexité du modèle (non-linéarité, sources, non-conservation partielle, états limites). Les choix effectués visent un équilibre entre précision, robustesse et faisabilité de l'implémentation pour permettre des simulations fiables du trafic routier au Bénin.
+

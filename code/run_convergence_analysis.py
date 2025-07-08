@@ -133,13 +133,11 @@ def analyze_convergence(results_dir: str, scenario_name: str, N_list: list[int],
             order_val = orders.get(N_val, np.full(4, float('nan'))) # Order is calculated for N, refers to (N, 2N) pair
 
             line = f"{N_val:>5d} {dx_val:>10.4e} | "
-            order_key_prev = N_list[i-1] if i > 0 else -1 # Key for order is the coarser grid N/2
-            order_val_pair = orders.get(order_key_prev, np.full(4, float('nan'))) if i > 0 else np.full(4, float('nan'))
-
             for k in range(4):
-                 # Get order corresponding to the transition *to* this N value
-                 q_obs = order_val_pair[k] if i > 0 else float('nan')
-                 line += f"{error_val[k]:>12.4e} {q_obs:>6.2f} | "
+                # The 'orders' dict is keyed by the coarser N of the pair.
+                # The order for N_val is calculated from the (N_val/2, N_val) pair.
+                order_val = orders.get(N_val / 2, np.full(4, float('nan')))[k] if N_val in orders else float('nan')
+                line += f"{error_val[k]:>12.4e} {order_val:>6.2f} | "
             print(line.strip().rstrip('|'))
         print("-" * len(header))
 

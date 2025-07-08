@@ -1,0 +1,38 @@
+# Scenario configuration for mass conservation test with WENO5
+
+scenario_name: mass_conservation_test_weno5
+
+# Force WENO5 + SSP-RK3
+spatial_scheme: 'weno5'
+time_scheme: 'ssprk3'
+ghost_cells: 3  # Requis pour WENO5
+
+# Grid parameters
+N: 100
+xmin: 0.0
+xmax: 1000.0
+
+boundary_conditions:
+  left: { type: periodic }
+  right: { type: periodic }
+
+initial_conditions:
+  type: sine_wave_perturbation
+  R_val: 1 # Route parfaite
+  background_state:
+    rho_m: 0.03  # 30 veh/km
+    rho_c: 0.02  # 20 veh/km
+  perturbation:
+    amplitude: 0.005 # 5 veh/km
+    wave_number: 1
+
+simulation:
+  t_final_sec: 100.0  # Test long pour voir la conservation
+  output_dt_sec: 10.0 # Sortie toutes les 10s
+
+# Configuration de test de conservation de masse
+mass_conservation_check:
+  enabled: true
+  tolerance: 1.0e-6  # Tolerance stricte pour WENO5
+  check_interval_sec: 10.0
+  frequency_steps: 100  # Vérifier toutes les 100 étapes

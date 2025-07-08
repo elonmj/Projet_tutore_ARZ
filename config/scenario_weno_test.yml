@@ -1,0 +1,61 @@
+# Fichier de configuration pour le test et la validation du schéma WENO.
+
+# --- Scénario 1 : Test de Précision sur Solution Lisse ---
+smooth_test:
+  scenario_name: weno_accuracy_test_sine
+  numerical:
+    scheme: weno5 # Placeholder pour la sélection du schéma
+    cfl_number: 0.5
+  grid:
+    N: 100 # Sera surchargé par le script de test
+    xmin: 0.0
+    xmax: 1000.0
+    num_ghost_cells: 3 # Requis pour WENO5
+  simulation:
+    t_final_sec: 200.0
+    output_dt_sec: 200.0
+  initial_conditions:
+    type: sine_wave_perturbation
+    R_val: 1 # Qualité de route uniforme
+    background_state:
+      rho_m: 0.02 # ~20 veh/km
+      rho_c: 0.01 # ~10 veh/km
+    perturbation:
+      amplitude: 0.005 # ~5 veh/km
+      wave_number: 2
+  boundary_conditions:
+    left: { type: periodic }
+    right: { type: periodic }
+
+# --- Scénario 2 : Test de Non-Oscillation sur Choc ---
+shock_test:
+  scenario_name: weno_shock_test_riemann
+  numerical:
+    scheme: weno5
+    cfl_number: 0.5
+  grid:
+    N: 200
+    xmin: 0.0
+    xmax: 1000.0
+    num_ghost_cells: 3
+  simulation:
+    t_final_sec: 150.0
+    output_dt_sec: 5.0
+  initial_conditions:
+    type: riemann
+    split_pos: 500.0
+    # État Gauche : Faible densité, haute vitesse
+    U_L:
+      - 0.01  # rho_m (10 veh/km)
+      - 22.22 # w_m (v ~ 80 km/h)
+      - 0.005 # rho_c (5 veh/km)
+      - 22.22 # w_c (v ~ 80 km/h)
+    # État Droit : Haute densité, basse vitesse
+    U_R:
+      - 0.08  # rho_m (80 veh/km)
+      - 5.55  # w_m (v ~ 20 km/h)
+      - 0.04  # rho_c (40 veh/km)
+      - 5.55  # w_c (v ~ 20 km/h)
+  boundary_conditions:
+    left: { type: outflow }
+    right: { type: outflow }

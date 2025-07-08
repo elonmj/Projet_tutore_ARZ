@@ -1,0 +1,30 @@
+Profil de performance: WENO5 (N=50)
+==================================================
+         298863 function calls (298595 primitive calls) in 2.943 seconds
+
+   Ordered by: internal time
+   List reduced from 303 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    11570    0.554    0.000    1.078    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\numerics\time_integration.py:111(_ode_rhs)
+    11571    0.451    0.000    0.451    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\core\physics.py:118(calculate_equilibrium_speed)
+     1667    0.357    0.000    1.381    0.001 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\rk.py:14(rk_step)
+     1071    0.132    0.000    0.319    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\numerics\riemann_solvers.py:14(central_upwind_flux)
+     2149    0.122    0.000    0.129    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\core\physics.py:301(calculate_eigenvalues)
+     1667    0.116    0.000    1.616    0.001 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\rk.py:111(_step_impl)
+     2142    0.078    0.000    0.103    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\numerics\time_integration.py:82(primitives_to_conserved_single)
+     4019    0.062    0.000    0.115    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numpy\linalg\linalg.py:2383(norm)
+      784    0.055    0.000    0.231    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\common.py:68(select_initial_step)
+    17979    0.053    0.000    0.053    0.000 {built-in method numpy.array}
+    24655    0.051    0.000    0.051    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\serialize.py:30(_numba_unpickle)
+      784    0.045    0.000    2.271    0.003 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\ivp.py:159(solve_ivp)
+       21    0.044    0.002    0.470    0.022 D:\Projets\Alibi\Projet_tutore_ARZ\code\numerics\time_integration.py:15(calculate_spatial_discretization_weno)
+    11570    0.039    0.000    1.164    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\base.py:22(fun_wrapped)
+      784    0.039    0.000    0.108    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\common.py:44(validate_tol)
+       14    0.038    0.003    2.311    0.165 D:\Projets\Alibi\Projet_tutore_ARZ\code\numerics\time_integration.py:175(solve_ode_step_cpu)
+     4019    0.037    0.000    0.155    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\common.py:63(norm)
+     2366    0.036    0.000    0.036    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+    18033    0.033    0.000    0.033    0.000 {built-in method builtins.min}
+    11570    0.030    0.000    1.194    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\base.py:152(fun)
+
+

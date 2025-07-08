@@ -1,0 +1,100 @@
+
+
+\chapter{Analyse et Amélioration de la Chaîne Numérique}
+\label{chap:analyse_amelioration_numerique}
+
+% Introduction
+Après avoir formulé le modèle ARZ multi-classes étendu (Chapitre \ref{chap:formulation_modele}), ce chapitre se consacre à l'analyse critique de la chaîne de résolution numérique choisie pour sa simulation. Nous commencerons par résumer la logique de la chaîne initiale, conçue pour sa robustesse. Nous identifierons ensuite une limitation fondamentale de cette approche, mise en évidence par l'apparition d'un artefact non-physique dans les simulations de forte congestion. Finalement, nous détaillerons la stratégie d'amélioration, qui consiste en une mise à niveau ciblée vers un schéma d'ordre élevé de type **WENO (Weighted Essentially Non-Oscillatory)**. L'objectif est de faire évoluer la plateforme de simulation d'un outil qualitatif robuste vers un instrument prédictif de haute-fidélité, capable de résoudre avec précision toute la complexité du modèle physique.
+
+\section{La Chaîne de Résolution Initiale : Une Fondation Robuste}
+\label{sec:chaine_initiale}
+
+La résolution numérique de notre système de quatre EDP non-linéaires et couplées repose sur une séquence d'outils dont chaque composant a été sélectionné pour répondre à un défi spécifique du modèle.
+
+\begin{table}[h!]
+\centering
+\caption{Synthèse de la chaîne de résolution numérique initiale.}
+\label{tab:chaine_initiale_synthese}
+\begin{tabular}{|p{0.25\linewidth}|p{0.25\linewidth}|p{0.45\linewidth}|}
+\hline
+\textbf{Composant} & \textbf{Méthode Choisie} & \textbf{Justification Spécifique au Modèle ARZ Étendu} \\
+\hline
+\textbf{Discrétisation Spatiale} & Volumes Finis (FVM) & Indispensable pour garantir la conservation discrète des densités \(\rho_m\) et \(\rho_c\), fondement de l'équation de la masse. \\
+\hline
+\textbf{Calcul des Flux} & Schéma Central-Upwind (CU) & Choix pragmatique et robuste pour un système 4x4 complexe. Ne requiert que le calcul des valeurs propres \(\lambda_k\), que nous avons déterminées analytiquement. \\
+\hline
+\textbf{Gestion des Sources} & Strang Splitting & Essentiel pour gérer la "raideur" potentielle des termes de relaxation \((V_{e,i} - v_i)/\tau_i\), assurant la stabilité même pour des temps d'adaptation \(\tau_i\) très courts. \\
+\hline
+\textbf{Stabilité Temporelle} & Condition CFL & Le garde-fou qui lie le pas de temps \(\Delta t\) au pas d'espace \(\Delta x\) via la vitesse d'onde la plus rapide, \(\max|\lambda_k|\), assurant la stabilité globale. \\
+\hline
+\end{tabular}
+\end{table}
+
+Cette architecture constitue une base solide, cohérente et fonctionnelle qui permet d'obtenir des simulations qualitatives du trafic. Cependant, les tests en conditions extrêmes révèlent les limites inhérentes à sa précision.
+
+\section{Le Point de Rupture : Identification de la Faiblesse du Premier Ordre}
+\label{sec:point_de_rupture}
+
+L'analyse des scénarios de congestion (type "feu rouge") a mis en lumière un artefact numérique critique : un **pic de densité moto `ρm` qui dépasse la densité maximale physique (`ρjam`)**. Il ne s'agit pas d'une faille du modèle physique, mais d'une conséquence directe de la manière dont la chaîne numérique actuelle le résout.
+
+\subsection{L'Artefact Observé et sa Cause Racine : La Diffusion Numérique}
+
+La cause profonde est la **précision du premier ordre** du schéma, qui approxime l'état du trafic (`ρm, wc`, etc.) comme étant **constant** à l'intérieur de chaque cellule de calcul. Cette vision en "escalier" est trop grossière pour représenter correctement les ondes de choc abruptes que notre modèle ARZ est conçu pour générer. Le schéma "floute" le choc sur plusieurs cellules, un phénomène connu sous le nom de **diffusion numérique**.
+
+C'est cette information "floutée" et corrompue qui est ensuite transmise à l'étape de relaxation du fractionnement de Strang. Le terme de relaxation, en réagissant à un profil de densité physiquement incorrect, produit à son tour une réponse erronée qui se manifeste par ce pic de densité non-physique, comme illustré conceptuellement sur la Figure \ref{fig:artefact_depassement_densite}.
+
+\begin{figure}[h!]
+    \centering
+    % Note : Remplacez par un graphique réel de vos simulations montrant le problème.
+    \fbox{\parbox[c][8cm][c]{0.8\textwidth}{\centering \large Placeholder pour Résultat de Simulation \\ (Graphique de ρm vs. x montrant ρm > ρjam)}}
+    \caption{Illustration de l'artefact numérique observé avec le schéma du premier ordre lors d'un scénario de congestion. La densité des motos `ρm` (courbe bleue) dépasse transitoirement la limite physique `ρjam` (ligne rouge pointillée) au front de choc. Il s'agit d'un résultat non-physique causé par la méthode numérique.}
+    \label{fig:artefact_depassement_densite}
+\end{figure}
+
+En résumé, la chaîne numérique initiale, bien que robuste, n'est pas assez précise pour résoudre fidèlement l'interaction entre les ondes de choc générées par le modèle et ses termes de relaxation.
+
+\section{La Stratégie d'Amélioration : Une Mise à Niveau Chirurgicale vers WENO}
+\label{sec:strategie_weno}
+
+Pour résoudre ce problème, il n'est pas nécessaire de changer toute la chaîne, mais seulement de remplacer le maillon faible : **l'étape de reconstruction des données** au sein du solveur hyperbolique. Nous passons d'une reconstruction constante à une reconstruction polynomiale intelligente grâce à la méthode **WENO (Weighted Essentially Non-Oscillatory)**.
+
+\subsection{Principe et Avantages de la Méthode WENO}
+
+Le principe de WENO est de construire une approximation polynomiale de haute précision des variables dans chaque cellule, tout en évitant de créer des oscillations parasites près des chocs. Pour ce faire, il combine de manière "intelligente" plusieurs polynômes candidats basés sur des pochoirs de cellules voisins. Grâce à une pondération non-linéaire, le schéma :
+- **Atteint une haute précision** (par exemple, d'ordre 5) dans les zones où le flux est régulier.
+- **Rejette automatiquement l'information "contaminée"** provenant de l'autre côté d'un choc, ce qui lui permet de capturer la discontinuité de manière nette et sans rebond.
+
+WENO fournit donc au solveur de flux une description bien plus réaliste et précise de l'état du trafic à l'interface des cellules.
+
+\subsection{Intégration Concrète de WENO dans la Chaîne de Résolution}
+
+L'intégration de WENO est une mise à niveau ciblée, pas une refonte. La structure globale (FVM, Strang Splitting) est conservée. La modification est chirurgicale et se situe au cœur de l'étape de transport (l'étape 2 du fractionnement de Strang).
+
+\begin{table}[h!]
+\centering
+\caption{Évolution de l'étape du solveur hyperbolique avec l'intégration de WENO.}
+\label{tab:evolution_weno}
+\begin{tabular}{|p{0.2\linewidth}|p{0.38\linewidth}|p{0.38\linewidth}|}
+\hline
+\textbf{Sous-étape} & \textbf{Chaîne Actuelle (1er Ordre)} & \textbf{Chaîne Améliorée (Ordre Élevé WENO)} \\
+\hline
+\textbf{1. Reconstruction aux Interfaces} & Prend directement les valeurs moyennes des cellules : \(U_L = U_j\) et \(U_R = U_{j+1}\). & **(NOUVEAU)** Applique la **procédure de reconstruction WENO** sur les variables primitives pour calculer des états \(U_L\) et \(U_R\) de haute précision à l'interface. \\
+\hline
+\textbf{2. Calcul du Flux} & Injecte les \(U_L, U_R\) de premier ordre dans la **formule de flux Central-Upwind (CU)**. & Injecte les \(U_L, U_R\) de haute précision issus de WENO dans la **même formule de flux Central-Upwind (CU)**. \\
+\hline
+\textbf{3. Intégration Temporelle} & Utilise un pas de temps simple du premier ordre (ex: Euler avant). & **(MISE À NIVEAU ESSENTIELLE)** Utilise un intégrateur temporel d'ordre élevé et à forte stabilité (SSP), tel qu'un **Runge-Kutta SSP d'ordre 3 (SSP-RK3)**. \\
+\hline
+\end{tabular}
+\end{table}
+
+Les autres briques du projet restent inchangées. Le **fractionnement de Strang** continue d'isoler la relaxation, qui est toujours résolue par `scipy.solve_ivp`, et la stabilité est toujours gouvernée par la **condition CFL**.
+
+\section{Conclusion et Bénéfices Attendus}
+\label{sec:conclusion_weno}
+
+Le passage à un schéma **WENO d'ordre élevé couplé à un intégrateur temporel SSP-RK** est une évolution ciblée et scientifiquement fondée pour corriger la faiblesse identifiée. Les bénéfices attendus sont directs et critiques pour la validité du projet :
+
+1.  **Élimination de la Diffusion Numérique et des Artefacts :** La capture nette des chocs élimine la cause du dépassement de densité non-physique (`ρm > ρjam`), rendant la simulation physiquement cohérente en toutes circonstances.
+2.  **Haute-Fidélité et Fiabilité Quantitative :** La précision accrue sur l'ensemble du domaine permet une analyse quantitative fiable des phénomènes subtils décrits par notre modèle, comme l'impact des paramètres \(\alpha\) et \(R(x)\).
+
+En conclusion, cette mise à niveau transforme notre outil de simulation. D'une plateforme fonctionnelle pour l'analyse qualitative, il devient un instrument d'analyse prédictive de haute-fidélité, capable de rendre justice à la complexité et à la richesse du modèle ARZ multi-classes que nous avons développé pour le contexte du trafic béninois.

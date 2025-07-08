@@ -1,0 +1,447 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{graphicx}
+\usepackage[export]{adjustbox}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{xcolor}
+
+% Définition des commandes personnalisées pour la page de garde
+\makeatletter
+\def\@ecole{école}
+\newcommand{\ecole}[1]{
+  \def\@ecole{#1}
+}
+
+% Configuration des headers/footers
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Protocole de Recherche - Jumeau Numérique Trafic Ouest-Africain}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Configuration des liens
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    citecolor=red
+}
+
+% Espacement
+\onehalfspacing
+
+% Définition du titre et de l'école pour la page de garde
+\author{Josaphat Elonm AHOUANYE}
+\title{Développement d'un Jumeau Numérique pour le Trafic Ouest-Africain : Application à l'Optimisation des Feux de Signalisation par Apprentissage par Renforcement}
+\ecole{\textbf{ECOLE NATIONALE SUPERIEURE DE GENIE MATHEMATIQUE ET MODELISATION (ENSGMM)}}
+
+\begin{document}
+
+%%Page de garde
+\begin{titlepage}
+  \centering
+  \includegraphics[width=0.15\textwidth]{assets/logo_unstim.jpeg}
+  \hfill
+  \includegraphics[width=0.15\textwidth]{assets/logo_gmm.jpeg}
+  
+  \vspace{0.5cm}
+   {\large \textbf{REPUBLIQUE DU BENIN}}
+  \vspace{0.5cm}
+  
+  \vspace{0.5cm}
+   {\large \textbf{MINISTERE DE L'ENSEIGNEMENT SUPERIEUR ET DE LA RECHERCHE SCIENTIFIQUE}}
+  \vspace{0.5cm}
+  \vspace{0.5cm}
+  
+ {\large \textbf{UNIVERSITE NATIONALE DES SCIENCES TECHNOLOGIES ET INGENIERIE MATHEMATIQUE(UNSTIM)}}\\
+ \vspace{0.5cm}
+ 
+ 
+    \vspace{0.5cm}
+    	{\large \@ecole}\\
+    	\vspace{0.5cm}
+    	\vspace{0.5cm}
+    	{\large\textbf{Protocole de recherches}}\\
+    	\vspace{0.5cm}
+    	\vspace{0.5cm}
+    	{\large \textbf{Niveau} : ING-GMM3}\\
+       \vspace{0.5cm}
+       \vspace{0.5cm}
+       
+		\hrule
+		\vspace{1cm}
+       {\Large \color[rgb]{0,0,1} \bfseries{\@title}} \\
+        \vspace{1cm}
+        \hrule
+        
+	\vspace{1cm}
+	
+	\begin{minipage}{0.4\textwidth}
+      \begin{flushleft}
+        \textbf{Realisé par :}
+	\begin{enumerate}
+	\item AHOUANYE Elonm Josaphat
+	\end{enumerate}
+      \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.5\textwidth}
+      \begin{flushright}
+        \textbf{Supervisé par :}\\
+        \vspace{0.3cm}
+        Dr Régis HONTIFINDE
+      \end{flushright}
+    \end{minipage}
+
+    \vfill
+	
+	\textbf{Année académique : 2024 - 2025}
+	
+  \end{titlepage}
+ \newpage
+
+\tableofcontents
+
+\newpage
+
+\section{Introduction Générale}
+
+\subsection{Contexte Global}
+
+L'urbanisation rapide en Afrique de l'Ouest constitue l'un des défis majeurs du XXIe siècle. Avec un taux de croissance urbaine parmi les plus élevés au monde, les métropoles ouest-africaines comme Lagos, Accra, Dakar, et Cotonou connaissent une explosion démographique qui met à rude épreuve leurs infrastructures de transport. Lagos, mégalopole de plus de 15 millions d'habitants, illustre parfaitement cette problématique : la mobilité urbaine y est devenue un enjeu critique pour le développement économique, la compétitivité internationale, et la qualité de vie des populations.
+
+Dans ce contexte, la congestion routière chronique ne constitue plus seulement une nuisance ; elle représente un véritable frein au développement économique. Les pertes économiques liées aux embouteillages sont estimées à plusieurs milliards de dollars annuellement pour la seule région de Lagos, sans compter les impacts sanitaires et environnementaux (pollution atmosphérique, stress, accidents).
+
+\subsection{Problématique Spécifique}
+
+Le trafic urbain ouest-africain présente des caractéristiques uniques qui le distinguent fondamentalement des contextes pour lesquels la plupart des systèmes de gestion intelligente du trafic ont été développés. Cette spécificité se manifeste par :
+
+\begin{itemize}
+    \item \textbf{Hétérogénéité extrême du parc véhiculaire} : Coexistence de motocyclettes (souvent majoritaires à plus de 70\%), voitures particulières, véhicules commerciaux, tricycles motorisés, et parfois véhicules non motorisés
+    \item \textbf{Comportements de conduite adaptatifs} : Les conducteurs, particulièrement de deux-roues, développent des stratégies spécifiques (filtrage inter-véhiculaire, remontée de files, "creeping" en congestion) qui optimisent l'utilisation de l'espace disponible
+    \item \textbf{Infrastructure hétérogène} : Qualité très variable des routes, signalisation souvent déficiente, intersections non régulées ou mal synchronisées
+    \item \textbf{Saturation chronique} : Demande de mobilité dépassant largement la capacité des infrastructures existantes
+\end{itemize}
+
+Par exemple, les motocyclettes, qui représentent plus de 70\% du trafic dans certaines zones, adoptent des comportements tels que le "filtrage inter-véhiculaire", où elles se faufilent entre les voitures, et la "remontée de files", où elles dépassent les files d'attente aux intersections. De plus, en cas de congestion extrême, les motocyclettes peuvent maintenir une vitesse résiduelle grâce au "creeping", un phénomène où elles avancent lentement dans les espaces restreints.
+
+Ces caractéristiques rendent les solutions de gestion de trafic "standard", développées pour des contextes homogènes et disciplinés, largement inadaptées ou sous-performantes. Les systèmes de feux de signalisation à cycles fixes, encore largement répandus, sont particulièrement inefficaces face à cette dynamique complexe et imprévisible.
+
+\subsection{Proposition de Solution et Vision du Projet}
+
+Ce projet propose une approche révolutionnaire basée sur le concept de \textbf{Jumeau Numérique} comme fondation indispensable pour des stratégies de contrôle intelligent adaptées au contexte ouest-africain. 
+
+Le Jumeau Numérique représente une réplique virtuelle haute-fidélité du système de trafic réel, capable de reproduire en temps quasi-réel la dynamique complexe des flux hétérogènes. Cette approche se distingue des modélisations classiques par sa capacité à :
+\begin{itemize}
+    \item Intégrer la physique spécifique des différentes classes de véhicules
+    \item Capturer les phénomènes hors-équilibre (hystérésis, ondes de choc, relaxation)
+    \item Modéliser l'impact de l'infrastructure variable sur les comportements de conduite
+\end{itemize}
+
+Sur cette base, l'\textbf{Apprentissage par Renforcement (RL)} émerge comme la technologie de rupture pour le contrôle adaptatif des feux de signalisation. Contrairement aux approches classiques d'optimisation statique, le RL permet de développer des politiques de contrôle qui s'adaptent dynamiquement aux conditions changeantes, apprennent des patterns récurrents, et optimisent les performances globales du réseau.
+
+La vision du projet est de créer un système de contrôle intelligent capable de :
+\begin{itemize}
+    \item Réduire significativement les temps de parcours (objectif : -20\% minimum)
+    \item Améliorer la fluidité du trafic en optimisant l'utilisation de l'infrastructure existante
+    \item Diminuer les émissions polluantes par une réduction des arrêts et redémarrages
+    \item S'adapter en temps réel aux variations de demande et aux incidents
+\end{itemize}
+
+\subsection{Annonce de la Structure du Document}
+
+Ce protocole s'articule autour de cinq sections principales qui détaillent la méthodologie complète : l'état de l'art positionne scientifiquement le projet à l'intersection de la modélisation macroscopique avancée et de l'intelligence artificielle ; les objectifs et hypothèses formalisent les ambitions quantifiables ; la méthodologie décrit précisément les trois phases de réalisation ; les résultats attendus et la valorisation exposent les contributions scientifiques et technologiques ; enfin, l'environnement de travail spécifie les ressources nécessaires.
+
+\section{État de l'Art et Positionnement Scientifique}
+
+\subsection{Modélisation Macroscopique du Trafic}
+
+\subsubsection{Modèles de Premier et Second Ordre}
+
+Les modèles macroscopiques de premier ordre, inaugurés par le modèle Lighthill-Whitham-Richards (LWR) dans les années 1950, constituent la base historique de la modélisation du trafic. Le modèle LWR repose sur l'équation de conservation de la masse :
+\begin{equation}
+\frac{\partial \rho}{\partial t} + \frac{\partial q}{\partial x} = 0
+\end{equation}
+avec une relation d'équilibre instantané $q = \rho V_e(\rho)$ entre débit, densité et vitesse.
+
+Cependant, des travaux antérieurs sur la modélisation du trafic béninois ont démontré les limitations critiques de cette approche : incapacité à modéliser l'hystérésis, les phénomènes hors-équilibre, et la dynamique complexe des interactions multi-classes observées en Afrique de l'Ouest.
+
+Les modèles de second ordre, et particulièrement le modèle Aw-Rascle-Zhang (ARZ), offrent une alternative théoriquement plus robuste. Le système ARZ introduit une équation supplémentaire pour la dynamique de la vitesse :
+\begin{align}
+\frac{\partial \rho}{\partial t} + \frac{\partial (\rho v)}{\partial x} &= 0 \\
+\frac{\partial (v + p(\rho))}{\partial t} + v \frac{\partial (v + p(\rho))}{\partial x} &= \frac{V_e(\rho) - v}{\tau}
+\end{align}
+
+\subsubsection{Approches Multi-Classes}
+
+La modélisation multi-classes représente une nécessité absolue pour le contexte ouest-africain. Notre approche étend le modèle ARZ avec des équations distinctes pour chaque classe de véhicules :
+\begin{align}
+\frac{\partial \rho_i}{\partial t} + \frac{\partial (\rho_i v_i)}{\partial x} &= 0 \\
+\frac{\partial (v_i + p_i(\rho_{eff,i}))}{\partial t} + v_i \frac{\partial (v_i + p_i(\rho_{eff,i}))}{\partial x} &= \frac{V_{e,i}(\rho, R(x)) - v_i}{\tau_i}
+\end{align}
+
+Les innovations clés incluent :
+\begin{itemize}
+    \item Un paramètre $\alpha < 1$ pour modéliser la perception réduite de la congestion par les motos, reflétant leur capacité à naviguer plus librement dans le trafic dense
+    \item Une vitesse de "creeping" $V_{creeping} > 0$ permettant aux motos de maintenir une mobilité résiduelle même en congestion extrême
+    \item Une dépendance spatiale $R(x)$ pour intégrer l'impact de la qualité variable des infrastructures sur les flux de trafic
+\end{itemize}
+
+Ces extensions sont essentielles pour capturer la dynamique unique du trafic ouest-africain, où les motocyclettes dominent et adoptent des comportements adaptatifs.
+
+\subsection{Contrôle des Feux de Signalisation par Apprentissage par Renforcement}
+
+\subsubsection{Principes Fondamentaux}
+
+L'apprentissage par renforcement formalise le problème de contrôle des feux comme un Processus de Décision Markovien (MDP) défini par :
+\begin{itemize}
+    \item \textbf{État} $s_t$ : Représentation de l'état du trafic au temps $t$
+    \item \textbf{Action} $a_t$ : Décision de contrôle (durées des phases, séquences)
+    \item \textbf{Récompense} $r_t$ : Signal d'évaluation de la performance
+    \item \textbf{Politique} $\pi(a|s)$ : Stratégie de mapping état-action
+\end{itemize}
+
+\subsubsection{Algorithmes et Applications}
+
+Pour ce projet, nous privilégions initialement l'algorithme Deep Q-Network (DQN) avec les extensions Double DQN et Dueling DQN, reconnus pour leurs performances dans le contrôle de trafic multi-intersection. Ces méthodes utilisent des réseaux neuronaux profonds pour estimer les valeurs des actions possibles, améliorant la stabilité et la précision par rapport au DQN classique. De plus, nous explorerons également Proximal Policy Optimization (PPO) et Soft Actor-Critic (SAC), deux algorithmes avancés adaptés aux environnements stochastiques. PPO assure une optimisation stable des politiques dans des contextes dynamiques, tandis que SAC favorise l'exploration grâce à une régularisation par entropie, ce qui est crucial pour s'adapter aux comportements imprévisibles du trafic ouest-africain.
+
+\subsubsection{Architectures de Contrôle}
+
+Nous adoptons une architecture centralisée coordonnée où un agent unique contrôle l'ensemble des intersections du corridor, permettant une optimisation globale tout en maintenant la tractabilité computationnelle.
+
+\subsection{Synthèse et Positionnement du Projet}
+
+L'analyse de la littérature révèle un gap critique : aucune approche n'intègre de bout en bout (1) la modélisation macroscopique de second ordre multi-classes, (2) la calibration sur données de trafic hétérogène réelles, et (3) l'application d'algorithmes de RL avancés pour le contrôle adaptatif, spécifiquement pour le contexte ouest-africain. Ce projet se positionne à l'intersection de ces trois domaines en proposant une chaîne de valeur complète, combinant des modèles physiques validés avec des techniques d'intelligence artificielle adaptées aux défis locaux.
+
+\section{Objectifs et Hypothèses de Recherche}
+
+\subsection{Objectif Général}
+
+Développer et valider une méthodologie complète pour la création d'un jumeau numérique de trafic hétérogène et son exploitation pour l'optimisation en temps réel des feux de signalisation, avec application pilote sur un corridor stratégique de Lagos et perspective d'extensibilité à l'ensemble de l'Afrique de l'Ouest.
+
+\subsection{Objectifs Spécifiques et Verrous Scientifiques}
+
+\textbf{OS1 - Adaptation du modèle ARZ multi-classes au contexte de Lagos}
+\begin{itemize}
+    \item Adapter les paramètres du modèle ARZ étendu, initialement conçu pour le trafic béninois, aux spécificités du trafic lagosien
+    \item Intégrer les comportements spécifiques des motocyclettes, tels que le "creeping" (maintien d'une vitesse résiduelle en congestion) et le "gap-filling" (exploitation des espaces inter-véhiculaires), dans le modèle
+    \item \textit{Verrou scientifique} : Calibration robuste d'un modèle non-linéaire complexe avec données partielles
+\end{itemize}
+
+\textbf{OS2 - Construction du jumeau numérique haute-fidélité}
+\begin{itemize}
+    \item Implémenter un simulateur ARZ multi-classes pour un corridor de 2-3 km avec 3-4 intersections à Lagos
+    \item Calibrer et valider le modèle sur données collectées via API et sources publiques, en l'absence de vidéos in situ
+    \item \textit{Verrou scientifique} : Validation quantitative d'un modèle macroscopique sur données de trafic hétérogène réelles
+\end{itemize}
+
+\textbf{OS3 - Conception de l'environnement d'apprentissage par renforcement}
+\begin{itemize}
+    \item Formaliser le MDP (états, actions, récompenses) adapté au contrôle multi-intersection en contexte hétérogène
+    \item Développer l'interface entre le simulateur ARZ et les algorithmes de RL
+    \item \textit{Verrou scientifique} : Définition d'un espace d'état pertinent capturant la complexité du trafic multi-classes
+\end{itemize}
+
+\textbf{OS4 - Entraînement et optimisation de l'agent RL}
+\begin{itemize}
+    \item Implémenter et entraîner un agent Double DQN pour l'optimisation coordonnée des feux, tout en explorant PPO et SAC
+    \item Développer une fonction de récompense multi-objectif intégrant temps de parcours, équité, et robustesse
+    \item \textit{Verrou scientifique} : Convergence stable d'un agent RL dans un environnement stochastique multi-classe
+\end{itemize}
+
+\textbf{OS5 - Évaluation comparative et validation des performances}
+\begin{itemize}
+    \item Comparer quantitativement les performances de l'agent RL vs. contrôle actuel vs. contrôle optimisé classique
+    \item Analyser la robustesse face aux variations de demande et aux incidents
+    \item \textit{Verrou scientifique} : Évaluation rigoureuse de la performance en conditions réelles variables
+\end{itemize}
+
+\subsection{Hypothèses de Recherche}
+
+\textbf{H1 - Fidelité du jumeau numérique}  
+Le modèle ARZ multi-classes adapté peut reproduire la dynamique du trafic lagosien (temps de parcours, longueurs de files, débits par classe) avec une erreur moyenne inférieure à 15\%, validant ainsi sa capacité prédictive.
+
+\textbf{H2 - Efficacité de l'apprentissage adaptatif}  
+Un agent de contrôle basé sur le RL peut apprendre une politique de gestion des feux qui surpasse significativement les stratégies à cycles fixes, en s'adaptant dynamiquement aux conditions de trafic hétérogène.
+
+\textbf{H3 - Performance quantitative du système intelligent}  
+La politique de contrôle RL permettra une réduction d'au moins 20\% du temps de parcours moyen sur le corridor d'étude par rapport à la politique actuelle, particulièrement durant les heures de pointe.
+
+\textbf{H4 - Robustesse et généralisation}  
+Le système développé maintiendra des performances supérieures (dégradation < 10\%) face à des variations significatives de la demande de trafic (+/- 30\%) et des événements perturbateurs (incidents, travaux).
+
+\textbf{H5 - Extensibilité régionale}  
+La méthodologie développée pour Lagos peut être adaptée à d'autres contextes ouest-africains similaires (Accra, Dakar, Cotonou) avec des ajustements paramétriques mineurs (< 20\% des paramètres).
+
+\section{Méthodologie et Programme de Travail}
+
+\subsection{Approche Globale}
+
+La méthodologie s'articule autour de trois phases séquentielles et interdépendantes sur une période de 6 mois :
+\begin{itemize}
+    \item \textbf{Phase 1} (Mois 1-2) : Construction du Jumeau Numérique
+    \item \textbf{Phase 2} (Mois 3-4) : Développement du Contrôleur Intelligent  
+    \item \textbf{Phase 3} (Mois 5-6) : Évaluation Comparative et Validation
+\end{itemize}
+
+\begin{figure}[h]
+\centering
+\textit{[Diagramme de flux méthodologique à insérer]}
+\caption{Enchaînement des phases et interdépendances}
+\end{figure}
+
+\subsection{Phase 1 : Construction du Jumeau Numérique (Mois 1-2)}
+
+\subsubsection{Site d'Étude et Collecte de Données}
+
+\textbf{Sélection du corridor pilote} : Un corridor stratégique de 2-3 km avec 3-4 intersections majeures sera sélectionné dans Lagos (zones candidates : Victoria Island, Ikoyi, ou axe Lagos Island - Mainland). Les critères de sélection incluent :
+\begin{itemize}
+    \item Représentativité du trafic hétérogène lagosien
+    \item Couverture complète par l'API TomTom Traffic
+    \item Importance stratégique pour les flux économiques
+    \item Variabilité des conditions de trafic (fluide à congestionné)
+    \item Disponibilité de données historiques suffisantes
+\end{itemize}
+
+\textbf{Stratégie de collecte de données} :
+\begin{itemize}
+    \item \textbf{API TomTom} : Données en temps réel pour calibration et validation (vitesses moyennes, temps de parcours, indices de congestion)
+    \item \textbf{Sources publiques} : Données historiques de trafic, rapports sur la circulation, études antérieures
+    \item \textbf{Période de collecte} : 8-12 semaines pour capturer les variations saisonnières
+\end{itemize}
+
+\textbf{Collecte de données et limitations} :  
+Puisque la collecte de vidéos in situ n'est pas possible, les données seront obtenues via l'API TomTom, complétées par des sources publiques comme Google Maps ou HERE. Ces données agrégées ne distinguent pas les classes de véhicules et offrent une granularité spatiale limitée. Pour pallier ces lacunes, des techniques de fusion de données multi-sources et d'inférence statistique seront utilisées pour estimer la composition du trafic (par exemple, proportion de motocyclettes) et calibrer le modèle de manière robuste.
+
+\subsubsection{Implémentation Numérique du Modèle}
+
+Le modèle ARZ multi-classes étendu sera implémenté numériquement avec une méthode de volumes finis et un solveur de Riemann adapté aux jonctions, garantissant une simulation précise des interactions entre classes de véhicules et des discontinuités aux intersections.
+
+\subsubsection{Protocole de Calibration et Validation}
+
+\textbf{Fonction objectif adaptée aux données} :
+\begin{equation}
+\min_{\theta} \sum_{i} w_i \left\| M_{i,sim}(\theta) - M_{i,data} \right\|^2 + \lambda R(\theta)
+\end{equation}
+où $M_i$ représentent les métriques simulées (temps de parcours, débits) comparées aux données API et publiques. L'optimisation bayésienne sera utilisée pour gérer l'incertitude des données.
+
+\subsection{Phase 2 : Développement du Contrôleur Intelligent (Mois 3-4)}
+
+\subsubsection{Formalisation du Problème d'Apprentissage}
+
+\textbf{Espace d'état} $S$ : Vecteur de dimension $\sim$50 incluant :
+\begin{itemize}
+    \item Densités et vitesses estimées par classe pour chaque segment de route
+    \item Longueurs des files d'attente par direction aux intersections
+    \item États actuels des feux (phase, temps écoulé)
+    \item Historique court-terme (3-5 pas de temps précédents)
+\end{itemize}
+
+\textbf{Espace d'action} $A$ : Actions discrètes pour chaque intersection :
+\begin{itemize}
+    \item Extension/réduction de la phase courante (±5s, ±10s)
+    \item Activation de phase prioritaire pour direction saturée
+    \item Maintien du cycle normal
+\end{itemize}
+
+\textbf{Fonction de récompense} $R(s,a,s')$ : Combinaison pondérée :
+\begin{equation}
+R = -w_1 \cdot TT - w_2 \cdot TW - w_3 \cdot THR + w_4 \cdot TP
+\end{equation}
+
+\subsubsection{Architecture et Algorithme de l'Agent}
+
+Nous utiliserons Double DQN pour sa capacité à gérer des espaces d'action discrets, complété par PPO et SAC pour leur robustesse dans des environnements stochastiques, adaptés aux variations imprévisibles du trafic ouest-africain.
+
+\subsection{Phase 3 : Évaluation Comparative et Validation (Mois 5-6)}
+
+\subsubsection{Indicateurs de Performance (KPIs)}
+
+\textbf{Métriques primaires} :
+\begin{itemize}
+    \item Temps de parcours moyen par classe de véhicule
+    \item Débit total et par classe (véhicules/heure)
+    \item Temps d'attente moyen aux intersections
+    \item Nombre d'arrêts par véhicule
+\end{itemize}
+
+\subsubsection{Plan Expérimental}
+
+Les scénarios testeront la capacité du modèle à gérer les comportements uniques comme le "creeping" des motocyclettes et le "gap-filling" aux intersections.
+
+\subsection{Chronogramme Prévisionnel}
+
+\begin{longtable}{|p{1.5cm}|p{2cm}|p{5cm}|p{4cm}|}
+\hline
+\textbf{Phase} & \textbf{Mois} & \textbf{Tâches Principales} & \textbf{Livrables} \\
+\hline
+\multirow{2}{*}{\textbf{Phase 1}} & \textbf{Mois 1} & Sélection corridor, collecte API/publique, traitement données & Base de données trafic \\
+\hline
+& \textbf{Mois 2} & Adaptation modèle ARZ, calibration, validation & Simulateur calibré \\
+\hline
+\multirow{2}{*}{\textbf{Phase 2}} & \textbf{Mois 3} & Conception environnement RL, interface & Environnement RL \\
+\hline
+& \textbf{Mois 4} & Implémentation et entraînement RL & Agent RL entraîné \\
+\hline
+\multirow{2}{*}{\textbf{Phase 3}} & \textbf{Mois 5} & Implémentation baselines, évaluation & Résultats comparatifs \\
+\hline
+& \textbf{Mois 6} & Analyse, rédaction & Rapport final \\
+\hline
+\end{longtable}
+
+\section{Résultats Attendus, Contributions et Valorisation}
+
+\subsection{Résultats Attendus}
+
+\textbf{Performances quantitatives attendues} :
+\begin{itemize}
+    \item Réduction du temps de parcours moyen : 20-30\%
+    \item Amélioration du débit total : 15-25\%
+    \item Réduction des temps d'attente : 25-35\%
+\end{itemize}
+
+\subsection{Contributions Scientifiques et Technologiques}
+
+\textbf{Contribution scientifique} :
+\begin{enumerate}
+    \item Intégration modélisation ARZ multi-classes et RL pour l'Afrique de l'Ouest
+    \item Validation empirique des modèles de second ordre
+\end{enumerate}
+
+\subsection{Valorisation et Perspectives}
+
+\textbf{Perspectives futures} :
+\begin{itemize}
+    \item Intégration de données IoT
+    \item Approches multi-agents
+\end{itemize}
+
+\section{Environnement de Travail et Ressources}
+
+\subsection{Encadrement}
+
+\textbf{Logiciels et bibliothèques} :
+\begin{itemize}
+    \item Environnement : Python 3.9+
+    \item Bibliothèques : NumPy, SciPy, Pandas, Matplotlib
+    \item RL : PyTorch, Stable-Baselines3, Gymnasium
+    \item Simulation : Framework ARZ développé pour ce projet
+\end{itemize}
+
+
+\makeatother
+\end{document}

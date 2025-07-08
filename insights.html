@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infographie : Optimisation du Trafic par IA en Afrique de l'Ouest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F2F2F2;
+            color: #005082;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .kpi-card {
+            background-color: #0077C2;
+            color: #FFFFFF;
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+        .kpi-number {
+            font-size: 3.5rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .kpi-label {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        .flow-chart-node {
+            background-color: white;
+            border: 2px solid #0077C2;
+            color: #005082;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .flow-chart-arrow {
+            color: #00A1E4;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-black text-[#231F20] mb-2">Révolutionner le Trafic en Afrique de l'Ouest</h1>
+            <p class="text-lg md:text-xl font-semibold text-[#0077C2]">Une approche par Jumeau Numérique et Apprentissage par Renforcement</p>
+        </header>
+
+        <main class="space-y-16">
+
+            <section id="problem" class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-3xl font-bold text-[#231F20] mb-4">Un Défi Unique : Le Trafic de Lagos</h2>
+                    <p class="mb-4">Le trafic en Afrique de l'Ouest est fondamentalement différent. Il est dominé par les motos ("okadas") qui adoptent des comportements de conduite uniques comme le "creeping" (maintien d'une vitesse lente dans les embouteillages) et le "gap-filling" (utilisation des espaces inter-véhiculaires). Les solutions standards sont inefficaces face à cette dynamique complexe et hétérogène.</p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="font-bold text-[#005082]">Conséquence :</p>
+                        <p class="text-[#005082]">Des pertes économiques de plusieurs milliards de dollars par an et une infrastructure constamment saturée, rendant les modèles de gestion de trafic classiques obsolètes.</p>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-center mb-4 text-[#231F20]">Composition Typique du Trafic Urbain</h3>
+                    <div class="chart-container h-64 md:h-80">
+                        <canvas id="vehicleCompositionChart"></canvas>
+                    </div>
+                    <p class="text-center mt-2 text-sm text-[#005082]">La prédominance des motos change radicalement la dynamique des flux.</p>
+                </div>
+            </section>
+            
+            <section id="solution" class="bg-white rounded-lg shadow-md p-8 md:col-span-2">
+                <h2 class="text-3xl font-bold text-center text-[#231F20] mb-6">Notre Solution : Le Duo IA</h2>
+                <p class="text-center max-w-3xl mx-auto mb-8">Nous développons un système en deux parties : un **Jumeau Numérique** pour simuler la réalité complexe du trafic, et un **Agent d'Apprentissage par Renforcement (RL)** qui apprend à prendre les meilleures décisions pour contrôler les feux de signalisation.</p>
+                <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
+                    <div class="flow-chart-node">Données de Trafic<br/>(API, Capteurs)</div>
+                    <div class="flow-chart-arrow transform md:-rotate-0">➔</div>
+                    <div class="flow-chart-node bg-[#00A1E4] text-white border-[#00A1E4]">Jumeau Numérique<br/>(Simulation ARZ)</div>
+                    <div class="flow-chart-arrow">➔</div>
+                    <div class="flow-chart-node bg-[#00A1E4] text-white border-[#00A1E4]">Agent RL<br/>(Cerveau IA)</div>
+                    <div class="flow-chart-arrow">➔</div>
+                    <div class="flow-chart-node">Contrôle des Feux<br/>(Actions optimisées)</div>
+                </div>
+                 <p class="text-center mt-4 text-sm text-[#005082]">Ce cycle d'apprentissage continu permet au système de s'adapter dynamiquement aux conditions de trafic en temps réel.</p>
+            </section>
+
+            <section id="digital-twin" class="space-y-8">
+                 <h2 class="text-3xl font-bold text-center text-[#231F20] mb-6">Plongée dans le Jumeau Numérique</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    <div class="bg-white rounded-lg shadow-md p-6 space-y-4">
+                        <h3 class="text-2xl font-bold text-[#231F20]">Modéliser les Comportements Uniques</h3>
+                        <p>Le Jumeau Numérique, basé sur un modèle ARZ multi-classes, ne se contente pas de simuler le trafic ; il en capture l'essence ouest-africaine grâce à des paramètres spécifiques :</p>
+                        <ul class="list-none space-y-3">
+                            <li class="flex items-start"><span class="text-2xl mr-3 text-[#00A1E4]">①</span><div><span class="font-bold">Perception de la Congestion (α) :</span> Modélise comment les motos (moins impactées) perçoivent la densité du trafic par rapport aux voitures.</div></li>
+                            <li class="flex items-start"><span class="text-2xl mr-3 text-[#00A1E4]">②</span><div><span class="font-bold">Vitesse de "Creeping" (V_creeping) :</span> Permet aux motos de conserver une vitesse résiduelle (~5 km/h) même dans les embouteillages denses.</div></li>
+                            <li class="flex items-start"><span class="text-2xl mr-3 text-[#00A1E4]">③</span><div><span class="font-bold">Qualité de l'Infrastructure (R(x)) :</span> Ajuste la vitesse maximale des véhicules en fonction de l'état de la route, un facteur crucial.</div></li>
+                        </ul>
+                    </div>
+                     <div>
+                        <h3 class="text-xl font-bold text-center mb-4 text-[#231F20]">Impact de l'Infrastructure sur la Vitesse</h3>
+                        <div class="chart-container">
+                            <canvas id="roadQualityChart"></canvas>
+                        </div>
+                        <p class="text-center mt-2 text-sm text-[#005082]">Les motos sont moins pénalisées par la dégradation des routes, un comportement que notre modèle simule précisément.</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="mdp" class="bg-white rounded-lg shadow-md p-8">
+                <h2 class="text-3xl font-bold text-center text-[#231F20] mb-6">Apprendre à l'IA : Les Règles du Jeu (MDP)</h2>
+                <p class="text-center max-w-3xl mx-auto mb-8">Nous formalisons le problème en Processus de Décision Markovien (MDP), qui définit ce que l'agent voit (État), ce qu'il peut faire (Action), et ce qu'il cherche à accomplir (Récompense).</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                    <div>
+                        <div class="text-6xl mb-2">📡</div>
+                        <h4 class="text-xl font-bold mb-2">État (S) : La Vision de l'IA</h4>
+                        <p class="text-sm">Un vecteur de ~50 dimensions : densités, vitesses par type de véhicule, longueurs des files d'attente, état actuel des feux et historique récent.</p>
+                    </div>
+                    <div>
+                        <div class="text-6xl mb-2">🕹️</div>
+                        <h4 class="text-xl font-bold mb-2">Action (A) : Les Levier de Contrôle</h4>
+                        <p class="text-sm">Actions discrètes : prolonger ou réduire une phase de feu (ex: ±5s), activer une phase prioritaire, ou ne rien changer.</p>
+                    </div>
+                    <div>
+                        <div class="text-6xl mb-2">🏆</div>
+                        <h4 class="text-xl font-bold mb-2">Récompense (R) : L'Objectif Final</h4>
+                        <p class="text-sm">Une fonction multi-objectifs pour équilibrer fluidité, temps d'attente et stabilité du système.</p>
+                    </div>
+                </div>
+                 <div class="mt-8">
+                    <h3 class="text-xl font-bold text-center mb-4 text-[#231F20]">Équilibrer les Objectifs de la Récompense</h3>
+                    <div class="chart-container h-80">
+                        <canvas id="rewardObjectivesChart"></canvas>
+                    </div>
+                     <p class="text-center mt-2 text-sm text-[#005082]">L'agent n'optimise pas un seul critère, mais cherche le meilleur compromis global.</p>
+                </div>
+            </section>
+            
+            <section id="algorithms" class="space-y-8">
+                <h2 class="text-3xl font-bold text-center text-[#231F20] mb-6">Choisir les Bons Algorithmes d'IA</h2>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-2xl font-bold text-[#231F20] mb-4">Une Approche Évolutive</h3>
+                        <p class="mb-4">Le choix de l'algorithme est crucial et évoluera avec le projet :</p>
+                        <ul class="list-none space-y-3">
+                            <li><span class="font-bold text-[#0077C2]">Phase 1 (Fondation):</span> Utilisation de **DQN** et ses variantes (Double, Dueling). Ils sont robustes, stables et bien adaptés aux actions discrètes pour notre corridor pilote.</li>
+                            <li><span class="font-bold text-[#0077C2]">Phase 2 (Exploration):</span> Évaluation de **PPO** pour sa stabilité dans des environnements chaotiques, et **SAC** pour son exploration efficace et sa grande efficacité en termes de données.</li>
+                            <li><span class="font-bold text-[#0077C2]">Stratégie Continue:</span> L'approche **basée sur un modèle (MBRL)** est clé pour surmonter les limitations de données en apprenant un modèle du trafic pour générer des expériences synthétiques.</li>
+                        </ul>
+                    </div>
+                     <div>
+                        <h3 class="text-xl font-bold text-center mb-4 text-[#231F20]">Comparaison des Algorithmes Candidats</h3>
+                        <div class="chart-container">
+                            <canvas id="algoComparisonChart"></canvas>
+                        </div>
+                        <p class="text-center mt-2 text-sm text-[#005082]">Chaque algorithme présente un compromis unique entre efficacité, stabilité et exploration.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="impact" class="text-center">
+                 <h2 class="text-3xl font-bold text-[#231F20] mb-8">Impact Attendu : Une Mobilité Transformée</h2>
+                 <p class="max-w-3xl mx-auto mb-8">En optimisant dynamiquement les feux de signalisation, notre solution vise à atteindre des améliorations quantifiables et significatives pour les usagers de la route.</p>
+                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                     <div class="kpi-card bg-[#00A1E4]">
+                         <div class="kpi-number">-20-30%</div>
+                         <div class="kpi-label">de Temps de Parcours</div>
+                     </div>
+                     <div class="kpi-card bg-[#0077C2]">
+                         <div class="kpi-number">+15-25%</div>
+                         <div class="kpi-label">de Débit Total</div>
+                     </div>
+                     <div class="kpi-card bg-[#005082]">
+                         <div class="kpi-number">-25-35%</div>
+                         <div class="kpi-label">de Temps d'Attente</div>
+                     </div>
+                 </div>
+            </section>
+            
+            <footer class="text-center pt-8 border-t border-gray-300">
+                <p class="text-sm text-gray-600">Ce projet représente une avancée majeure vers des solutions technologiques endogènes, conçues pour les réalités locales et portées par l'excellence scientifique africaine.</p>
+                <p class="text-xs text-gray-400 mt-4">Infographie générée sur la base des documents de recherche fournis. Ni Mermaid JS ni SVG n'ont été utilisés. Palette de couleurs : Brilliant Blues.</p>
+            </footer>
+
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const tooltipTitleCallback = (tooltipItems) => {
+        const item = tooltipItems[0];
+        let label = item.chart.data.labels[item.dataIndex];
+        if (Array.isArray(label)) {
+            return label.join(' ');
+        }
+        return label;
+    };
+
+    const commonTooltipOptions = {
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    title: tooltipTitleCallback
+                },
+                backgroundColor: '#231F20',
+                titleFont: { size: 14, weight: 'bold' },
+                bodyFont: { size: 12 },
+                padding: 10,
+                cornerRadius: 4,
+                displayColors: true,
+                boxPadding: 4,
+            }
+        }
+    };
+
+    const wrapLabel = (str, maxWidth) => {
+        if (str.length <= maxWidth) {
+            return str;
+        }
+        let wrapped = [];
+        let words = str.split(' ');
+        let currentLine = '';
+        words.forEach(word => {
+            if ((currentLine + ' ' + word).trim().length > maxWidth && currentLine.length > 0) {
+                wrapped.push(currentLine);
+                currentLine = word;
+            } else {
+                currentLine = (currentLine + ' ' + word).trim();
+            }
+        });
+        wrapped.push(currentLine);
+        return wrapped;
+    };
+
+
+    const vehicleCompositionCtx = document.getElementById('vehicleCompositionChart');
+    if (vehicleCompositionCtx) {
+        new Chart(vehicleCompositionCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Motos', 'Autres Véhicules'],
+                datasets: [{
+                    label: 'Composition du Trafic',
+                    data: [75, 25],
+                    backgroundColor: ['#00A1E4', '#005082'],
+                    borderColor: '#F2F2F2',
+                    borderWidth: 4,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    ...commonTooltipOptions.plugins,
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#231F20',
+                            font: { size: 14 }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    const roadQualityCtx = document.getElementById('roadQualityChart');
+    if (roadQualityCtx) {
+        new Chart(roadQualityCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Majeures', 'Secondaires', 'Locales', 'Pistes'],
+                datasets: [{
+                    label: 'Motos (Vmax km/h)',
+                    data: [85, 70, 50, 45],
+                    backgroundColor: '#00A1E4',
+                    borderRadius: 4
+                }, {
+                    label: 'Voitures (Vmax km/h)',
+                    data: [75, 60, 35, 25],
+                    backgroundColor: '#0077C2',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                ...commonTooltipOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#e0e0e0' },
+                        title: { display: true, text: 'Vitesse Max (km/h)', color: '#005082'}
+                    },
+                    x: {
+                        grid: { display: false },
+                        title: { display: true, text: 'Qualité de la Route', color: '#005082'}
+                    }
+                },
+                plugins: {
+                    ...commonTooltipOptions.plugins,
+                    legend: { position: 'bottom', labels: { color: '#231F20' } },
+                }
+            }
+        });
+    }
+
+    const rewardObjectivesCtx = document.getElementById('rewardObjectivesChart');
+    if (rewardObjectivesCtx) {
+        const rawLabels = ['Maximiser Débit', 'Minimiser Temps de Parcours', 'Minimiser Temps d\'Attente', 'Assurer Stabilité du Contrôle'];
+        new Chart(rewardObjectivesCtx, {
+            type: 'radar',
+            data: {
+                labels: rawLabels.map(label => wrapLabel(label, 16)),
+                datasets: [{
+                    label: 'Importance Relative',
+                    data: [8, 9, 9, 7],
+                    fill: true,
+                    backgroundColor: 'rgba(0, 161, 228, 0.2)',
+                    borderColor: '#00A1E4',
+                    pointBackgroundColor: '#00A1E4',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#00A1E4'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                ...commonTooltipOptions,
+                scales: {
+                    r: {
+                        angleLines: { color: '#ccc' },
+                        grid: { color: '#ddd' },
+                        pointLabels: {
+                            font: { size: 12 },
+                            color: '#005082'
+                        },
+                        ticks: {
+                            display: false,
+                            stepSize: 2
+                        },
+                        suggestedMin: 0,
+                        suggestedMax: 10
+                    }
+                },
+                plugins: {
+                    ...commonTooltipOptions.plugins,
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    const algoComparisonCtx = document.getElementById('algoComparisonChart');
+    if(algoComparisonCtx) {
+        new Chart(algoComparisonCtx, {
+            type: 'bar',
+            data: {
+                labels: ['DQN', 'PPO', 'SAC'],
+                datasets: [
+                    {
+                        label: 'Stabilité',
+                        data: [6, 9, 8],
+                        backgroundColor: '#005082',
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Efficacité Données',
+                        data: [4, 6, 9],
+                        backgroundColor: '#0077C2',
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Exploration',
+                        data: [5, 7, 9],
+                        backgroundColor: '#00A1E4',
+                        borderRadius: 4,
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                ...commonTooltipOptions,
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: '#e0e0e0' },
+                        title: { display: true, text: 'Score Relatif (1-10)', color: '#005082' },
+                        max: 10,
+                    },
+                     y: {
+                        grid: { display: false },
+                    }
+                },
+                plugins: {
+                    ...commonTooltipOptions.plugins,
+                    legend: { position: 'bottom', labels: { color: '#231F20' } },
+                }
+            }
+        });
+    }
+
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,30 @@
+Profil de performance: Premier ordre (N=100)
+==================================================
+         11593453 function calls (11100748 primitive calls) in 41.053 seconds
+
+   Ordered by: internal time
+   List reduced from 3906 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    27906    5.066    0.000    6.363    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\llvmlite\binding\ffi.py:195(__call__)
+    23188    4.000    0.000    4.027    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:108(_winapi_test)
+    23188    3.884    0.000    3.916    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:170(GetConsoleMode)
+    11594    1.876    0.000    1.876    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:177(SetConsoleMode)
+    38760    1.521    0.000    9.826    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\numerics\time_integration.py:111(_ode_rhs)
+    38761    1.202    0.000    1.202    0.000 D:\Projets\Alibi\Projet_tutore_ARZ\code\core\physics.py:118(calculate_equilibrium_speed)
+     5508    0.954    0.000    3.659    0.001 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\rk.py:14(rk_step)
+302898/52643    0.873    0.000    1.363    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\ir.py:321(_rec_list_vars)
+  1859103    0.824    0.000    1.134    0.000 {built-in method builtins.isinstance}
+    23188    0.391    0.000    4.619    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\win32.py:114(winapi_test)
+432777/432379    0.362    0.000    0.763    0.000 {built-in method builtins.getattr}
+149133/79206    0.315    0.000    0.929    0.000 {method 'format' of 'str' objects}
+     5508    0.310    0.000    4.332    0.001 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\scipy\integrate\_ivp\rk.py:111(_step_impl)
+   208638    0.255    0.000    0.423    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\targetconfig.py:111(getter)
+   144184    0.236    0.000    0.583    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\event.py:243(notify)
+    11594    0.228    0.000   11.226    0.001 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\colorama\ansitowin32.py:81(__init__)
+    14076    0.196    0.000    0.390    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numpy\linalg\linalg.py:2383(norm)
+   295162    0.191    0.000    0.274    0.000 {method 'get' of 'dict' objects}
+   100548    0.177    0.000    0.309    0.000 <frozen abc>:117(__instancecheck__)
+    66100    0.173    0.000    0.781    0.000 C:\Users\JOSAPHAT\AppData\Roaming\Python\Python312\site-packages\numba\core\event.py:209(broadcast)
+
+

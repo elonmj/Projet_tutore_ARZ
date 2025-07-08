@@ -145,11 +145,18 @@ The key functional changes involved iterative refinement of the right 'wall' bou
     *   Analysis (`inspect_npz.py`): Shock propagated well past 200m by t=60s. Densities behind the shock (`rho_m` ~ 0.268, `rho_c` ~ 0.101) remained physically plausible (only slightly above `rho_jam=0.25`).
     *   **Conclusion:** Removing the artificial cap in the pressure calculation **resolved the density overshoot issue** while maintaining correct shock propagation dynamics.
 
-**Final Diagnosis:** The investigation revealed two interacting issues:
+*   **Test 8 (N=200, K=5/7.5, capped BC, tau=0.1s, Uncapped Pressure, gamma_m=3.0):**
+    *   Ran simulation with `config/scenario_red_light_gamma_m_3.yml`.
+    *   Output: `results/red_light_test_gamma_m_3/20250505_191244.npz`.
+    *   Analysis (`inspect_npz.py`): Shock propagated upstream. However, the maximum observed `rho_m` (0.9455 veh/m) was even higher than with `gamma_m=1.5`, indicating a worse overshoot.
+    *   **Conclusion:** Increasing the pressure exponent `gamma_m` did not resolve the density overshoot and potentially exacerbated it.
+
+**Final Diagnosis:** The investigation revealed two primary interacting issues:
 1.  **Lack of Shock Propagation:** Caused by excessively long relaxation times (`tau_m=5.0s`, `tau_c=10.0s`) preventing rapid adjustment near the boundary. Resolved by reducing `tau` to `0.1s`.
-2.  **Density Overshoot (`rho_m > rho_jam`):** Occurred with low `tau` (<= 0.5s) due to an artificial cap (`min(..., 1.0 - epsilon)`) in the pressure calculation (`code/core/physics.py`) which prevented pressure from increasing sufficiently as density approached `rho_jam`. Resolved by removing this cap.
+2.  **Density Overshoot (`rho_m > rho_jam`):** Occurred with low `tau` (<= 0.5s). Initial attempts to fix this by removing an artificial cap in the pressure calculation (`Test 7`) or increasing the pressure exponent (`Test 8`) were unsuccessful in fully eliminating the overshoot, although removing the cap (`Test 7`) yielded the lowest overshoot (`max rho_m` ~ 0.69 vs `rho_jam`=0.25). The overshoot appears to be a persistent numerical artifact possibly related to the first-order scheme's handling of the strong shock combined with fast relaxation, or the specific power-law form of the pressure function near the jam density.
 
 **Resolution & Recommendation:**
-*   The combination of **short relaxation times (`tau_m_sec: 0.1`, `tau_c_sec: 0.1`)** and the **modified (uncapped) pressure calculation** in `code/core/physics.py` produces stable and physically realistic results for the red light scenario.
-*   **Recommendation:** Keep the modifications to `code/core/physics.py`. Use the configuration `config/scenario_red_light_low_tau.yml` (which specifies `tau=0.1s`) as the standard for this scenario.
+*   The combination of **short relaxation times (`tau_m_sec: 0.1`, `tau_c_sec: 0.1`)** and the **modified (uncapped) pressure calculation** in `code/core/physics.py` (as used in Test 7) produces the most physically realistic *dynamics* (shock propagation) for the red light scenario, despite still exhibiting some density overshoot (`rho_m` max ~0.69).
+*   **Recommendation:** Keep the modifications to `code/core/physics.py` (uncapped pressure). Use the configuration `config/scenario_red_light_low_tau.yml` (which specifies `tau=0.1s`) as the standard for this scenario, acknowledging the remaining density overshoot as a known limitation.
 *   Consider cleaning up intermediate test configuration files.
+*   **Future Work:** The remaining density overshoot (`rho_m > rho_jam`) should be investigated further if higher physical accuracy is required. Potential avenues include exploring alternative pressure function forms or implementing a higher-order numerical scheme (e.g., MUSCL).
