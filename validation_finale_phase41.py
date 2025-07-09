@@ -21,30 +21,21 @@ def run_final_gpu_cpu_validation():
     print("Objectif : Erreur GPU/CPU < 1e-10 avec correction CFL")
     print("")
     
-    # Configuration de test complète
+    # Configuration de test directe via override des attributs ModelParameters  
     override_params = {
-        # Paramètres de grille (requis)
+        # Paramètres de grille (attributs directs)
         'N': 200,
-        'xmin': 0.0,
+        'xmin': 0.0, 
         'xmax': 1000.0,
         
-        # Paramètres temporels
-        't_final': 10.0,       # Simulation plus longue pour tester stabilité
-        'output_dt': 1.0,      # Échantillonnage régulier
+        # Paramètres temporels (attributs directs)
+        't_final': 10.0,       
+        'output_dt': 1.0,      
         'cfl_number': 0.4,     # CFL strict pour WENO5+SSP-RK3 
         
-        # Schémas numériques
+        # Schémas numériques (attributs directs)
         'spatial_scheme': 'weno5',
-        'time_scheme': 'ssprk3',
-        
-        # Conditions aux limites et initiales
-        'boundary_conditions': {'type': 'periodic'},
-        'initial_conditions': {
-            'type': 'sine_wave_perturbation',
-            'background_state': [0.02, 10.0, 0.01, 15.0],  # [rho_m, v_m, rho_c, v_c]
-            'amplitude': 0.1,
-            'wavelength': 200.0
-        }
+        'time_scheme': 'ssprk3'
     }
     
     print(f"📋 Configuration: {override_params}")
@@ -59,7 +50,7 @@ def run_final_gpu_cpu_validation():
             'config/scenario_gpu_validation.yml',
             override_params=override_params,
             device='cpu',
-            quiet=True  # Moins de sortie pour clarté
+            quiet=False  # Permettre de voir les messages d'override
         )
         
         times_cpu, states_cpu = runner_cpu.run()
