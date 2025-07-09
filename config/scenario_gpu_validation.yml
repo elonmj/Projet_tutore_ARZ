@@ -24,7 +24,7 @@ temporal:
   time_scheme: "ssp_rk3"  # Pour tests GPU
 
 # CORRECTION CFL - Assurer compatibilité avec le système existant
-cfl_number: 0.4  # ⚠️ CORRECTION: Paramètre utilisé par le système de calcul CFL
+cfl_number: 0.4  # CORRECTION: Paramètre utilisé par le système de calcul CFL
 t_final: 10.0    # Paramètre attendu par le système
 output_dt: 1.0   # Paramètre attendu par le système
 
@@ -67,9 +67,18 @@ physical:
 # Conditions initiales pour tests
 initial_conditions:
   type: "sine_wave_perturbation"
-  background_density: [0.5, 0.3]
-  amplitude: 0.1
-  wavelength: 2.0
+  background_state:
+    rho_m: 0.5    # Densité de fond motos [veh/m]
+    rho_c: 0.3    # Densité de fond voitures [veh/m]
+    v_m: 10.0     # Vitesse de fond motos [m/s]
+    v_c: 12.0     # Vitesse de fond voitures [m/s]
+  perturbation:
+    amplitude: 0.1      # Amplitude perturbation
+    wave_number: 3.14   # Nombre d'onde [rad/m]
+  R_val: 1              # Qualité route uniforme
+  
+# Scenario name pour le système
+scenario_name: "gpu_validation_test"
 
 # Configuration des tests
 testing:
