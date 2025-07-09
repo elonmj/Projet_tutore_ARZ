@@ -28,6 +28,18 @@ cfl_number: 0.4  # ⚠️ CORRECTION: Paramètre utilisé par le système de cal
 t_final: 10.0    # Paramètre attendu par le système
 output_dt: 1.0   # Paramètre attendu par le système
 
+# CORRECTION GRILLE - Paramètres au niveau racine pour compatibilité
+N: 200           # Nombre de cellules
+xmin: 0.0        # Début du domaine [m] 
+xmax: 1000.0     # Fin du domaine [m]
+
+# CORRECTION CONDITIONS AUX LIMITES - Au niveau racine
+boundary_conditions:
+  left:
+    type: "periodic"
+  right:
+    type: "periodic"
+
 # Configuration numérique
 numerics:
   spatial_scheme: "weno5"  # Pour tests GPU
