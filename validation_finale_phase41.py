@@ -23,11 +23,28 @@ def run_final_gpu_cpu_validation():
     
     # Configuration de test complète
     override_params = {
+        # Paramètres de grille (requis)
+        'N': 200,
+        'xmin': 0.0,
+        'xmax': 1000.0,
+        
+        # Paramètres temporels
         't_final': 10.0,       # Simulation plus longue pour tester stabilité
         'output_dt': 1.0,      # Échantillonnage régulier
         'cfl_number': 0.4,     # CFL strict pour WENO5+SSP-RK3 
+        
+        # Schémas numériques
         'spatial_scheme': 'weno5',
-        'time_scheme': 'ssprk3'
+        'time_scheme': 'ssprk3',
+        
+        # Conditions aux limites et initiales
+        'boundary_conditions': {'type': 'periodic'},
+        'initial_conditions': {
+            'type': 'sine_wave_perturbation',
+            'background_state': [0.02, 10.0, 0.01, 15.0],  # [rho_m, v_m, rho_c, v_c]
+            'amplitude': 0.1,
+            'wavelength': 200.0
+        }
     }
     
     print(f"📋 Configuration: {override_params}")
