@@ -245,4 +245,55 @@ def calculate_cfl_dt(U_or_d_U_physical, grid: Grid1D, params: ModelParameters) -
     else:
         dt = params.cfl_number * grid.dx / max_abs_lambda
 
-    return dt
+    # --- Validate and Correct CFL ---
+    dt_corrected, cfl_actual, warning_message = validate_and_correct_cfl(dt, max_abs_lambda, grid, params)
+
+    # Optionally, print or log the warning message if correction was applied
+    if warning_message:
+        print(warning_message) # Or use a logging framework
+
+    return dt_corrected
+
+
+def validate_and_correct_cfl(dt, max_abs_lambda, grid, params, tolerance=0.5):
+    """
+    Valide et corrige automatiquement le pas de temps pour respecter la condition CFL.
+    
+    Args:
+        dt (float): Pas de temps calculé
+        max_abs_lambda (float): Vitesse maximale absolue détectée
+        grid (Grid1D): Grille de calcul
+        params (ModelParameters): Paramètres du modèle
+        tolerance (float): Facteur de sécurité CFL (défaut: 0.5 pour WENO5+SSP-RK3)
+    
+    Returns:
+        tuple: (dt_corrected, cfl_actual, warning_message)
+    """
+    # Calculer le CFL effectif
+    if max_abs_lambda > params.epsilon:
+        cfl_actual = max_abs_lambda * dt / grid.dx
+    else:
+        cfl_actual = 0.0
+    
+    # Vérifier si correction nécessaire
+    cfl_limit = tolerance
+    warning_message = ""
+    
+    if cfl_actual > cfl_limit:
+        # ⚠️ CORRECTION CRITIQUE CFL
+        dt_corrected = cfl_limit * grid.dx / max_abs_lambda if max_abs_lambda > params.epsilon else dt
+        
+        warning_message = (
+            f"🚨 CORRECTION CFL AUTOMATIQUE:\n"
+            f"   CFL calculé: {cfl_actual:.3f} > limite {cfl_limit:.3f}\n"
+            f"   dt original: {dt:.6e} s\n"
+            f"   dt corrigé:  {dt_corrected:.6e} s\n"
+            f"   Facteur correction: {dt/dt_corrected:.1f}x\n"
+            f"   v_max détectée: {max_abs_lambda:.2f} m/s"
+        )
+    else:
+        dt_corrected = dt
+        if cfl_actual > 0.1:  # Afficher info si CFL significatif
+            warning_message = f"✅ CFL OK: {cfl_actual:.3f} ≤ {cfl_limit:.3f}"
+    
+    return dt_corrected, cfl_actual, warning_message

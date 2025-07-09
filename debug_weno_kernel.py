@@ -41,7 +41,7 @@ def test_weno_kernel(input_array, output_weights, output_betas):
     if i >= 2 and i < input_array.size - 2:
         w0, w1, w2, b0, b1, b2 = weno5_weights_debug(
             input_array[i-2], input_array[i-1], input_array[i], 
-            input_array[i+1], input_array[i+2], 1e-6
+            input_array[i+1], input_array[i+2]
         )
         
         output_weights[i, 0] = w0

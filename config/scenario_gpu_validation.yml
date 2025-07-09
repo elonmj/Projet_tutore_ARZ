@@ -19,6 +19,9 @@ temporal:
   CFL: 0.4
   time_scheme: "ssp_rk3"  # Pour tests GPU
 
+# CORRECTION CFL - Assurer compatibilité avec le système existant
+cfl_number: 0.4  # ⚠️ CORRECTION: Paramètre utilisé par le système de calcul CFL
+
 # Configuration numérique
 numerics:
   spatial_scheme: "weno5"  # Pour tests GPU
