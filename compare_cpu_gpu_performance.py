@@ -2,7 +2,7 @@
 """
 Comparaison Performance CPU vs GPU - Script Local
 =================================================
-Analyse des performances et génère des graphiques de benchmark.
+Analyse des performanc    axes[0,0].set_title('Temps d\'\'Execution CPU vs GPU')s et génère des graphiques de benchmark.
 
 Usage: python compare_cpu_gpu_performance.py [output_gpu_folder]
 """
@@ -151,7 +151,7 @@ def plot_performance_analysis(perf_data, output_dir="output_gpu"):
     
     bars = axes[0,0].bar(devices, times, color=colors, alpha=0.8)
     axes[0,0].set_ylabel('Temps [s]')
-    axes[0,0].set_title('Temps d\\'Exécution CPU vs GPU')
+    axes[0,0].set_title('Temps d\'Execution CPU vs GPU')
     
     # Ajouter valeurs sur les barres
     for bar, time in zip(bars, times):

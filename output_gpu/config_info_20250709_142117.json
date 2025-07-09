@@ -1,0 +1,19 @@
+{
+  "scenario": "scenario_gpu_validation.yml",
+  "grid": {
+    "N": 200,
+    "xmin": 0.0,
+    "xmax": 1000.0,
+    "dx": 5.0
+  },
+  "temporal": {
+    "t_final": 10.0,
+    "output_dt": 1.0
+  },
+  "numerics": {
+    "cfl_number": 0.4,
+    "spatial_scheme": "weno5",
+    "time_scheme": "ssprk3"
+  },
+  "correction_cfl": "enabled"
+}

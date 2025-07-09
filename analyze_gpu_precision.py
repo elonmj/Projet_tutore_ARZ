@@ -224,7 +224,8 @@ def plot_precision_analysis(data_cpu, data_gpu, analysis_results, output_dir="ou
     axes[0,1].axhline(y=1e-10, color='g', linestyle='--', alpha=0.5)
     
     # Ajouter valeurs sur les barres
-    for bar, error in zip(bars, var_errors):\n        height = bar.get_height()
+    for bar, error in zip(bars, var_errors):
+        height = bar.get_height()
         axes[0,1].text(bar.get_x() + bar.get_width()/2., height,
                       f'{error:.1e}', ha='center', va='bottom', fontsize=9)
     

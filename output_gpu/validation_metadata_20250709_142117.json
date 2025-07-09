@@ -1,0 +1,15 @@
+{
+  "timestamp": "20250709_142117",
+  "cpu_success": true,
+  "gpu_success": true,
+  "comparison_success": true,
+  "cpu_duration": 17.963518,
+  "gpu_duration": 3.270731,
+  "speedup": 5.492202813377193,
+  "error_max": 0.008922634076839131,
+  "error_mean": 0.0006365073334046507,
+  "status": "PROBL\u00c9MATIQUE",
+  "phase": "4.1",
+  "correction_cfl": "active",
+  "objective": "< 1e-10"
+}

@@ -1,0 +1,11 @@
+RAPPORT D'ANALYSE DE PRECISION GPU vs CPU
+==================================================
+
+Timestamp: 20250709_142117
+Erreur maximale: 8.922634e-03
+Erreur moyenne: 6.365073e-04
+Statut: PROBLEMATIQUE
+Grade: D
+
+Objectif Phase 4.1: < 1e-10
+Resultat: ECHEC

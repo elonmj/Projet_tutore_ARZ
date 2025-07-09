@@ -814,6 +814,161 @@ def solve_hyperbolic_step_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_hyp: fl
     return d_U_out
 
 
+# --- SSP-RK3 GPU Implementation ---
+
+def solve_hyperbolic_step_ssprk3_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
+    """
+    Version GPU de solve_hyperbolic_step_ssprk3() utilisant SSP-RK3 CUDA.
+    
+    Implémente le schéma Strong Stability Preserving Runge-Kutta 3:
+    U^{(1)} = U^n + dt * L(U^n)
+    U^{(2)} = 3/4 * U^n + 1/4 * U^{(1)} + 1/4 * dt * L(U^{(1)})
+    U^{n+1} = 1/3 * U^n + 2/3 * U^{(2)} + 2/3 * dt * L(U^{(2)})
+    
+    où L(U) = -dF/dx utilise la discrétisation spatiale GPU.
+
+    Args:
+        d_U_in (cuda.devicearray.DeviceNDArray): État d'entrée sur GPU (4, N_total)
+        dt_hyp (float): Pas de temps hyperbolique
+        grid (Grid1D): Objet grille
+        params (ModelParameters): Paramètres du modèle
+
+    Returns:
+        cuda.devicearray.DeviceNDArray: État mis à jour après SSP-RK3 sur GPU
+    """
+    try:
+        from .gpu.ssp_rk3_cuda import SSP_RK3_GPU
+    except ImportError:
+        raise ImportError("SSP-RK3 CUDA module not available. Please ensure code.numerics.gpu.ssp_rk3_cuda is properly implemented.")
+    
+    # Vérifications de base
+    if not cuda.is_cuda_array(d_U_in):
+        raise TypeError("d_U_in must be a CUDA device array")
+    
+    N_physical = grid.N_physical
+    N_total = grid.N_total
+    num_variables = 4  # rho_m, w_m, rho_c, w_c
+    
+    # Fonction pour calculer la discrétisation spatiale L(U) = -dF/dx
+    def compute_spatial_discretization_gpu(d_U_state, d_L_out):
+        """
+        Fonction de callback pour SSP_RK3_GPU qui calcule L(U) = -dF/dx.
+        
+        Args:
+            d_U_state: État sur GPU (N_physical, 4) - format attendu par SSP_RK3_GPU
+            d_L_out: Sortie L(U) sur GPU (N_physical, 4)
+        """
+        # Convertir le format (N_physical, 4) vers (4, N_total) avec cellules fantômes
+        d_U_extended = cuda.device_array((4, N_total), dtype=d_U_in.dtype)
+        
+        # Copier les cellules fantômes depuis l'état d'entrée original
+        n_ghost = grid.num_ghost_cells
+        d_U_extended[:, :n_ghost] = d_U_in[:, :n_ghost]  # Cellules fantômes gauches
+        d_U_extended[:, n_ghost+N_physical:] = d_U_in[:, n_ghost+N_physical:]  # Cellules fantômes droites
+        
+        # Copier les cellules physiques depuis d_U_state (transposer)
+        # d_U_state est (N_physical, 4), d_U_extended[:, n_ghost:n_ghost+N_physical] est (4, N_physical)
+        for i in range(N_physical):
+            for var in range(4):
+                d_U_extended[var, n_ghost + i] = d_U_state[i, var]
+        
+        # Appliquer les conditions aux limites
+        boundary_conditions.apply_boundary_conditions_gpu(d_U_extended, grid, params)
+        
+        # Calculer les flux avec la discrétisation spatiale existante
+        if params.spatial_scheme == 'first_order':
+            # Utiliser la méthode du premier ordre existante
+            d_fluxes = riemann_solvers.central_upwind_flux_gpu(d_U_extended, params)
+            
+            # Calculer la divergence des flux : L(U) = -dF/dx
+            threadsperblock = 256
+            blockspergrid = (N_physical + threadsperblock - 1) // threadsperblock
+            
+            _compute_flux_divergence_kernel[blockspergrid, threadsperblock](
+                d_U_extended, d_fluxes, dt_hyp, grid.dx, params.epsilon,
+                grid.num_ghost_cells, N_physical, d_L_out
+            )
+        else:
+            # Pour WENO5, utiliser calculate_spatial_discretization_weno_gpu (à implémenter)
+            raise NotImplementedError(f"GPU SSP-RK3 with spatial_scheme='{params.spatial_scheme}' not yet implemented. "
+                                    "Currently supports 'first_order' only.")
+    
+    # Préparer les données pour SSP_RK3_GPU
+    # Convertir d_U_in de (4, N_total) vers (N_physical, 4) pour les cellules physiques uniquement
+    d_U_physical = cuda.device_array((N_physical, num_variables), dtype=d_U_in.dtype)
+    n_ghost = grid.num_ghost_cells
+    
+    for i in range(N_physical):
+        for var in range(4):
+            d_U_physical[i, var] = d_U_in[var, n_ghost + i]
+    
+    # Créer l'intégrateur SSP-RK3 GPU
+    integrator = SSP_RK3_GPU(N_physical, num_variables)
+    
+    # Préparer la sortie
+    d_U_result = cuda.device_array_like(d_U_physical)
+    
+    # Effectuer l'intégration SSP-RK3
+    integrator.integrate_step(d_U_physical, d_U_result, dt_hyp, compute_spatial_discretization_gpu)
+    
+    # Convertir le résultat de (N_physical, 4) vers (4, N_total)
+    d_U_out = cuda.device_array_like(d_U_in)
+    
+    # Copier les cellules fantômes depuis l'entrée
+    d_U_out[:, :n_ghost] = d_U_in[:, :n_ghost]
+    d_U_out[:, n_ghost+N_physical:] = d_U_in[:, n_ghost+N_physical:]
+    
+    # Copier les cellules physiques depuis le résultat (transposer)
+    for i in range(N_physical):
+        for var in range(4):
+            d_U_out[var, n_ghost + i] = d_U_result[i, var]
+    
+    # Appliquer le plancher de densité
+    _apply_density_floor_kernel[blockspergrid, threadsperblock](
+        d_U_out, params.epsilon, grid.num_ghost_cells, N_physical
+    )
+    
+    # Nettoyer l'intégrateur
+    integrator.cleanup()
+    
+    return d_U_out
+
+
+@cuda.jit
+def _compute_flux_divergence_kernel(d_U, d_fluxes, dt, dx, epsilon, num_ghost_cells, N_physical, d_L_out):
+    """
+    Kernel CUDA pour calculer la divergence des flux L(U) = -dF/dx.
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j = num_ghost_cells + idx  # Index global avec cellules fantômes
+        dt_dx = dt / dx
+        
+        for var in range(4):
+            # Flux à droite et à gauche de la cellule j
+            flux_right = d_fluxes[var, j]
+            flux_left = d_fluxes[var, j-1]
+            
+            # Divergence: -dF/dx = -(F_{j+1/2} - F_{j-1/2})/dx
+            d_L_out[idx, var] = -(flux_right - flux_left) / dx
+
+
+@cuda.jit
+def _apply_density_floor_kernel(d_U, epsilon, num_ghost_cells, N_physical):
+    """
+    Kernel CUDA pour appliquer le plancher de densité.
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j = num_ghost_cells + idx
+        
+        # Appliquer le plancher pour les densités
+        d_U[0, j] = max(d_U[0, j], epsilon)  # rho_m
+        d_U[2, j] = max(d_U[2, j], epsilon)  # rho_c
+
+
 # --- Strang Splitting Step ---
 
 def strang_splitting_step(U_or_d_U_n, dt: float, grid: Grid1D, params: ModelParameters, d_R=None):
@@ -845,11 +1000,14 @@ def strang_splitting_step(U_or_d_U_n, dt: float, grid: Grid1D, params: ModelPara
         d_U_star = solve_ode_step_gpu(d_U_n, dt / 2.0, grid, params, d_R)
 
         # Step 2: Solve Hyperbolic part for full dt
-        # Dynamic solver selection (GPU currently supports only first_order + euler)
+        # Dynamic solver selection
         if params.spatial_scheme == 'first_order' and params.time_scheme == 'euler':
             d_U_ss = solve_hyperbolic_step_gpu(d_U_star, dt, grid, params)
+        elif params.spatial_scheme == 'first_order' and params.time_scheme == 'ssprk3':
+            d_U_ss = solve_hyperbolic_step_ssprk3_gpu(d_U_star, dt, grid, params)
         else:
-            raise ValueError(f"GPU device currently supports only spatial_scheme='first_order' and time_scheme='euler'. "
+            raise ValueError(f"GPU device currently supports: "
+                           f"('first_order', 'euler') and ('first_order', 'ssprk3'). "
                            f"Requested: spatial_scheme='{params.spatial_scheme}', time_scheme='{params.time_scheme}'")
 
         # Step 3: Solve ODEs for dt/2
@@ -871,13 +1029,19 @@ def strang_splitting_step(U_or_d_U_n, dt: float, grid: Grid1D, params: ModelPara
         # Dynamic solver selection based on spatial_scheme and time_scheme
         if params.spatial_scheme == 'first_order' and params.time_scheme == 'euler':
             U_ss = solve_hyperbolic_step_cpu(U_star, dt, grid, params)
+        elif params.spatial_scheme == 'first_order' and params.time_scheme == 'ssprk3':
+            # Phase 4.2: First-order spatial + SSP-RK3 temporal (CPU et GPU)
+            if params.device == 'gpu':
+                U_ss = solve_hyperbolic_step_ssprk3_gpu(U_star, dt, grid, params)
+            else:
+                U_ss = solve_hyperbolic_step_ssprk3(U_star, dt, grid, params)
         elif params.spatial_scheme == 'weno5' and params.time_scheme == 'euler':
             U_ss = solve_hyperbolic_step_weno_cpu(U_star, dt, grid, params)
         elif params.spatial_scheme == 'weno5' and params.time_scheme == 'ssprk3':
             U_ss = solve_hyperbolic_step_ssprk3(U_star, dt, grid, params)
         else:
             raise ValueError(f"Unsupported scheme combination: spatial_scheme='{params.spatial_scheme}', time_scheme='{params.time_scheme}'. "
-                           f"Supported combinations: (first_order, euler), (weno5, euler), (weno5, ssprk3)")
+                           f"Supported combinations: (first_order, euler), (first_order, ssprk3), (weno5, euler), (weno5, ssprk3)")
 
         # Step 3: Solve ODEs for dt/2
         U_np1 = solve_ode_step_cpu(U_ss, dt / 2.0, grid, params)
