@@ -21,24 +21,11 @@ def run_final_gpu_cpu_validation():
     print("Objectif : Erreur GPU/CPU < 1e-10 avec correction CFL")
     print("")
     
-    # Configuration de test directe via override des attributs ModelParameters  
-    override_params = {
-        # Paramètres de grille (attributs directs)
-        'N': 200,
-        'xmin': 0.0, 
-        'xmax': 1000.0,
-        
-        # Paramètres temporels (attributs directs)
-        't_final': 10.0,       
-        'output_dt': 1.0,      
-        'cfl_number': 0.4,     # CFL strict pour WENO5+SSP-RK3 
-        
-        # Schémas numériques (attributs directs)
-        'spatial_scheme': 'weno5',
-        'time_scheme': 'ssprk3'
-    }
-    
-    print(f"📋 Configuration: {override_params}")
+    print("📋 Configuration: scenario_gpu_validation.yml (corrigée)")
+    print("   - Domaine: 1000m, N=200, dx=5.0m")
+    print("   - Temps: 10s, dt_output=1s")
+    print("   - CFL: 0.4 (strict WENO5+SSP-RK3)")
+    print("   - Schémas: WENO5 + SSP-RK3")
     print("")
     
     # ========== SIMULATION CPU (RÉFÉRENCE) ==========
@@ -48,9 +35,8 @@ def run_final_gpu_cpu_validation():
     try:
         runner_cpu = SimulationRunner(
             'config/scenario_gpu_validation.yml',
-            override_params=override_params,
             device='cpu',
-            quiet=False  # Permettre de voir les messages d'override
+            quiet=False
         )
         
         times_cpu, states_cpu = runner_cpu.run()
@@ -80,7 +66,6 @@ def run_final_gpu_cpu_validation():
     try:
         runner_gpu = SimulationRunner(
             'config/scenario_gpu_validation.yml',
-            override_params=override_params,
             device='gpu',
             quiet=True
         )

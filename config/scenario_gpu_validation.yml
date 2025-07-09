@@ -9,18 +9,24 @@ num_classes: 2
 # Configuration spatiale pour tests GPU
 spatial:
   N: 200
-  L: 10.0
+  L: 1000.0  # Domaine total [m] 
+  xmin: 0.0  # Début du domaine [m]
+  xmax: 1000.0  # Fin du domaine [m]
   ghost_cells: 3
   boundary_conditions: "periodic"
 
 # Configuration temporelle 
 temporal:
-  T_final: 1.0
+  T_final: 10.0  # Temps total de simulation [s]
+  t_final_sec: 10.0  # Alias pour compatibilité
+  output_dt_sec: 1.0  # Intervalle de sortie [s]
   CFL: 0.4
   time_scheme: "ssp_rk3"  # Pour tests GPU
 
 # CORRECTION CFL - Assurer compatibilité avec le système existant
 cfl_number: 0.4  # ⚠️ CORRECTION: Paramètre utilisé par le système de calcul CFL
+t_final: 10.0    # Paramètre attendu par le système
+output_dt: 1.0   # Paramètre attendu par le système
 
 # Configuration numérique
 numerics:
