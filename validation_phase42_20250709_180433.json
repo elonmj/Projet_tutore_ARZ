@@ -1,0 +1,21 @@
+{
+  "timestamp": "20250709_180433",
+  "phase": "4.2",
+  "test": "ssprk3_gpu_validation",
+  "cpu_success": true,
+  "gpu_success": false,
+  "comparison_success": false,
+  "cpu_duration": 64.068959,
+  "gpu_duration": null,
+  "speedup": null,
+  "error_max": null,
+  "error_mean": null,
+  "precision_status": "\u00c9CHEC",
+  "order_status": "NON TEST\u00c9",
+  "global_status": "\u274c \u00c9CHEC",
+  "improvements_vs_phase41": {
+    "phase41_error": 0.0089,
+    "phase42_error": null,
+    "improvement_factor": null
+  }
+}

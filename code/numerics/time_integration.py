@@ -10,6 +10,15 @@ from . import boundary_conditions
 from .reconstruction.weno import reconstruct_weno5
 from .reconstruction.converter import conserved_to_primitives_arr, primitives_to_conserved_arr
 
+# Import GPU implementations
+try:
+    from .gpu.weno_cuda import reconstruct_weno5_gpu_naive, reconstruct_weno5_gpu_optimized
+    from .gpu.ssp_rk3_cuda import SSP_RK3_GPU, integrate_ssp_rk3_gpu
+    GPU_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: GPU implementations not available: {e}")
+    GPU_AVAILABLE = False
+
 # --- WENO-Based Spatial Discretization ---
 
 def calculate_spatial_discretization_weno(U: np.ndarray, grid: Grid1D, params: ModelParameters) -> np.ndarray:
@@ -368,607 +377,6 @@ def solve_ode_step_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_ode: float, gr
     return d_U_out
 
 
-# --- Helper for Hyperbolic Step ---
-
-def solve_hyperbolic_step_cpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
-    """
-    Solves the hyperbolic part dU/dt + dF/dx = 0 using FVM with CU flux on the CPU.
-    Uses first-order Euler forward in time.
-
-    Args:
-        U_in (np.ndarray): Input state array (including ghost cells). Shape (4, N_total).
-        dt_hyp (float): Time step for the hyperbolic update.
-        grid (Grid1D): Grid object.
-        params (ModelParameters): Model parameters.
-
-    Returns:
-        np.ndarray: Output state array after the hyperbolic step. Shape (4, N_total).
-                     Note: Ghost cells are copied from U_in, only physical cells are updated.
-    """
-    U_out = np.copy(U_in) # Start with input, ghost cells won't be updated by flux diff
-    fluxes = np.zeros((4, grid.N_total)) # Store fluxes at interfaces j-1/2
-
-    # Calculate fluxes at interfaces j+1/2 (between cell j and j+1).
-    # We need N_total+1 interfaces if we consider interfaces outside the domain,
-    # but for updating N_physical cells from j=g to j=g+N-1, we need
-    # fluxes F_{g-1/2} to F_{g+N-1/2}.
-    # F_{j+1/2} is calculated using U_j and U_{j+1}.
-    # F_{j+1/2} is stored in fluxes[:, j].
-    # We need j from g-1 to g+N-1.
-    # The loop range should cover indices j such that both U_in[:, j] and U_in[:, j+1] are valid.
-    # Loop from j = g-1 to g+N-1. Max index accessed in U_in is (g+N-1)+1 = g+N (first right ghost cell).
-    g = grid.num_ghost_cells
-    N = grid.N_physical
-    for j in range(g - 1, g + N): # Calculate fluxes F_{j+1/2} for j=g-1..g+N-1
-        U_L = U_in[:, j]
-        U_R = U_in[:, j + 1]
-        fluxes[:, j] = riemann_solvers.central_upwind_flux(U_L, U_R, params)
-    # Update physical cells using flux differences
-    # Update cell j using F_{j+1/2} - F_{j-1/2}
-    # Physical cell indices run from g to N_phys+g-1
-    # Flux indices F_{j+1/2} correspond to fluxes[:, j] in our loop above
-    for j in range(grid.num_ghost_cells, grid.num_ghost_cells + grid.N_physical):
-        flux_right = fluxes[:, j]     # F_{j+1/2}
-        flux_left = fluxes[:, j - 1] # F_{j-1/2}
-        U_out[:, j] = U_in[:, j] - (dt_hyp / grid.dx) * (flux_right - flux_left)
-
-    # Check for negative densities *before* applying the floor
-    neg_rho_m_indices = np.where(U_out[0, :] < 0)[0]
-    neg_rho_c_indices = np.where(U_out[2, :] < 0)[0]
-
-    if len(neg_rho_m_indices) > 0:
-        print(f"Warning: Negative rho_m detected before floor in cells: {neg_rho_m_indices}. Applying floor.")
-    if len(neg_rho_c_indices) > 0:
-        print(f"Warning: Negative rho_c detected before floor in cells: {neg_rho_c_indices}. Applying floor.")
-
-
-    # Ensure densities remain non-negative after update
-    U_out[0, :] = np.maximum(U_out[0, :], params.epsilon) # rho_m
-    U_out[2, :] = np.maximum(U_out[2, :], params.epsilon) # rho_c
-
-    return U_out
-
-
-def solve_hyperbolic_step_weno_cpu(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
-    """
-    Résout l'étape hyperbolique dU/dt + dF/dx = 0 en utilisant la reconstruction WENO5.
-    Utilise Euler avant d'ordre 1 en temps (à remplacer par SSP-RK3).
-
-    Args:
-        U_in (np.ndarray): État d'entrée (4, N_total) incluant cellules fantômes
-        dt_hyp (float): Pas de temps hyperbolique
-        grid (Grid1D): Objet grille
-        params (ModelParameters): Paramètres du modèle
-
-    Returns:
-        np.ndarray: État mis à jour après l'étape hyperbolique
-    """
-    # Calcul de la discrétisation spatiale L(U) = -dF/dx avec WENO
-    L_U = calculate_spatial_discretization_weno(U_in, grid, params)
-    
-    # Mise à jour temporelle simple (Euler avant)
-    # dU/dt = L(U) => U^{n+1} = U^n + dt * L(U^n)
-    U_out = np.copy(U_in)
-    
-    # Mise à jour des cellules physiques seulement
-    g = grid.num_ghost_cells
-    N = grid.N_physical
-    for j in range(g, g + N):
-        U_out[:, j] = U_in[:, j] + dt_hyp * L_U[:, j]
-    
-    # Vérification des densités négatives avant application du plancher
-    neg_rho_m_indices = np.where(U_out[0, :] < 0)[0]
-    neg_rho_c_indices = np.where(U_out[2, :] < 0)[0]
-
-    if len(neg_rho_m_indices) > 0:
-        print(f"Warning: Negative rho_m detected in WENO step in cells: {neg_rho_m_indices}. Applying floor.")
-    if len(neg_rho_c_indices) > 0:
-        print(f"Warning: Negative rho_c detected in WENO step in cells: {neg_rho_c_indices}. Applying floor.")
-
-    # Application du plancher pour assurer la positivité des densités
-    U_out[0, :] = np.maximum(U_out[0, :], params.epsilon)  # rho_m
-    U_out[2, :] = np.maximum(U_out[2, :], params.epsilon)  # rho_c
-
-    return U_out
-
-
-# --- SSP-RK3 Time Integration ---
-
-def solve_hyperbolic_step_ssprk3(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
-    """
-    Résout l'étape hyperbolique dU/dt + dF/dx = 0 en utilisant WENO5 + SSP-RK3.
-    
-    Le schéma SSP-RK3 (Strong Stability Preserving Runge-Kutta d'ordre 3) est :
-    U^{(1)} = U^n + dt * L(U^n)
-    U^{(2)} = 3/4 * U^n + 1/4 * U^{(1)} + 1/4 * dt * L(U^{(1)})
-    U^{n+1} = 1/3 * U^n + 2/3 * U^{(2)} + 2/3 * dt * L(U^{(2)})
-    
-    où L(U) = -dF/dx est la discrétisation spatiale WENO.
-
-    Args:
-        U_in (np.ndarray): État d'entrée (4, N_total)
-        dt_hyp (float): Pas de temps hyperbolique
-        grid (Grid1D): Objet grille
-        params (ModelParameters): Paramètres du modèle
-
-    Returns:
-        np.ndarray: État mis à jour après SSP-RK3
-    """
-    # --- Étape 1 : U^{(1)} = U^n + dt * L(U^n) ---
-    L_U_n = calculate_spatial_discretization_weno(U_in, grid, params)
-    U_1 = apply_temporal_update(U_in, L_U_n, dt_hyp, grid, params)
-    
-    # --- Étape 2 : U^{(2)} = 3/4 * U^n + 1/4 * U^{(1)} + 1/4 * dt * L(U^{(1)}) ---
-    L_U_1 = calculate_spatial_discretization_weno(U_1, grid, params)
-    U_2 = np.copy(U_in)
-    g, N = grid.num_ghost_cells, grid.N_physical
-    
-    for j in range(g, g + N):  # Cellules physiques seulement
-        U_2[:, j] = (3.0/4.0) * U_in[:, j] + (1.0/4.0) * U_1[:, j] + (1.0/4.0) * dt_hyp * L_U_1[:, j]
-    
-    # Application du plancher après l'étape 2
-    U_2[0, :] = np.maximum(U_2[0, :], params.epsilon)  # rho_m
-    U_2[2, :] = np.maximum(U_2[2, :], params.epsilon)  # rho_c
-    
-    # --- Étape 3 : U^{n+1} = 1/3 * U^n + 2/3 * U^{(2)} + 2/3 * dt * L(U^{(2)}) ---
-    L_U_2 = calculate_spatial_discretization_weno(U_2, grid, params)
-    U_out = np.copy(U_in)
-    
-    for j in range(g, g + N):  # Cellules physiques seulement
-        U_out[:, j] = (1.0/3.0) * U_in[:, j] + (2.0/3.0) * U_2[:, j] + (2.0/3.0) * dt_hyp * L_U_2[:, j]
-    
-    # Vérification des densités négatives
-    neg_rho_m_indices = np.where(U_out[0, :] < 0)[0]
-    neg_rho_c_indices = np.where(U_out[2, :] < 0)[0]
-
-    if len(neg_rho_m_indices) > 0:
-        print(f"Warning: Negative rho_m detected in SSP-RK3 step in cells: {neg_rho_m_indices}. Applying floor.")
-    if len(neg_rho_c_indices) > 0:
-        print(f"Warning: Negative rho_c detected in SSP-RK3 step in cells: {neg_rho_c_indices}. Applying floor.")
-
-    # Application du plancher final
-    U_out[0, :] = np.maximum(U_out[0, :], params.epsilon)  # rho_m
-    U_out[2, :] = np.maximum(U_out[2, :], params.epsilon)  # rho_c
-
-    return U_out
-
-def apply_temporal_update(U_in: np.ndarray, L_U: np.ndarray, dt: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
-    """
-    Applique la mise à jour temporelle U_out = U_in + dt * L_U avec plancher de densité.
-    
-    Args:
-        U_in (np.ndarray): État d'entrée
-        L_U (np.ndarray): Discrétisation spatiale L(U)
-        dt (float): Pas de temps
-        grid (Grid1D): Objet grille
-        params (ModelParameters): Paramètres du modèle
-        
-    Returns:
-        np.ndarray: État mis à jour
-    """
-    U_out = np.copy(U_in)
-    g, N = grid.num_ghost_cells, grid.N_physical
-    
-    for j in range(g, g + N):  # Cellules physiques seulement
-        U_out[:, j] = U_in[:, j] + dt * L_U[:, j]
-    
-    # Application du plancher
-    U_out[0, :] = np.maximum(U_out[0, :], params.epsilon)  # rho_m
-    U_out[2, :] = np.maximum(U_out[2, :], params.epsilon)  # rho_c
-    
-    return U_out
-
-
-# --- New CUDA Kernel for ODE Step ---
-@cuda.jit
-def _ode_step_kernel(U_in, U_out, dt_ode, R_local_arr, N_physical, num_ghost_cells,
-                     # Pass necessary parameters explicitly
-                     alpha, rho_jam, K_m, gamma_m, K_c, gamma_c, # Pressure
-                     rho_jam_eq, V_creeping, # Equilibrium Speed base params
-                     v_max_m_cat1, v_max_m_cat2, v_max_m_cat3, # Motorcycle Vmax per category
-                     v_max_c_cat1, v_max_c_cat2, v_max_c_cat3, # Car Vmax per category
-                     tau_relax_m, tau_relax_c, # Relaxation times
-                     epsilon):
-    """
-    CUDA kernel for explicit Euler step for the ODE source term.
-    Updates U_out based on U_in and the source term S(U_in).
-    Operates only on physical cells.
-    """
-    idx = cuda.grid(1) # Global thread index
-
-    # Check if index is within the range of physical cells
-    if idx < N_physical:
-        j_phys = idx
-        j_total = j_phys + num_ghost_cells # Index in the full U array (including ghosts)
-
-        # --- 1. Get local state and road quality ---
-        # Read state variables directly into scalars (potential register allocation)
-        y0 = U_in[0, j_total]
-        y1 = U_in[1, j_total]
-        y2 = U_in[2, j_total]
-        y3 = U_in[3, j_total]
-        # Note: Access U_in[i, j_total] is likely non-coalesced. Consider transposing U_in/U_out later.
-
-        # Road quality for this physical cell
-        # Assumes R_local_arr is the array of road qualities for physical cells
-        R_local = R_local_arr[j_phys]
-
-        # --- 2. Calculate intermediate values (Equilibrium speeds, Relaxation times) ---
-        # These calculations need to be done per-cell within the kernel
-        rho_m_calc = max(y0, 0.0)
-        rho_c_calc = max(y2, 0.0)
-
-        # Assume physics functions have @cuda.jit(device=True) versions
-        Ve_m, Ve_c = physics.calculate_equilibrium_speed_gpu(
-            rho_m_calc, rho_c_calc, R_local,
-            rho_jam_eq, V_creeping, # Pass base params for eq speed
-            v_max_m_cat1, v_max_m_cat2, v_max_m_cat3, # Pass category-specific Vmax
-            v_max_c_cat1, v_max_c_cat2, v_max_c_cat3
-        )
-        tau_m, tau_c = physics.calculate_relaxation_time_gpu(
-            rho_m_calc, rho_c_calc, # Pass densities (might be used in future)
-            tau_relax_m, tau_relax_c # Pass base relaxation times
-        )
-
-        # --- 3. Calculate source term S(U) ---
-        # Assume physics.calculate_source_term_gpu has a @cuda.jit(device=True) version
-        # Create a tuple or temporary array if the device function expects an array-like input
-        # If it accepts scalars, pass them directly. Assuming it needs array-like:
-        y_temp = (y0, y1, y2, y3) # Pass as a tuple
-        source = physics.calculate_source_term_gpu(
-            y_temp, alpha, rho_jam, K_m, gamma_m, K_c, gamma_c,
-            Ve_m, Ve_c, tau_m, tau_c, epsilon
-        )
-
-        # --- 4. Apply Explicit Euler step ---
-        # Update the output array directly at the correct total index
-        # Note: Access U_out[i, j_total] is likely non-coalesced.
-        U_out[0, j_total] = y0 + dt_ode * source[0]
-        U_out[1, j_total] = y1 + dt_ode * source[1]
-        U_out[2, j_total] = y2 + dt_ode * source[2]
-        U_out[3, j_total] = y3 + dt_ode * source[3]
-
-# --- New GPU Wrapper Function for ODE Step ---
-def solve_ode_step_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_ode: float, grid: Grid1D, params: ModelParameters, d_R: cuda.devicearray.DeviceNDArray) -> cuda.devicearray.DeviceNDArray:
-    """
-    Solves the ODE system dU/dt = S(U) using an explicit Euler step on the GPU.
-    Operates entirely on GPU arrays.
-
-    Args:
-        d_U_in (cuda.devicearray.DeviceNDArray): Input state device array (including ghost cells). Shape (4, N_total).
-        dt_ode (float): Time step for the ODE integration.
-        grid (Grid1D): Grid object (used for N_physical, num_ghost_cells).
-        params (ModelParameters): Model parameters.
-        d_R (cuda.devicearray.DeviceNDArray): Road quality device array (physical cells only). Shape (N_physical,).
-
-    Returns:
-        cuda.devicearray.DeviceNDArray: Output state device array after the ODE step. Shape (4, N_total).
-    """
-    # Road quality check is implicitly handled by requiring d_R
-    if d_R is None or not cuda.is_cuda_array(d_R):
-         raise ValueError("Valid GPU road quality array d_R must be provided for GPU ODE step.")
-    if not hasattr(physics, 'calculate_source_term_gpu') or \
-       not hasattr(physics, 'calculate_equilibrium_speed_gpu') or \
-       not hasattr(physics, 'calculate_relaxation_time_gpu'):
-        raise NotImplementedError("GPU versions (_gpu suffix) of required physics functions are not available in the physics module.")
-
-    # --- Extract category-specific Vmax values ---
-    # Assuming categories 1, 2, 3 exist. Add error handling or defaults if needed.
-    try:
-        v_max_m_cat1 = params.Vmax_m[1]
-        v_max_m_cat2 = params.Vmax_m.get(2, params.Vmax_m[1]) # Default cat 2 to 1 if missing
-        v_max_m_cat3 = params.Vmax_m.get(3, params.Vmax_m[1]) # Default cat 3 to 1 if missing
-
-        v_max_c_cat1 = params.Vmax_c[1]
-        v_max_c_cat2 = params.Vmax_c.get(2, params.Vmax_c[1]) # Default cat 2 to 1 if missing
-        v_max_c_cat3 = params.Vmax_c.get(3, params.Vmax_c[1]) # Default cat 3 to 1 if missing
-    except KeyError as e:
-        raise ValueError(f"Missing required Vmax for category {e} in parameters (Vmax_m/Vmax_c dictionaries)") from e
-    except AttributeError as e:
-         raise AttributeError(f"Could not find Vmax_m or Vmax_c dictionaries in parameters object: {e}") from e
-
-
-    # --- 1. Allocate output array on GPU ---
-    # Note: We don't need to initialize with d_U_in because the kernel only updates
-    # physical cells. Ghost cells will be updated by the boundary condition kernel later.
-    # However, allocating like d_U_in ensures the same shape and dtype.
-    d_U_out = cuda.device_array_like(d_U_in)
-    # Explicitly copy ghost cells from input to output *before* kernel launch
-    # This ensures they are preserved if the kernel doesn't touch them (which it shouldn't)
-    # and are correct if the subsequent hyperbolic step needs them.
-    n_ghost = grid.num_ghost_cells
-    n_phys = grid.N_physical
-    d_U_out[:, :n_ghost] = d_U_in[:, :n_ghost]
-    d_U_out[:, n_ghost+n_phys:] = d_U_in[:, n_ghost+n_phys:]
-
-
-    # --- 2. Configure and launch kernel ---
-    threadsperblock = 256 # Typical value, can be tuned
-    blockspergrid = math.ceil(grid.N_physical / threadsperblock)
-
-    _ode_step_kernel[blockspergrid, threadsperblock](
-        d_U_in, d_U_out, dt_ode, d_R, grid.N_physical, grid.num_ghost_cells,
-        # Pass all necessary parameters explicitly from the params object
-        # Pressure params
-        params.alpha, params.rho_jam, params.K_m, params.gamma_m, params.K_c, params.gamma_c,
-        # Equilibrium speed params (base + extracted category Vmax)
-        params.rho_jam, params.V_creeping, # Note: rho_jam passed twice, once for pressure, once for eq speed
-        v_max_m_cat1, v_max_m_cat2, v_max_m_cat3,
-        v_max_c_cat1, v_max_c_cat2, v_max_c_cat3,
-        # Relaxation times
-        params.tau_m, params.tau_c,
-        # Epsilon
-        params.epsilon
-    )
-    # cuda.synchronize() # No sync needed here, let subsequent steps handle it
-
-    # --- 3. Return GPU array ---
-    # No copy back to host
-    return d_U_out
-
-
-# --- CUDA Kernel for Hyperbolic State Update ---
-
-@cuda.jit
-def _update_state_hyperbolic_cuda_kernel(U_in, fluxes, dt_hyp, dx, epsilon,
-                                         num_ghost_cells, N_physical, U_out):
-    """
-    CUDA kernel to update the state vector for physical cells using flux differences.
-    U_out = U_in - (dt/dx) * (F_{j+1/2} - F_{j-1/2})
-    Also applies density floor.
-    """
-    # Global thread index, maps to physical cell index
-    phys_idx = cuda.grid(1)
-
-    if phys_idx < N_physical:
-        # Calculate the corresponding index in the full U array (including ghost cells)
-        j = num_ghost_cells + phys_idx
-
-        # Flux indices F_{j+1/2} correspond to fluxes[:, j]
-        # Flux indices F_{j-1/2} correspond to fluxes[:, j-1]
-        flux_right_0 = fluxes[0, j]
-        flux_right_1 = fluxes[1, j]
-        flux_right_2 = fluxes[2, j]
-        flux_right_3 = fluxes[3, j]
-
-        flux_left_0 = fluxes[0, j - 1]
-        flux_left_1 = fluxes[1, j - 1]
-        flux_left_2 = fluxes[2, j - 1]
-        flux_left_3 = fluxes[3, j - 1]
-
-        # Update state variables
-        dt_dx = dt_hyp / dx
-        U_out_0 = U_in[0, j] - dt_dx * (flux_right_0 - flux_left_0)
-        U_out_1 = U_in[1, j] - dt_dx * (flux_right_1 - flux_left_1)
-        U_out_2 = U_in[2, j] - dt_dx * (flux_right_2 - flux_left_2)
-        U_out_3 = U_in[3, j] - dt_dx * (flux_right_3 - flux_left_3)
-
-        # Apply density floor (ensure non-negative densities)
-        U_out[0, j] = max(U_out_0, epsilon) # rho_m
-        U_out[1, j] = U_out_1             # w_m
-        U_out[2, j] = max(U_out_2, epsilon) # rho_c
-        U_out[3, j] = U_out_3             # w_c
-
-
-# --- GPU Hyperbolic Step Implementation ---
-
-def solve_hyperbolic_step_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
-    """
-    Solves the hyperbolic part dU/dt + dF/dx = 0 using FVM with CU flux on the GPU.
-    Uses first-order Euler forward in time. Operates entirely on GPU arrays.
-
-    Args:
-        d_U_in (cuda.devicearray.DeviceNDArray): Input state device array (including ghost cells). Shape (4, N_total).
-        dt_hyp (float): Time step for the hyperbolic update.
-        grid (Grid1D): Grid object.
-        params (ModelParameters): Model parameters.
-
-    Returns:
-        cuda.devicearray.DeviceNDArray: Output state device array after the hyperbolic step. Shape (4, N_total).
-    """
-    # --- 1. Allocate output array on GPU ---
-    d_U_out = cuda.device_array_like(d_U_in)
-    # Explicitly copy ghost cells from input to output *before* kernel launch
-    # This ensures they are preserved if the kernel doesn't touch them (which it shouldn't)
-    # and are correct if the subsequent boundary condition step needs them.
-    n_ghost = grid.num_ghost_cells
-    n_phys = grid.N_physical
-    d_U_out[:, :n_ghost] = d_U_in[:, :n_ghost]
-    d_U_out[:, n_ghost+n_phys:] = d_U_in[:, n_ghost+n_phys:]
-
-
-    # --- 2. Calculate fluxes on the GPU ---
-    # NOTE: riemann_solvers.central_upwind_flux_gpu needs modification
-    #       to accept d_U_in and return d_fluxes (GPU array).
-    try:
-        d_fluxes = riemann_solvers.central_upwind_flux_gpu(d_U_in, params)
-    except TypeError as e:
-         # Catch potential error if central_upwind_flux_gpu hasn't been updated yet
-         if "CUDA device array" in str(e):
-              raise TypeError("solve_hyperbolic_step_gpu requires riemann_solvers.central_upwind_flux_gpu to accept GPU arrays.") from e
-         else:
-              raise e # Re-raise other TypeErrors
-
-    # --- 3. Configure and launch state update kernel ---
-    threadsperblock_update = 256 # Can be tuned
-    blockspergrid_update = (grid.N_physical + (threadsperblock_update - 1)) // threadsperblock_update
-
-    # Launch the state update kernel
-    _update_state_hyperbolic_cuda_kernel[blockspergrid_update, threadsperblock_update](
-        d_U_in, d_fluxes, dt_hyp, grid.dx, params.epsilon,
-        grid.num_ghost_cells, grid.N_physical, d_U_out
-    )
-
-    # cuda.synchronize() # No sync needed here
-
-    # --- 4. Return GPU array ---
-    # No copy back to host, no manual ghost cell copy needed here
-    # (Ghost cells were copied into d_U_out before the kernel)
-
-    # Optional: Add a debug flag to copy back and check NaNs if needed
-    # if params.debug_check_nan:
-    #     U_out_cpu = d_U_out.copy_to_host()
-    #     if np.isnan(U_out_cpu).any() or np.isinf(U_out_cpu).any():
-    #         print("Warning: NaN or Inf detected in GPU hyperbolic step output.")
-
-    return d_U_out
-
-
-# --- SSP-RK3 GPU Implementation ---
-
-def solve_hyperbolic_step_ssprk3_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
-    """
-    Version GPU de solve_hyperbolic_step_ssprk3() utilisant SSP-RK3 CUDA.
-    
-    Implémente le schéma Strong Stability Preserving Runge-Kutta 3:
-    U^{(1)} = U^n + dt * L(U^n)
-    U^{(2)} = 3/4 * U^n + 1/4 * U^{(1)} + 1/4 * dt * L(U^{(1)})
-    U^{n+1} = 1/3 * U^n + 2/3 * U^{(2)} + 2/3 * dt * L(U^{(2)})
-    
-    où L(U) = -dF/dx utilise la discrétisation spatiale GPU.
-
-    Args:
-        d_U_in (cuda.devicearray.DeviceNDArray): État d'entrée sur GPU (4, N_total)
-        dt_hyp (float): Pas de temps hyperbolique
-        grid (Grid1D): Objet grille
-        params (ModelParameters): Paramètres du modèle
-
-    Returns:
-        cuda.devicearray.DeviceNDArray: État mis à jour après SSP-RK3 sur GPU
-    """
-    try:
-        from .gpu.ssp_rk3_cuda import SSP_RK3_GPU
-    except ImportError:
-        raise ImportError("SSP-RK3 CUDA module not available. Please ensure code.numerics.gpu.ssp_rk3_cuda is properly implemented.")
-    
-    # Vérifications de base
-    if not cuda.is_cuda_array(d_U_in):
-        raise TypeError("d_U_in must be a CUDA device array")
-    
-    N_physical = grid.N_physical
-    N_total = grid.N_total
-    num_variables = 4  # rho_m, w_m, rho_c, w_c
-    
-    # Fonction pour calculer la discrétisation spatiale L(U) = -dF/dx
-    def compute_spatial_discretization_gpu(d_U_state, d_L_out):
-        """
-        Fonction de callback pour SSP_RK3_GPU qui calcule L(U) = -dF/dx.
-        
-        Args:
-            d_U_state: État sur GPU (N_physical, 4) - format attendu par SSP_RK3_GPU
-            d_L_out: Sortie L(U) sur GPU (N_physical, 4)
-        """
-        # Convertir le format (N_physical, 4) vers (4, N_total) avec cellules fantômes
-        d_U_extended = cuda.device_array((4, N_total), dtype=d_U_in.dtype)
-        
-        # Copier les cellules fantômes depuis l'état d'entrée original
-        n_ghost = grid.num_ghost_cells
-        d_U_extended[:, :n_ghost] = d_U_in[:, :n_ghost]  # Cellules fantômes gauches
-        d_U_extended[:, n_ghost+N_physical:] = d_U_in[:, n_ghost+N_physical:]  # Cellules fantômes droites
-        
-        # Copier les cellules physiques depuis d_U_state (transposer)
-        # d_U_state est (N_physical, 4), d_U_extended[:, n_ghost:n_ghost+N_physical] est (4, N_physical)
-        for i in range(N_physical):
-            for var in range(4):
-                d_U_extended[var, n_ghost + i] = d_U_state[i, var]
-        
-        # Appliquer les conditions aux limites
-        boundary_conditions.apply_boundary_conditions_gpu(d_U_extended, grid, params)
-        
-        # Calculer les flux avec la discrétisation spatiale existante
-        if params.spatial_scheme == 'first_order':
-            # Utiliser la méthode du premier ordre existante
-            d_fluxes = riemann_solvers.central_upwind_flux_gpu(d_U_extended, params)
-            
-            # Calculer la divergence des flux : L(U) = -dF/dx
-            threadsperblock = 256
-            blockspergrid = (N_physical + threadsperblock - 1) // threadsperblock
-            
-            _compute_flux_divergence_kernel[blockspergrid, threadsperblock](
-                d_U_extended, d_fluxes, dt_hyp, grid.dx, params.epsilon,
-                grid.num_ghost_cells, N_physical, d_L_out
-            )
-        else:
-            # Pour WENO5, utiliser calculate_spatial_discretization_weno_gpu (à implémenter)
-            raise NotImplementedError(f"GPU SSP-RK3 with spatial_scheme='{params.spatial_scheme}' not yet implemented. "
-                                    "Currently supports 'first_order' only.")
-    
-    # Préparer les données pour SSP_RK3_GPU
-    # Convertir d_U_in de (4, N_total) vers (N_physical, 4) pour les cellules physiques uniquement
-    d_U_physical = cuda.device_array((N_physical, num_variables), dtype=d_U_in.dtype)
-    n_ghost = grid.num_ghost_cells
-    
-    for i in range(N_physical):
-        for var in range(4):
-            d_U_physical[i, var] = d_U_in[var, n_ghost + i]
-    
-    # Créer l'intégrateur SSP-RK3 GPU
-    integrator = SSP_RK3_GPU(N_physical, num_variables)
-    
-    # Préparer la sortie
-    d_U_result = cuda.device_array_like(d_U_physical)
-    
-    # Effectuer l'intégration SSP-RK3
-    integrator.integrate_step(d_U_physical, d_U_result, dt_hyp, compute_spatial_discretization_gpu)
-    
-    # Convertir le résultat de (N_physical, 4) vers (4, N_total)
-    d_U_out = cuda.device_array_like(d_U_in)
-    
-    # Copier les cellules fantômes depuis l'entrée
-    d_U_out[:, :n_ghost] = d_U_in[:, :n_ghost]
-    d_U_out[:, n_ghost+N_physical:] = d_U_in[:, n_ghost+N_physical:]
-    
-    # Copier les cellules physiques depuis le résultat (transposer)
-    for i in range(N_physical):
-        for var in range(4):
-            d_U_out[var, n_ghost + i] = d_U_result[i, var]
-    
-    # Appliquer le plancher de densité
-    _apply_density_floor_kernel[blockspergrid, threadsperblock](
-        d_U_out, params.epsilon, grid.num_ghost_cells, N_physical
-    )
-    
-    # Nettoyer l'intégrateur
-    integrator.cleanup()
-    
-    return d_U_out
-
-
-@cuda.jit
-def _compute_flux_divergence_kernel(d_U, d_fluxes, dt, dx, epsilon, num_ghost_cells, N_physical, d_L_out):
-    """
-    Kernel CUDA pour calculer la divergence des flux L(U) = -dF/dx.
-    """
-    idx = cuda.grid(1)
-    
-    if idx < N_physical:
-        j = num_ghost_cells + idx  # Index global avec cellules fantômes
-        dt_dx = dt / dx
-        
-        for var in range(4):
-            # Flux à droite et à gauche de la cellule j
-            flux_right = d_fluxes[var, j]
-            flux_left = d_fluxes[var, j-1]
-            
-            # Divergence: -dF/dx = -(F_{j+1/2} - F_{j-1/2})/dx
-            d_L_out[idx, var] = -(flux_right - flux_left) / dx
-
-
-@cuda.jit
-def _apply_density_floor_kernel(d_U, epsilon, num_ghost_cells, N_physical):
-    """
-    Kernel CUDA pour appliquer le plancher de densité.
-    """
-    idx = cuda.grid(1)
-    
-    if idx < N_physical:
-        j = num_ghost_cells + idx
-        
-        # Appliquer le plancher pour les densités
-        d_U[0, j] = max(d_U[0, j], epsilon)  # rho_m
-        d_U[2, j] = max(d_U[2, j], epsilon)  # rho_c
-
-
 # --- Strang Splitting Step ---
 
 def strang_splitting_step(U_or_d_U_n, dt: float, grid: Grid1D, params: ModelParameters, d_R=None):
@@ -1005,9 +413,14 @@ def strang_splitting_step(U_or_d_U_n, dt: float, grid: Grid1D, params: ModelPara
             d_U_ss = solve_hyperbolic_step_gpu(d_U_star, dt, grid, params)
         elif params.spatial_scheme == 'first_order' and params.time_scheme == 'ssprk3':
             d_U_ss = solve_hyperbolic_step_ssprk3_gpu(d_U_star, dt, grid, params)
+        elif params.spatial_scheme == 'weno5' and params.time_scheme == 'euler':
+            d_U_ss = solve_hyperbolic_step_weno_gpu(d_U_star, dt, grid, params)
+        elif params.spatial_scheme == 'weno5' and params.time_scheme == 'ssprk3':
+            d_U_ss = solve_hyperbolic_step_ssprk3_gpu(d_U_star, dt, grid, params)
         else:
             raise ValueError(f"GPU device currently supports: "
-                           f"('first_order', 'euler') and ('first_order', 'ssprk3'). "
+                           f"('first_order', 'euler'), ('first_order', 'ssprk3'), "
+                           f"('weno5', 'euler'), ('weno5', 'ssprk3'). "
                            f"Requested: spatial_scheme='{params.spatial_scheme}', time_scheme='{params.time_scheme}'")
 
         # Step 3: Solve ODEs for dt/2
@@ -1050,3 +463,427 @@ def strang_splitting_step(U_or_d_U_n, dt: float, grid: Grid1D, params: ModelPara
 
     else:
         raise ValueError("Invalid device type in parameters. Expected 'cpu' or 'gpu'.")
+
+# --- SSP-RK3 Time Integration ---
+
+def solve_hyperbolic_step_ssprk3(U_in: np.ndarray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+    """
+    Résout l'étape hyperbolique dU/dt + dF/dx = 0 en utilisant le schéma SSP-RK3.
+    
+    Support les combinaisons:
+    - first_order + SSP-RK3 (via flux Central-Upwind)
+    - weno5 + SSP-RK3 (via WENO5 + SSP-RK3)
+    
+    Le schéma SSP-RK3 (Strong Stability Preserving Runge-Kutta d'ordre 3) est :
+    U^{(1)} = U^n + dt * L(U^n)
+    U^{(2)} = 3/4 * U^n + 1/4 * U^{(1)} + 1/4 * dt * L(U^{(1)})
+    U^{n+1} = 1/3 * U^n + 2/3 * U^{(2)} + 2/3 * dt * L(U^{(2)})
+    
+    où L(U) est la discrétisation spatiale selon params.spatial_scheme.
+
+    Args:
+        U_in (np.ndarray): État d'entrée (4, N_total)
+        dt_hyp (float): Pas de temps hyperbolique
+        grid (Grid1D): Objet grille
+        params (ModelParameters): Paramètres du modèle
+
+    Returns:
+        np.ndarray: État mis à jour après SSP-RK3
+    """
+    
+    # Choisir la fonction de discrétisation spatiale selon le schéma
+    if params.spatial_scheme == 'first_order':
+        compute_L = lambda U: -compute_flux_divergence_first_order(U, grid, params)
+    elif params.spatial_scheme == 'weno5':
+        compute_L = lambda U: calculate_spatial_discretization_weno(U, grid, params)
+    else:
+        raise ValueError(f"Unsupported spatial_scheme '{params.spatial_scheme}' for SSP-RK3")
+    
+    # --- Étape 1 : U^{(1)} = U^n + dt * L(U^n) ---
+    L_U_n = compute_L(U_in)
+    U_1 = apply_temporal_update_ssprk3(U_in, L_U_n, dt_hyp, grid, params)
+    
+    # --- Étape 2 : U^{(2)} = 3/4 * U^n + 1/4 * U^{(1)} + 1/4 * dt * L(U^{(1)}) ---
+    L_U_1 = compute_L(U_1)
+    U_2 = np.copy(U_in)
+    g, N = grid.num_ghost_cells, grid.N_physical
+    
+    for j in range(g, g + N):  # Cellules physiques seulement
+        U_2[:, j] = (3.0/4.0) * U_in[:, j] + (1.0/4.0) * U_1[:, j] + (1.0/4.0) * dt_hyp * L_U_1[:, j]
+    
+    # Application du plancher après l'étape 2
+    U_2[0, :] = np.maximum(U_2[0, :], params.epsilon)  # rho_m
+    U_2[2, :] = np.maximum(U_2[2, :], params.epsilon)  # rho_c
+    
+    # --- Étape 3 : U^{n+1} = 1/3 * U^n + 2/3 * U^{(2)} + 2/3 * dt * L(U^{(2)}) ---
+    L_U_2 = compute_L(U_2)
+    U_out = np.copy(U_in)
+    
+    for j in range(g, g + N):  # Cellules physiques seulement
+        U_out[:, j] = (1.0/3.0) * U_in[:, j] + (2.0/3.0) * U_2[:, j] + (2.0/3.0) * dt_hyp * L_U_2[:, j]
+    
+    # Vérification des densités négatives
+    neg_rho_m_indices = np.where(U_out[0, :] < 0)[0]
+    neg_rho_c_indices = np.where(U_out[2, :] < 0)[0]
+
+    if len(neg_rho_m_indices) > 0:
+        print(f"Warning: Negative rho_m detected in SSP-RK3 step in cells: {neg_rho_m_indices}. Applying floor.")
+    if len(neg_rho_c_indices) > 0:
+        print(f"Warning: Negative rho_c detected in SSP-RK3 step in cells: {neg_rho_c_indices}. Applying floor.")
+
+    # Application du plancher final
+    U_out[0, :] = np.maximum(U_out[0, :], params.epsilon)  # rho_m
+    U_out[2, :] = np.maximum(U_out[2, :], params.epsilon)  # rho_c
+
+    return U_out
+
+
+def apply_temporal_update_ssprk3(U_in: np.ndarray, L_U: np.ndarray, dt: float, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+    """
+    Applique la mise à jour temporelle U_out = U_in + dt * L_U avec plancher de densité pour SSP-RK3.
+    
+    Args:
+        U_in (np.ndarray): État d'entrée
+        L_U (np.ndarray): Discrétisation spatiale L(U)
+        dt (float): Pas de temps
+        grid (Grid1D): Objet grille
+        params (ModelParameters): Paramètres du modèle
+        
+    Returns:
+        np.ndarray: État mis à jour
+    """
+    U_out = np.copy(U_in)
+    g, N = grid.num_ghost_cells, grid.N_physical
+    
+    for j in range(g, g + N):  # Cellules physiques seulement
+        U_out[:, j] = U_in[:, j] + dt * L_U[:, j]
+    
+    # Application du plancher
+    U_out[0, :] = np.maximum(U_out[0, :], params.epsilon)  # rho_m
+    U_out[2, :] = np.maximum(U_out[2, :], params.epsilon)  # rho_c
+    
+    return U_out
+
+
+def compute_flux_divergence_first_order(U: np.ndarray, grid: Grid1D, params: ModelParameters) -> np.ndarray:
+    """
+    Calcule la divergence des flux -dF/dx pour le schéma du premier ordre.
+    
+    Args:
+        U (np.ndarray): État conservé (4, N_total)
+        grid (Grid1D): Objet grille
+        params (ModelParameters): Paramètres du modèle
+        
+    Returns:
+        np.ndarray: Divergence des flux dF/dx (4, N_total)
+    """
+    # Application des conditions aux limites
+    U_bc = np.copy(U)
+    boundary_conditions.apply_boundary_conditions(U_bc, grid, params)
+    
+    fluxes = np.zeros((4, grid.N_total))
+    g = grid.num_ghost_cells
+    N = grid.N_physical
+    
+    # Calcul des flux aux interfaces
+    for j in range(g - 1, g + N):  # F_{j+1/2} pour j=g-1..g+N-1
+        U_L = U_bc[:, j]
+        U_R = U_bc[:, j + 1]
+        fluxes[:, j] = riemann_solvers.central_upwind_flux(U_L, U_R, params)
+    
+    # Calcul de la divergence dF/dx
+    flux_div = np.zeros_like(U)
+    for j in range(g, g + N):  # Cellules physiques seulement
+        flux_right = fluxes[:, j]      # F_{j+1/2}
+        flux_left = fluxes[:, j - 1]   # F_{j-1/2}
+        flux_div[:, j] = (flux_right - flux_left) / grid.dx
+    
+    return flux_div
+
+
+# --- GPU WENO and SSP-RK3 Implementations ---
+
+def solve_hyperbolic_step_weno_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
+    """
+    Version GPU de solve_hyperbolic_step_weno_cpu() utilisant WENO5 + Euler.
+    
+    Args:
+        d_U_in (cuda.devicearray.DeviceNDArray): État d'entrée sur GPU (4, N_total)
+        dt_hyp (float): Pas de temps hyperbolique
+        grid (Grid1D): Objet grille
+        params (ModelParameters): Paramètres du modèle
+
+    Returns:
+        cuda.devicearray.DeviceNDArray: État mis à jour après WENO5 + Euler sur GPU
+    """
+    if not GPU_AVAILABLE:
+        raise RuntimeError("GPU WENO implementation not available. Check GPU imports.")
+    
+    if not cuda.is_cuda_array(d_U_in):
+        raise TypeError("d_U_in must be a CUDA device array")
+    
+    # Calcul de la discrétisation spatiale L(U) = -dF/dx avec WENO5 GPU
+    d_L_U = calculate_spatial_discretization_weno_gpu(d_U_in, grid, params)
+    
+    # Mise à jour temporelle Euler sur GPU
+    d_U_out = cuda.device_array_like(d_U_in)
+    
+    # Configuration des kernels
+    threadsperblock = 256
+    blockspergrid = (grid.N_physical + threadsperblock - 1) // threadsperblock
+    
+    # Kernel pour la mise à jour temporelle
+    _apply_euler_update_kernel[blockspergrid, threadsperblock](
+        d_U_in, d_L_U, d_U_out, dt_hyp, params.epsilon, 
+        grid.num_ghost_cells, grid.N_physical
+    )
+    
+    return d_U_out
+
+
+def solve_hyperbolic_step_ssprk3_gpu(d_U_in: cuda.devicearray.DeviceNDArray, dt_hyp: float, grid: Grid1D, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
+    """
+    Version GPU de solve_hyperbolic_step_ssprk3() utilisant les kernels CUDA existants.
+    
+    Support les combinaisons:
+    - first_order + SSP-RK3 (via flux Central-Upwind existant)
+    - weno5 + SSP-RK3 (via WENO5 GPU + SSP-RK3 GPU)
+    
+    Args:
+        d_U_in (cuda.devicearray.DeviceNDArray): État d'entrée sur GPU (4, N_total)
+        dt_hyp (float): Pas de temps hyperbolique
+        grid (Grid1D): Objet grille
+        params (ModelParameters): Paramètres du modèle
+
+    Returns:
+        cuda.devicearray.DeviceNDArray: État mis à jour après SSP-RK3 sur GPU
+    """
+    if not GPU_AVAILABLE:
+        raise RuntimeError("GPU SSP-RK3 implementation not available. Check GPU imports.")
+    
+    if not cuda.is_cuda_array(d_U_in):
+        raise TypeError("d_U_in must be a CUDA device array")
+    
+    N_physical = grid.N_physical
+    N_total = grid.N_total
+    num_variables = 4  # rho_m, w_m, rho_c, w_c
+    
+    # Fonction pour calculer la discrétisation spatiale L(U) = -dF/dx
+    def compute_spatial_discretization_gpu_callback(d_U_state, d_L_out):
+        """
+        Callback pour SSP_RK3_GPU qui calcule L(U) = -dF/dx.
+        
+        Args:
+            d_U_state: État sur GPU (N_physical, 4) - format attendu par SSP_RK3_GPU
+            d_L_out: Sortie L(U) sur GPU (N_physical, 4)
+        """
+        # Convertir le format (N_physical, 4) vers (4, N_total) avec cellules fantômes
+        d_U_extended = cuda.device_array((4, N_total), dtype=d_U_in.dtype)
+        
+        # Copier les cellules fantômes depuis l'état d'entrée original
+        n_ghost = grid.num_ghost_cells
+        d_U_extended[:, :n_ghost] = d_U_in[:, :n_ghost]  # Cellules fantômes gauches
+        d_U_extended[:, n_ghost+N_physical:] = d_U_in[:, n_ghost+N_physical:]  # Cellules fantômes droites
+        
+        # Copier les cellules physiques depuis d_U_state (transposer)
+        _transpose_physical_cells_kernel[
+            (N_physical + 255) // 256, 256
+        ](d_U_state, d_U_extended, n_ghost, N_physical)
+        
+        # Appliquer les conditions aux limites
+        boundary_conditions.apply_boundary_conditions_gpu(d_U_extended, grid, params)
+        
+        # Calculer la discrétisation spatiale selon le schéma choisi
+        if params.spatial_scheme == 'first_order':
+            # Utiliser la méthode du premier ordre existante
+            d_fluxes = riemann_solvers.central_upwind_flux_gpu(d_U_extended, params)
+            
+            # Calculer la divergence des flux : L(U) = -dF/dx
+            _compute_flux_divergence_kernel[
+                (N_physical + 255) // 256, 256
+            ](d_U_extended, d_fluxes, d_L_out, grid.dx, params.epsilon, n_ghost, N_physical)
+            
+        elif params.spatial_scheme == 'weno5':
+            # Utiliser WENO5 GPU
+            d_L_extended = calculate_spatial_discretization_weno_gpu(d_U_extended, grid, params)
+            
+            # Extraire les cellules physiques et transposer vers le format (N_physical, 4)
+            _extract_physical_cells_kernel[
+                (N_physical + 255) // 256, 256
+            ](d_L_extended, d_L_out, n_ghost, N_physical)
+        else:
+            raise ValueError(f"Unsupported spatial_scheme '{params.spatial_scheme}' for GPU SSP-RK3")
+    
+    # Préparer les données pour SSP_RK3_GPU
+    # Convertir d_U_in de (4, N_total) vers (N_physical, 4) pour les cellules physiques uniquement
+    d_U_physical = cuda.device_array((N_physical, num_variables), dtype=d_U_in.dtype)
+    n_ghost = grid.num_ghost_cells
+    
+    _extract_physical_cells_to_format_kernel[
+        (N_physical + 255) // 256, 256
+    ](d_U_in, d_U_physical, n_ghost, N_physical)
+    
+    # Créer l'intégrateur SSP-RK3 GPU
+    integrator = SSP_RK3_GPU(N_physical, num_variables)
+    
+    # Préparer la sortie
+    d_U_result = cuda.device_array_like(d_U_physical)
+    
+    # Effectuer l'intégration SSP-RK3
+    integrator.integrate_step(d_U_physical, d_U_result, dt_hyp, compute_spatial_discretization_gpu_callback)
+    
+    # Convertir le résultat de (N_physical, 4) vers (4, N_total)
+    d_U_out = cuda.device_array_like(d_U_in)
+    
+    # Copier les cellules fantômes depuis l'entrée
+    d_U_out[:, :n_ghost] = d_U_in[:, :n_ghost]
+    d_U_out[:, n_ghost+N_physical:] = d_U_in[:, n_ghost+N_physical:]
+    
+    # Copier les cellules physiques depuis le résultat (transposer)
+    _insert_physical_cells_from_format_kernel[
+        (N_physical + 255) // 256, 256
+    ](d_U_result, d_U_out, n_ghost, N_physical)
+    
+    # Appliquer le plancher de densité
+    _apply_density_floor_kernel[
+        (N_physical + 255) // 256, 256
+    ](d_U_out, params.epsilon, n_ghost, N_physical)
+    
+    # Nettoyer l'intégrateur
+    integrator.cleanup()
+    
+    return d_U_out
+
+
+def calculate_spatial_discretization_weno_gpu(d_U_in: cuda.devicearray.DeviceNDArray, grid: Grid1D, params: ModelParameters) -> cuda.devicearray.DeviceNDArray:
+    """
+    Version GPU de calculate_spatial_discretization_weno utilisant les kernels CUDA WENO5 existants.
+    
+    Args:
+        d_U_in (cuda.devicearray.DeviceNDArray): État conservé sur GPU (4, N_total)
+        grid (Grid1D): Objet grille
+        params (ModelParameters): Paramètres du modèle
+        
+    Returns:
+        cuda.devicearray.DeviceNDArray: L(U) = -dF/dx sur GPU (4, N_total)
+    """
+    if not GPU_AVAILABLE:
+        raise RuntimeError("GPU WENO implementation not available. Check GPU imports.")
+    
+    # Cette fonction utilisera les kernels WENO5 existants dans gpu/weno_cuda.py
+    # Pour l'instant, une implémentation simplifiée qui délègue aux fonctions existantes
+    
+    # Conversion temporaire vers CPU pour utiliser les fonctions WENO existantes
+    # TODO: Implémenter la version GPU complète avec les kernels existants
+    U_cpu = d_U_in.copy_to_host()
+    L_U_cpu = calculate_spatial_discretization_weno(U_cpu, grid, params)
+    d_L_U = cuda.to_device(L_U_cpu)
+    
+    return d_L_U
+
+
+# --- Kernels CUDA Helper Functions ---
+
+@cuda.jit
+def _apply_euler_update_kernel(d_U_in, d_L_U, d_U_out, dt, epsilon, num_ghost_cells, N_physical):
+    """
+    Kernel pour appliquer la mise à jour temporelle Euler : U_out = U_in + dt * L_U
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j = num_ghost_cells + idx
+        
+        for var in range(4):
+            d_U_out[var, j] = d_U_in[var, j] + dt * d_L_U[var, j]
+        
+        # Appliquer le plancher de densité
+        d_U_out[0, j] = max(d_U_out[0, j], epsilon)  # rho_m
+        d_U_out[2, j] = max(d_U_out[2, j], epsilon)  # rho_c
+
+
+@cuda.jit
+def _transpose_physical_cells_kernel(d_U_state, d_U_extended, n_ghost, N_physical):
+    """
+    Kernel pour transposer de (N_physical, 4) vers (4, N_physical) dans d_U_extended.
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j_extended = n_ghost + idx
+        for var in range(4):
+            d_U_extended[var, j_extended] = d_U_state[idx, var]
+
+
+@cuda.jit
+def _extract_physical_cells_kernel(d_L_extended, d_L_out, n_ghost, N_physical):
+    """
+    Kernel pour extraire les cellules physiques et transposer vers (N_physical, 4).
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j_extended = n_ghost + idx
+        for var in range(4):
+            d_L_out[idx, var] = d_L_extended[var, j_extended]
+
+
+@cuda.jit
+def _extract_physical_cells_to_format_kernel(d_U_in, d_U_physical, n_ghost, N_physical):
+    """
+    Kernel pour extraire les cellules physiques de (4, N_total) vers (N_physical, 4).
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j_in = n_ghost + idx
+        for var in range(4):
+            d_U_physical[idx, var] = d_U_in[var, j_in]
+
+
+@cuda.jit
+def _insert_physical_cells_from_format_kernel(d_U_result, d_U_out, n_ghost, N_physical):
+    """
+    Kernel pour insérer les cellules physiques de (N_physical, 4) vers (4, N_total).
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j_out = n_ghost + idx
+        for var in range(4):
+            d_U_out[var, j_out] = d_U_result[idx, var]
+
+
+@cuda.jit
+def _compute_flux_divergence_kernel(d_U, d_fluxes, d_L_out, dx, epsilon, num_ghost_cells, N_physical):
+    """
+    Kernel CUDA pour calculer la divergence des flux L(U) = -dF/dx.
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j = num_ghost_cells + idx  # Index global avec cellules fantômes
+        dx_inv = 1.0 / dx
+        
+        for var in range(4):
+            # Flux à droite et à gauche de la cellule j
+            flux_right = d_fluxes[var, j]       # F_{j+1/2}
+            flux_left = d_fluxes[var, j-1]      # F_{j-1/2}
+            
+            # Divergence: L(U) = -dF/dx = -(F_{j+1/2} - F_{j-1/2})/dx
+            d_L_out[idx, var] = -(flux_right - flux_left) * dx_inv
+
+
+@cuda.jit
+def _apply_density_floor_kernel(d_U, epsilon, num_ghost_cells, N_physical):
+    """
+    Kernel CUDA pour appliquer le plancher de densité.
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j = num_ghost_cells + idx
+        
+        # Appliquer le plancher pour les densités
+        d_U[0, j] = max(d_U[0, j], epsilon)  # rho_m
+        d_U[2, j] = max(d_U[2, j], epsilon)  # rho_c

@@ -65,6 +65,10 @@ class Grid1D:
 
         # Initialize road quality array for physical cells
         self.road_quality: np.ndarray | None = None # Shape (N_physical,)
+        
+        # GPU configuration for CUDA kernels
+        self.threads_per_block = 256
+        self.blocks_per_grid = (self.N_physical + self.threads_per_block - 1) // self.threads_per_block
 
     def load_road_quality(self, R_array: np.ndarray):
         """

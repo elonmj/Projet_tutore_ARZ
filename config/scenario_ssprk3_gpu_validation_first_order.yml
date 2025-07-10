@@ -1,0 +1,88 @@
+# Configuration pour la validation SSP-RK3 GPU vs CPU - Phase 4.2
+# Test de l'intégrateur temporel d'ordre 3 sur GPU avec schéma spatial premier ordre
+
+# Nom du scénario
+name: "ssprk3_gpu_validation_first_order"
+
+# === PARAMÈTRES COMPATIBLES (même structure que scenario_gpu_validation.yml) ===
+N: 200                    # Nombre de cellules
+xmin: 0.0                 # Début du domaine [m]
+xmax: 1000.0              # Fin du domaine [m]
+t_final: 10.0             # Temps final [s]
+output_dt: 1.0            # Intervalle de sortie [s]
+cfl_number: 0.4           # CFL conservateur pour SSP-RK3
+spatial_scheme: "first_order"   # *** Premier ordre pour compatibilité GPU ***
+time_scheme: "ssprk3"          # *** SSP-RK3 au lieu d'Euler ***
+
+# === CONDITIONS AUX LIMITES ===
+boundary_conditions:
+  left:
+    type: "periodic"
+  right:
+    type: "periodic"
+
+# === CONDITIONS INITIALES ===
+initial_conditions:
+  type: "sine_wave_perturbation"
+  background_state:
+    rho_m: 0.05           # Densité de fond motos [veh/m]
+    w_m: 12.0             # Momentum motos [m/s]
+    rho_c: 0.03           # Densité de fond voitures [veh/m]  
+    w_c: 18.0             # Momentum voitures [m/s]
+  perturbation:
+    amplitude: 0.1        # Amplitude perturbation
+    wave_number: 3.14     # Nombre d'onde [rad/m]
+  R_val: 1.0              # Qualité de route
+
+# === PARAMÈTRES PHYSIQUES ===
+# (Identiques à Phase 4.1 pour assurer la comparabilité)
+
+# Paramètres de pression (interaction entre classes)
+alpha: 0.5              # Coefficient d'interaction [-] (doit être [0,1))
+rho_jam: 2.0            # Densité de congestion [veh/m]
+
+# Vitesses maximales par catégorie de route
+Vmax_m:                 # Motos [km/h]
+  1: 5.0                # Route excellente  
+  2: 4.0                # Route bonne
+  3: 3.0                # Route dégradée
+
+Vmax_c:                 # Voitures [km/h]
+  1: 7.5                # Route excellente
+  2: 6.0                # Route bonne
+  3: 4.5                # Route dégradée
+
+# Paramètres de pression (selon Zhang et al. 2021)
+K_m: 5.0                # Coefficient K pour motos [km/h]
+gamma_m: 2.0            # Exposant gamma pour motos [-]
+K_c: 7.5                # Coefficient K pour voitures [km/h] 
+gamma_c: 2.0            # Exposant gamma pour voitures [-]
+
+# Vitesse de fluage (limite basse vitesse)
+V_creeping: 0.1         # Vitesse de fluage [m/s]
+
+# Temps de relaxation
+tau_m: 0.5              # Temps de relaxation motos [s]
+tau_c: 1.0              # Temps de relaxation voitures [s]
+
+# === PARAMÈTRES NUMÉRIQUES ===
+# Tolérance pour plancher de densité
+epsilon: 1e-10          # Densité minimale [veh/m]
+
+# Paramètres ODE
+ode_solver: "RK45"      # Solveur ODE
+ode_rtol: 1e-8          # Tolérance relative
+ode_atol: 1e-10         # Tolérance absolue
+
+# === PARAMÈTRES DE VALIDATION ===
+# Paramètres spécifiques à la validation GPU
+gpu_validation:
+  enabled: true
+  compare_with_cpu: true
+  precision_threshold: 1e-10
+  
+# === ROUTE ===
+# Qualité de route uniforme pour la validation
+road_quality:
+  type: "uniform"
+  value: 1
