@@ -1,0 +1,16 @@
+{
+  "timestamp": "20250714_144604",
+  "cpu_success": false,
+  "gpu_success": false,
+  "comparison_success": false,
+  "cpu_duration": null,
+  "gpu_duration": null,
+  "speedup": null,
+  "error_max": null,
+  "error_mean": null,
+  "status": "\u00c9CHEC",
+  "phase": "4.2",
+  "time_integrator": "ssprk3",
+  "spatial_scheme": "first_order",
+  "objective": "< 1e-10"
+}

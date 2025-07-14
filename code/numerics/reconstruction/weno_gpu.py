@@ -2,6 +2,7 @@ import numpy as np
 from numba import cuda
 import math
 from .converter import conserved_to_primitives_arr_gpu, primitives_to_conserved_arr_gpu
+from .converter import conserved_to_primitives_arr  # Import CPU version as fallback
 from .. import riemann_solvers
 from .. import boundary_conditions
 
@@ -271,3 +272,140 @@ def _central_upwind_flux_gpu_device(U_L, U_R, alpha, rho_jam, epsilon, K_m, gamm
         flux[i] = 0.5 * (U_L[i] + U_R[i])  # Placeholder
     
     return flux
+
+
+def calculate_spatial_discretization_weno_gpu_native(d_U_in, grid, params):
+    """
+    Implémentation GPU native complète de la discrétisation spatiale WENO5.
+    
+    Cette fonction orchestre :
+    1. Application des conditions aux limites
+    2. Conversion conservées → primitives 
+    3. Reconstruction WENO5 des variables primitives
+    4. Calcul des flux via le solveur de Riemann
+    5. Calcul de la divergence des flux L(U) = -dF/dx
+    
+    Args:
+        d_U_in: État conservé sur GPU (4, N_total)
+        grid: Objet grille
+        params: Paramètres du modèle
+        
+    Returns:
+        cuda.devicearray.DeviceNDArray: L(U) = -dF/dx sur GPU (4, N_total)
+    """
+    N_total = grid.N_total
+    N_physical = grid.N_physical
+    n_ghost = grid.num_ghost_cells
+    
+    # 0. Appliquer les conditions aux limites (utiliser la version CPU temporairement)
+    d_U_bc = cuda.device_array_like(d_U_in)
+    d_U_bc[:] = d_U_in[:]
+    
+    # Conversion temporaire pour les conditions aux limites
+    U_bc_cpu = d_U_bc.copy_to_host()
+    boundary_conditions.apply_boundary_conditions(U_bc_cpu, grid, params)
+    d_U_bc = cuda.to_device(U_bc_cpu)
+    
+    # 1. Conversion conservées → primitives (utiliser la version CPU temporairement)
+    U_bc_cpu = d_U_bc.copy_to_host()
+    P_cpu = conserved_to_primitives_arr(
+        U_bc_cpu, params.alpha, params.rho_jam, params.epsilon,
+        params.K_m, params.gamma_m, params.K_c, params.gamma_c
+    )
+    d_P = cuda.to_device(P_cpu)
+    
+    # 2. Reconstruction WENO5 pour chaque variable primitive
+    d_P_left = cuda.device_array_like(d_P)
+    d_P_right = cuda.device_array_like(d_P)
+    
+    # Configuration des kernels
+    threadsperblock = 256
+    blockspergrid = (N_total + threadsperblock - 1) // threadsperblock
+    
+    for var_idx in range(4):
+        weno5_reconstruction_kernel[blockspergrid, threadsperblock](
+            d_P[var_idx, :], d_P_left[var_idx, :], d_P_right[var_idx, :], 
+            N_total, params.epsilon
+        )
+    
+    # 3. Calcul des flux aux interfaces
+    d_fluxes = cuda.device_array((4, N_total), dtype=d_U_in.dtype)
+    
+    # Configuration pour les flux (N_physical + 1 interfaces)
+    n_interfaces = N_physical + 1
+    blockspergrid_flux = (n_interfaces + threadsperblock - 1) // threadsperblock
+    
+    _compute_weno_fluxes_kernel[blockspergrid_flux, threadsperblock](
+        d_P_left, d_P_right, d_fluxes, 
+        params.alpha, params.rho_jam, params.epsilon,
+        params.K_m, params.gamma_m, params.K_c, params.gamma_c,
+        n_ghost, N_physical
+    )
+    
+    # 4. Calcul de la divergence des flux L(U) = -dF/dx
+    d_L_U = cuda.device_array_like(d_U_in)
+    
+    blockspergrid_div = (N_physical + threadsperblock - 1) // threadsperblock
+    _compute_flux_divergence_weno_kernel[blockspergrid_div, threadsperblock](
+        d_fluxes, d_L_U, grid.dx, n_ghost, N_physical
+    )
+    
+    return d_L_U
+
+
+@cuda.jit
+def _compute_weno_fluxes_kernel(d_P_left, d_P_right, d_fluxes, 
+                               alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c,
+                               num_ghost_cells, N_physical):
+    """
+    Kernel pour calculer les flux WENO aux interfaces.
+    """
+    idx = cuda.grid(1)
+    N_interfaces = N_physical + 1
+    
+    if idx < N_interfaces:
+        j = num_ghost_cells - 1 + idx  # Interface j+1/2
+        
+        if j + 1 < d_P_left.shape[1]:
+            # Reconstruction à l'interface j+1/2
+            P_L = cuda.local.array(4, dtype=cuda.float64)
+            P_R = cuda.local.array(4, dtype=cuda.float64)
+            
+            P_L[0] = d_P_left[0, j+1]
+            P_L[1] = d_P_left[1, j+1] 
+            P_L[2] = d_P_left[2, j+1]
+            P_L[3] = d_P_left[3, j+1]
+            
+            P_R[0] = d_P_right[0, j]
+            P_R[1] = d_P_right[1, j]
+            P_R[2] = d_P_right[2, j]
+            P_R[3] = d_P_right[3, j]
+            
+            # Conversion primitives → conservées
+            U_L = _primitives_to_conserved_gpu_device(P_L, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c)
+            U_R = _primitives_to_conserved_gpu_device(P_R, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c)
+            
+            # Flux Central-Upwind (version device)
+            flux = _central_upwind_flux_gpu_device(U_L, U_R, alpha, rho_jam, epsilon, K_m, gamma_m, K_c, gamma_c)
+            
+            d_fluxes[0, j] = flux[0]
+            d_fluxes[1, j] = flux[1] 
+            d_fluxes[2, j] = flux[2]
+            d_fluxes[3, j] = flux[3]
+
+
+@cuda.jit
+def _compute_flux_divergence_weno_kernel(d_fluxes, d_L_U, dx, num_ghost_cells, N_physical):
+    """
+    Kernel pour calculer L(U) = -dF/dx.
+    """
+    idx = cuda.grid(1)
+    
+    if idx < N_physical:
+        j = num_ghost_cells + idx
+        dx_inv = 1.0 / dx
+        
+        for var in range(4):
+            flux_right = d_fluxes[var, j]      # F_{j+1/2}
+            flux_left = d_fluxes[var, j-1]     # F_{j-1/2}
+            d_L_U[var, j] = -(flux_right - flux_left) * dx_inv

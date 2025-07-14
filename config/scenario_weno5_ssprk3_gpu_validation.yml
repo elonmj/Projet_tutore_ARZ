@@ -1,0 +1,81 @@
+# Configuration pour la validation WENO5 + SSP-RK3 GPU vs CPU - Phase 4.3
+# Test de la combinaison complète WENO5 (ordre 5 spatial) + SSP-RK3 (ordre 3 temporel)
+
+# Nom du scénario
+name: "weno5_ssprk3_gpu_validation"
+
+# === PARAMÈTRES COMPATIBLES ===
+N: 200                    # Nombre de cellules
+xmin: 0.0                 # Début du domaine [m]
+xmax: 1000.0              # Fin du domaine [m]
+t_final: 10.0             # Temps final [s]
+output_dt: 1.0            # Intervalle de sortie [s]
+cfl_number: 0.3           # CFL plus strict pour WENO5 (ordre élevé)
+spatial_scheme: "weno5"        # *** WENO5 (ordre 5 spatial) ***
+time_scheme: "ssprk3"          # *** SSP-RK3 (ordre 3 temporel) ***
+
+# === CONDITIONS AUX LIMITES ===
+boundary_conditions:
+  left:
+    type: "periodic"
+  right:
+    type: "periodic"
+
+# === CONDITIONS INITIALES ===
+initial_conditions:
+  type: "sine_wave_perturbation"
+  background_state:
+    rho_m: 0.05           # Densité de fond motos [veh/m]
+    w_m: 12.0             # Momentum motos [m/s]
+    rho_c: 0.03           # Densité de fond voitures [veh/m]  
+    w_c: 18.0             # Momentum voitures [m/s]
+  perturbation:
+    amplitude: 0.1        # Amplitude perturbation
+    wave_number: 3.14     # Nombre d'onde [rad/m]
+  R_val: 1.0              # Qualité de route
+
+# === PARAMÈTRES PHYSIQUES ===
+# (Identiques aux phases précédentes pour assurer la comparabilité)
+
+# Paramètres de pression (interaction entre classes)
+alpha: 0.5              # Coefficient d'interaction [-] (doit être [0,1))
+rho_jam: 2.0            # Densité de congestion [veh/m]
+
+# Vitesses maximales par catégorie de route
+Vmax_m:                 # Motos [km/h]
+  1: 5.0                # Route excellente  
+  2: 4.0                # Route bonne
+  3: 3.0                # Route dégradée
+
+Vmax_c:                 # Voitures [km/h]
+  1: 4.0                # Route excellente
+  2: 3.0                # Route bonne  
+  3: 2.0                # Route dégradée
+
+# Paramètres de pression par classe
+K_m: 8.0                # Module de compressibilité motos [m²/s²]
+gamma_m: 2.0            # Exposant adiabatique motos [-]
+K_c: 6.0                # Module de compressibilité voitures [m²/s²]
+gamma_c: 2.0            # Exposant adiabatique voitures [-]
+
+# Vitesse de fluage et temps de relaxation
+V_creeping: 0.5         # Vitesse de fluage [km/h]
+tau_m: 2.0              # Temps de relaxation motos [s]
+tau_c: 3.0              # Temps de relaxation voitures [s]
+
+# === PARAMÈTRES NUMÉRIQUES ===
+epsilon: 1e-12          # Plancher numérique pour les densités
+
+# Paramètres WENO spécifiques
+weno_epsilon: 1e-6      # Paramètre de régularisation WENO
+
+# Solveur ODE (terme source)
+ode_solver: "RK45"      # Solveur adaptatif
+ode_rtol: 1e-8          # Tolérance relative
+ode_atol: 1e-10         # Tolérance absolue
+
+# === COMMENTAIRES DE VALIDATION ===
+# Cette configuration teste la combinaison complète:
+# - WENO5: Reconstruction d'ordre 5 (précision spatiale élevée, capture des discontinuités)
+# - SSP-RK3: Intégration temporelle d'ordre 3 (stabilité forte, grands pas de temps)
+# - Combinaison optimale pour: précision + stabilité + performance GPU

@@ -770,16 +770,18 @@ def calculate_spatial_discretization_weno_gpu(d_U_in: cuda.devicearray.DeviceNDA
     if not GPU_AVAILABLE:
         raise RuntimeError("GPU WENO implementation not available. Check GPU imports.")
     
-    # Cette fonction utilisera les kernels WENO5 existants dans gpu/weno_cuda.py
-    # Pour l'instant, une implémentation simplifiée qui délègue aux fonctions existantes
-    
-    # Conversion temporaire vers CPU pour utiliser les fonctions WENO existantes
-    # TODO: Implémenter la version GPU complète avec les kernels existants
-    U_cpu = d_U_in.copy_to_host()
-    L_U_cpu = calculate_spatial_discretization_weno(U_cpu, grid, params)
-    d_L_U = cuda.to_device(L_U_cpu)
-    
-    return d_L_U
+    # Utiliser l'implémentation GPU native complète
+    try:
+        from .reconstruction.weno_gpu import calculate_spatial_discretization_weno_gpu_native
+        d_L_U = calculate_spatial_discretization_weno_gpu_native(d_U_in, grid, params)
+        return d_L_U
+    except ImportError:
+        # Fallback temporaire si la fonction native n'existe pas encore
+        print("Warning: Using CPU fallback for WENO GPU calculation. Implementing native GPU version...")
+        U_cpu = d_U_in.copy_to_host()
+        L_U_cpu = calculate_spatial_discretization_weno(U_cpu, grid, params)
+        d_L_U = cuda.to_device(L_U_cpu)
+        return d_L_U
 
 
 # --- Kernels CUDA Helper Functions ---
